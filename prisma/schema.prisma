@@ -1,0 +1,68 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model AdminUser {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  createdAt DateTime @default(now())
+}
+
+model Source {
+  id        String   @id @default(cuid())
+  name      String
+  url       String   @unique
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Article {
+  id          String   @id @default(cuid())
+  title       String
+  description String
+  imageUrl    String?
+  articleUrl  String   @unique
+  sourceName  String
+  publishedAt DateTime
+  scrapedAt   DateTime @default(now())
+  selected    Boolean  @default(false)
+}
+
+model Template {
+  id        String   @id @default(cuid())
+  name      String
+  blocks    String   // JSON array of block objects
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Subscriber {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  firstName    String?
+  subscribedAt DateTime @default(now())
+  active       Boolean  @default(true)
+}
+
+model Setting {
+  id    String @id @default(cuid())
+  key   String @unique
+  value String
+}
+
+model NewsletterSend {
+  id         String   @id @default(cuid())
+  subject    String
+  htmlBody   String
+  sentAt     DateTime @default(now())
+  recipientCount Int  @default(0)
+  status     String   @default("sent")
+}

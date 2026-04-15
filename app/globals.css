@@ -1,0 +1,43 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+:root {
+  --brand-green: #166534;
+  --brand-green-light: #22c55e;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
+/* Prose styles for email preview */
+.email-preview img {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Block editor */
+.block-editor-item:hover .block-controls {
+  opacity: 1;
+}
+
+.block-controls {
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+/* Rich text editor toolbar */
+.toolbar-btn {
+  @apply px-2 py-1 text-sm rounded hover:bg-gray-100 font-mono;
+}
+
+.toolbar-btn.active {
+  @apply bg-gray-200;
+}
