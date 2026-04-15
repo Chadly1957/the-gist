@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifySessionToken } from "@/lib/auth";
+import { jwtVerify } from "jose";
 
-const ADMIN_PATHS = ["/admin"];
+// Use jose directly here — bcryptjs (imported by lib/auth) is not Edge-compatible
+const SECRET = new TextEncoder().encode(
+  process.env.JWT_SECRET || "dev-secret-change-in-production-32chars"
+);
+
 const PUBLIC_ADMIN_PATHS = ["/admin/login"];
 
 export async function middleware(req: NextRequest) {
@@ -23,7 +27,13 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  const session = await verifySessionToken(token);
+  let session = null;
+  try {
+    const { payload } = await jwtVerify(token, SECRET);
+    session = payload;
+  } catch {
+    // invalid or expired token
+  }
   if (!session) {
     const loginUrl = new URL("/admin/login", req.url);
     loginUrl.searchParams.set("from", pathname);

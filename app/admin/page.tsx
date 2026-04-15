@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 
+// Always render at request time — requires DB access, not available at build
+export const dynamic = "force-dynamic";
+
 async function getDashboardStats() {
   const [subscribers, sources, articles, lastSend] = await Promise.all([
     prisma.subscriber.count({ where: { active: true } }),
