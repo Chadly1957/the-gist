@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 
 export default function LandingPage() {
   const [email, setEmail] = useState("");
@@ -47,7 +48,12 @@ export default function LandingPage() {
               The Gist Decatur
             </span>
           </div>
-          <span className="text-sm text-gray-400 font-medium">Free newsletter</span>
+          <Link
+            href="/admin/login"
+            className="text-sm text-gray-400 hover:text-gray-600 font-medium transition-colors"
+          >
+            Admin
+          </Link>
         </div>
       </header>
 
