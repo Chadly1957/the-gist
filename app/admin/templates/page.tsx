@@ -128,7 +128,7 @@ export default function TemplatesPage() {
         </div>
         <div className="p-3 border-t border-gray-100">
           <button
-            onClick={createTemplate}
+            onClick={() => createTemplate()}
             className="w-full text-xs text-gray-500 hover:text-green-700 py-1.5 border border-dashed border-gray-200 rounded-lg hover:border-green-300 transition-colors"
           >
             + New template
