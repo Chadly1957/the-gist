@@ -20,19 +20,24 @@ export default function TemplatesPage() {
   const [preview, setPreview] = useState(false);
 
   async function fetchTemplates() {
-    const res = await fetch("/api/admin/templates");
-    const data = await res.json();
-    const tpls: Template[] = (data.templates || []).map(
-      (t: Template & { blocks: string }) => ({
-        ...t,
-        blocks: typeof t.blocks === "string" ? JSON.parse(t.blocks) : t.blocks,
-      })
-    );
-    setTemplates(tpls);
-    if (tpls.length > 0 && !selected) {
-      setSelected(tpls.find((t) => t.isDefault) || tpls[0]);
+    try {
+      const res = await fetch("/api/admin/templates");
+      const data = await res.json();
+      const tpls: Template[] = (data.templates || []).map(
+        (t: Template & { blocks: string }) => ({
+          ...t,
+          blocks: typeof t.blocks === "string" ? JSON.parse(t.blocks) : t.blocks,
+        })
+      );
+      setTemplates(tpls);
+      if (tpls.length > 0 && !selected) {
+        setSelected(tpls.find((t) => t.isDefault) || tpls[0]);
+      }
+    } catch {
+      // leave templates empty, show empty state
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }
 
   useEffect(() => {
@@ -55,13 +60,13 @@ export default function TemplatesPage() {
     setTimeout(() => setSaved(false), 3000);
   }
 
-  async function createTemplate() {
-    const name = prompt("Template name:");
-    if (!name) return;
+  async function createTemplate(name?: string) {
+    const templateName = name || prompt("Template name:");
+    if (!templateName) return;
     const res = await fetch("/api/admin/templates", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name }),
+      body: JSON.stringify({ name: templateName }),
     });
     const data = await res.json();
     await fetchTemplates();
@@ -132,6 +137,26 @@ export default function TemplatesPage() {
       </div>
 
       {/* Main: block editor */}
+      {!selected && !loading && (
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <div className="w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-4">
+              <svg className="w-8 h-8 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
+              </svg>
+            </div>
+            <h3 className="text-base font-semibold text-gray-800 mb-1">No templates yet</h3>
+            <p className="text-sm text-gray-400 mb-5">Create your first template to get started.</p>
+            <button
+              onClick={() => createTemplate("Default Newsletter")}
+              className="bg-green-700 hover:bg-green-800 text-white px-5 py-2.5 rounded-lg text-sm font-semibold transition-colors"
+            >
+              Create Default Template
+            </button>
+          </div>
+        </div>
+      )}
+
       {selected && (
         <div className="flex-1 flex flex-col overflow-hidden">
           {/* Toolbar */}
