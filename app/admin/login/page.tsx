@@ -33,7 +33,10 @@ function LoginForm() {
       const data = await res.json();
 
       if (res.ok) {
-        router.push(from);
+        // Navigate to compose (client component) to avoid a DB-heavy server render on redirect
+        const dest = from === "/admin/login" || from === "/admin" ? "/admin/compose" : from;
+        router.push(dest);
+        router.refresh();
       } else {
         setStatus("error");
         setError(data.error || "Invalid credentials.");
@@ -42,7 +45,7 @@ function LoginForm() {
       clearTimeout(timeout);
       setStatus("error");
       if (err instanceof Error && err.name === "AbortError") {
-        setError("Request timed out — the database may be waking up. Please try again in a moment.");
+        setError("Session may have been created — try navigating to /admin directly, or wait a moment and try again.");
       } else {
         setError("Connection error. Please try again.");
       }

@@ -5,13 +5,17 @@ import { prisma } from "@/lib/db";
 export const dynamic = "force-dynamic";
 
 async function getDashboardStats() {
-  const [subscribers, sources, articles, lastSend] = await Promise.all([
-    prisma.subscriber.count({ where: { active: true } }),
-    prisma.source.count({ where: { active: true } }),
-    prisma.article.count(),
-    prisma.newsletterSend.findFirst({ orderBy: { sentAt: "desc" } }),
-  ]);
-  return { subscribers, sources, articles, lastSend };
+  try {
+    const [subscribers, sources, articles, lastSend] = await Promise.all([
+      prisma.subscriber.count({ where: { active: true } }),
+      prisma.source.count({ where: { active: true } }),
+      prisma.article.count(),
+      prisma.newsletterSend.findFirst({ orderBy: { sentAt: "desc" } }),
+    ]);
+    return { subscribers, sources, articles, lastSend };
+  } catch {
+    return { subscribers: 0, sources: 0, articles: 0, lastSend: null };
+  }
 }
 
 export default async function AdminDashboard() {
