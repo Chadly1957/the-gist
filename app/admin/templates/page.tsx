@@ -15,13 +15,20 @@ export default function TemplatesPage() {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [selected, setSelected] = useState<Template | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [preview, setPreview] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [createError, setCreateError] = useState("");
+  const [showNewForm, setShowNewForm] = useState(false);
 
-  async function fetchTemplates() {
+  async function fetchTemplates(selectAfter?: string) {
+    setLoadError(false);
     try {
       const res = await fetch("/api/admin/templates");
+      if (!res.ok) throw new Error("Failed to load");
       const data = await res.json();
       const tpls: Template[] = (data.templates || []).map(
         (t: Template & { blocks: string }) => ({
@@ -30,11 +37,14 @@ export default function TemplatesPage() {
         })
       );
       setTemplates(tpls);
-      if (tpls.length > 0 && !selected) {
+      if (selectAfter) {
+        const match = tpls.find((t) => t.id === selectAfter);
+        if (match) setSelected(match);
+      } else if (tpls.length > 0 && !selected) {
         setSelected(tpls.find((t) => t.isDefault) || tpls[0]);
       }
     } catch {
-      // leave templates empty, show empty state
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -42,38 +52,51 @@ export default function TemplatesPage() {
 
   useEffect(() => {
     fetchTemplates();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function handleSave() {
     if (!selected) return;
     setSaving(true);
-    await fetch(`/api/admin/templates/${selected.id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name: selected.name,
-        blocks: JSON.stringify(selected.blocks),
-      }),
-    });
-    setSaving(false);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
+    try {
+      await fetch(`/api/admin/templates/${selected.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: selected.name,
+          blocks: JSON.stringify(selected.blocks),
+        }),
+      });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } finally {
+      setSaving(false);
+    }
   }
 
-  async function createTemplate(name?: string) {
-    const templateName = name || prompt("Template name:");
-    if (!templateName) return;
-    const res = await fetch("/api/admin/templates", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: templateName }),
-    });
-    const data = await res.json();
-    await fetchTemplates();
-    setSelected({
-      ...data.template,
-      blocks: JSON.parse(data.template.blocks),
-    });
+  async function handleCreate(name: string) {
+    if (!name.trim()) return;
+    setCreating(true);
+    setCreateError("");
+    try {
+      const res = await fetch("/api/admin/templates", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: name.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setCreateError(data.error || "Failed to create template.");
+        return;
+      }
+      setShowNewForm(false);
+      setNewName("");
+      await fetchTemplates(data.template.id);
+    } catch {
+      setCreateError("Connection error. Please try again.");
+    } finally {
+      setCreating(false);
+    }
   }
 
   const previewHtml = selected
@@ -98,12 +121,35 @@ export default function TemplatesPage() {
     : "";
 
   if (loading) {
-    return <div className="p-8 text-gray-400 text-sm">Loading templates…</div>;
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <div className="text-center">
+          <div className="w-8 h-8 border-2 border-green-600 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+          <p className="text-sm text-gray-400">Loading templates…</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <div className="text-center">
+          <p className="text-sm text-gray-500 mb-3">Could not load templates.</p>
+          <button
+            onClick={() => { setLoading(true); fetchTemplates(); }}
+            className="text-sm text-green-700 font-medium hover:underline"
+          >
+            Try again
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (
     <div className="flex h-screen overflow-hidden">
-      {/* Sidebar: template list */}
+      {/* Sidebar */}
       <div className="w-52 border-r border-gray-200 bg-white flex flex-col shrink-0">
         <div className="px-4 py-4 border-b border-gray-100">
           <h2 className="text-sm font-bold text-gray-800">Templates</h2>
@@ -126,18 +172,55 @@ export default function TemplatesPage() {
             </button>
           ))}
         </div>
+
+        {/* New template form */}
         <div className="p-3 border-t border-gray-100">
-          <button
-            onClick={() => createTemplate()}
-            className="w-full text-xs text-gray-500 hover:text-green-700 py-1.5 border border-dashed border-gray-200 rounded-lg hover:border-green-300 transition-colors"
-          >
-            + New template
-          </button>
+          {showNewForm ? (
+            <div className="space-y-2">
+              <input
+                autoFocus
+                type="text"
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleCreate(newName);
+                  if (e.key === "Escape") { setShowNewForm(false); setNewName(""); setCreateError(""); }
+                }}
+                placeholder="Template name…"
+                className="w-full px-2 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-green-500"
+              />
+              {createError && (
+                <p className="text-xs text-red-500">{createError}</p>
+              )}
+              <div className="flex gap-1">
+                <button
+                  onClick={() => handleCreate(newName)}
+                  disabled={creating || !newName.trim()}
+                  className="flex-1 text-xs bg-green-700 text-white py-1.5 rounded-lg font-medium disabled:opacity-50 hover:bg-green-800 transition-colors"
+                >
+                  {creating ? "Creating…" : "Create"}
+                </button>
+                <button
+                  onClick={() => { setShowNewForm(false); setNewName(""); setCreateError(""); }}
+                  className="flex-1 text-xs text-gray-500 py-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              onClick={() => setShowNewForm(true)}
+              className="w-full text-xs text-gray-500 hover:text-green-700 py-1.5 border border-dashed border-gray-200 rounded-lg hover:border-green-300 transition-colors"
+            >
+              + New template
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Main: block editor */}
-      {!selected && !loading && (
+      {/* Main area */}
+      {!selected && (
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center">
             <div className="w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-4">
@@ -148,11 +231,13 @@ export default function TemplatesPage() {
             <h3 className="text-base font-semibold text-gray-800 mb-1">No templates yet</h3>
             <p className="text-sm text-gray-400 mb-5">Create your first template to get started.</p>
             <button
-              onClick={() => createTemplate("Default Newsletter")}
-              className="bg-green-700 hover:bg-green-800 text-white px-5 py-2.5 rounded-lg text-sm font-semibold transition-colors"
+              onClick={() => handleCreate("Default Newsletter")}
+              disabled={creating}
+              className="bg-green-700 hover:bg-green-800 text-white px-5 py-2.5 rounded-lg text-sm font-semibold transition-colors disabled:opacity-60"
             >
-              Create Default Template
+              {creating ? "Creating…" : "Create Default Template"}
             </button>
+            {createError && <p className="text-sm text-red-500 mt-3">{createError}</p>}
           </div>
         </div>
       )}
@@ -161,15 +246,13 @@ export default function TemplatesPage() {
         <div className="flex-1 flex flex-col overflow-hidden">
           {/* Toolbar */}
           <div className="flex items-center justify-between px-6 py-3 border-b border-gray-200 bg-white shrink-0">
-            <div className="flex items-center gap-3">
-              <input
-                value={selected.name}
-                onChange={(e) =>
-                  setSelected((s) => s ? { ...s, name: e.target.value } : s)
-                }
-                className="font-semibold text-gray-800 text-sm bg-transparent border-0 focus:outline-none focus:border-b-2 focus:border-green-500"
-              />
-            </div>
+            <input
+              value={selected.name}
+              onChange={(e) =>
+                setSelected((s) => s ? { ...s, name: e.target.value } : s)
+              }
+              className="font-semibold text-gray-800 text-sm bg-transparent border-0 focus:outline-none focus:border-b-2 focus:border-green-500"
+            />
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setPreview(!preview)}
