@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { hashPassword } from "@/lib/auth";
 
+export const dynamic = "force-dynamic";
+
 // One-time setup endpoint — creates the admin user from env vars.
 // Self-disables once an admin user exists.
 export async function GET() {

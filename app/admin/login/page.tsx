@@ -19,12 +19,17 @@ function LoginForm() {
     setStatus("loading");
     setError("");
 
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 20000);
+
     try {
       const res = await fetch("/api/admin/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
+        signal: controller.signal,
       });
+      clearTimeout(timeout);
       const data = await res.json();
 
       if (res.ok) {
@@ -33,9 +38,14 @@ function LoginForm() {
         setStatus("error");
         setError(data.error || "Invalid credentials.");
       }
-    } catch {
+    } catch (err) {
+      clearTimeout(timeout);
       setStatus("error");
-      setError("Connection error. Please try again.");
+      if (err instanceof Error && err.name === "AbortError") {
+        setError("Request timed out — the database may be waking up. Please try again in a moment.");
+      } else {
+        setError("Connection error. Please try again.");
+      }
     }
   }
 
