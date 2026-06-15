@@ -107,7 +107,7 @@ function PortalContent() {
       const data = await res.json();
       if (res.ok) onSuccess(data.url);
       else setError(data.error || "Upload failed.");
-    } catch { setError("Upload failed."); }
+    } catch (_e) { setError("Upload failed."); }
     finally { setUploading(false); }
   }
 
@@ -123,7 +123,7 @@ function PortalContent() {
       const data = await res.json();
       if (res.ok) { setSSuccess(true); setProfile((p) => p ? { ...p, spotlights: [data.listing, ...p.spotlights] } : p); }
       else setSError(data.error || "Submission failed.");
-    } catch { setSError("Connection error."); }
+    } catch (_e) { setSError("Connection error."); }
     finally { setSSubmitting(false); }
   }
 
@@ -139,7 +139,7 @@ function PortalContent() {
       const data = await res.json();
       if (res.ok) { setBSuccess(true); setProfile((p) => p ? { ...p, bookings: [...p.bookings, data.booking] } : p); }
       else setBError(data.error || "Submission failed.");
-    } catch { setBError("Connection error."); }
+    } catch (_e) { setBError("Connection error."); }
     finally { setBSubmitting(false); }
   }
 
@@ -426,7 +426,7 @@ function PortalContent() {
                       Custom Intro Blurb <span className="font-normal text-gray-400">(optional)</span>
                     </label>
                     <textarea value={bForm.presentingBlurb} onChange={(e) => setBForm((f) => ({ ...f, presentingBlurb: e.target.value }))} rows={2}
-                      placeholder='e.g. "Today\'s Gist is brought to you by Decatur Coffee Co., your neighborhood spot for great coffee and community." Leave blank to use the default.'
+                      placeholder={`e.g. "Today's Gist is brought to you by Decatur Coffee Co., your neighborhood spot for great coffee and community." Leave blank to use the default.`}
                       className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none" />
                   </div>
                 )}
