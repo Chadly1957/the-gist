@@ -63,10 +63,16 @@ function renderText(content: Record<string, unknown>): string {
 
 function renderImage(content: Record<string, unknown>): string {
   if (!content.url) return "";
+  const pt = Number(content.paddingTop ?? 0);
+  const pr = Number(content.paddingRight ?? 0);
+  const pb = Number(content.paddingBottom ?? 0);
+  const pl = Number(content.paddingLeft ?? 0);
+  const hasNoPadding = pt === 0 && pr === 0 && pb === 0 && pl === 0;
+  const imgStyle = `max-width:100%;height:auto;display:block;${hasNoPadding ? "" : "border-radius:6px;"}`;
   return `
-    <div class="block image-block">
-      <img src="${content.url}" alt="${content.alt || ""}" />
-      ${content.caption ? `<p style="font-size:12px;color:#6b7280;margin-top:6px;font-family:sans-serif;">${content.caption}</p>` : ""}
+    <div style="padding:${pt}px ${pr}px ${pb}px ${pl}px;">
+      <img src="${content.url}" alt="${content.alt || ""}" style="${imgStyle}" />
+      ${content.caption ? `<p style="font-size:12px;color:#6b7280;margin:6px ${pl > 0 ? 0 : 4}px 0;font-family:sans-serif;">${content.caption}</p>` : ""}
     </div>`;
 }
 

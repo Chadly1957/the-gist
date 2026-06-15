@@ -32,7 +32,7 @@ export default function BlockEditor({ blocks, onChange }: BlockEditorProps) {
     const defaults: Record<Block["type"], Record<string, string>> = {
       header: { title: "The Gist Decatur", subtitle: "Your daily briefing", date: "{{DATE}}" },
       text: { html: "<p>Write your message here…</p>" },
-      image: { url: "", alt: "", caption: "" },
+      image: { url: "", alt: "", caption: "", paddingTop: "0", paddingRight: "0", paddingBottom: "0", paddingLeft: "0" },
       articles: { label: "Today's Top Stories" },
       divider: {},
       button: { label: "Read More", url: "https://" },
@@ -185,10 +185,15 @@ function BlockPreview({ block }: { block: Block }) {
           {block.content.caption && (
             <p className="text-xs text-gray-400 mt-1">{block.content.caption}</p>
           )}
+          {(block.content.paddingTop || block.content.paddingRight || block.content.paddingBottom || block.content.paddingLeft) && (
+            <p className="text-xs text-gray-400 mt-1">
+              Padding: {block.content.paddingTop || 0}px {block.content.paddingRight || 0}px {block.content.paddingBottom || 0}px {block.content.paddingLeft || 0}px
+            </p>
+          )}
         </div>
       ) : (
         <div className="h-16 bg-gray-100 rounded-lg flex items-center justify-center text-gray-400 text-xs">
-          No image URL set
+          No image set
         </div>
       );
     case "articles":
@@ -225,6 +230,128 @@ function BlockPreview({ block }: { block: Block }) {
     default:
       return null;
   }
+}
+
+function ImageBlockFields({
+  block,
+  onChange,
+}: {
+  block: Block;
+  onChange: (content: Record<string, string>) => void;
+}) {
+  const c = block.content;
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState("");
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    setUploadError("");
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/admin/upload", { method: "POST", body: fd });
+      const data = await res.json();
+      if (!res.ok) {
+        setUploadError(data.error || "Upload failed.");
+      } else {
+        onChange({ ...c, url: data.url });
+      }
+    } catch {
+      setUploadError("Upload failed. Check your connection.");
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Image source */}
+      <div>
+        <label className="block text-xs font-semibold text-gray-600 mb-1">Image</label>
+        <div className="flex gap-2">
+          <input
+            type="url"
+            value={c.url || ""}
+            onChange={(e) => onChange({ ...c, url: e.target.value })}
+            placeholder="https://example.com/image.jpg"
+            className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+          />
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            id={`upload-${block.id}`}
+            onChange={handleFileChange}
+          />
+          <label
+            htmlFor={`upload-${block.id}`}
+            className={`cursor-pointer flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors whitespace-nowrap ${uploading ? "opacity-60 pointer-events-none" : ""}`}
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+            </svg>
+            {uploading ? "Uploading…" : "Upload"}
+          </label>
+        </div>
+        {uploadError && <p className="text-xs text-red-500 mt-1">{uploadError}</p>}
+        <p className="text-xs text-gray-400 mt-1">Paste a URL or upload an image (max 5MB). Uploaded images are stored in Supabase Storage.</p>
+      </div>
+
+      {/* Alt text */}
+      <div>
+        <label className="block text-xs font-semibold text-gray-600 mb-1">Alt text</label>
+        <input
+          type="text"
+          value={c.alt || ""}
+          onChange={(e) => onChange({ ...c, alt: e.target.value })}
+          placeholder="Brief description for screen readers"
+          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+        />
+      </div>
+
+      {/* Caption */}
+      <div>
+        <label className="block text-xs font-semibold text-gray-600 mb-1">Caption (optional)</label>
+        <input
+          type="text"
+          value={c.caption || ""}
+          onChange={(e) => onChange({ ...c, caption: e.target.value })}
+          placeholder="Image caption"
+          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+        />
+      </div>
+
+      {/* Padding */}
+      <div>
+        <label className="block text-xs font-semibold text-gray-600 mb-2">
+          Padding (px) — <span className="font-normal text-gray-400">set all to 0 for full-width banners</span>
+        </label>
+        <div className="grid grid-cols-4 gap-2">
+          {(["Top", "Right", "Bottom", "Left"] as const).map((side) => {
+            const key = `padding${side}` as keyof typeof c;
+            return (
+              <div key={side}>
+                <label className="block text-xs text-gray-400 mb-1 text-center">{side}</label>
+                <input
+                  type="number"
+                  min="0"
+                  max="80"
+                  value={c[key] ?? "0"}
+                  onChange={(e) => onChange({ ...c, [key]: e.target.value })}
+                  className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-sm text-center focus:outline-none focus:ring-2 focus:ring-green-500"
+                />
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function BlockFields({
@@ -292,13 +419,7 @@ function BlockFields({
         </div>
       );
     case "image":
-      return (
-        <div className="space-y-3">
-          {field("url", "Image URL", { placeholder: "https://example.com/image.jpg" })}
-          {field("alt", "Alt text")}
-          {field("caption", "Caption (optional)")}
-        </div>
-      );
+      return <ImageBlockFields block={block} onChange={onChange} />;
     case "articles":
       return (
         <div className="space-y-3">
