@@ -1,48 +1,78 @@
 import Link from "next/link";
+import { prisma } from "@/lib/db";
 
-const TIERS = [
-  {
-    name: "Small Business Spotlight",
-    price: "Free",
-    description:
-      "Get your business in front of Decatur readers every week. Your listing rotates in a group of up to 5 local businesses and appears in every newsletter we send.",
-    includes: [
-      "Your logo, business name, and a 1–2 sentence description",
-      "A direct link to your website",
-      "Rotating placement — everyone gets equal visibility",
-    ],
-    cta: "Apply for Free",
-    highlight: false,
-  },
-  {
-    name: "In-Article Sponsorship",
-    price: "$15 / day",
-    description:
-      "Your message appears inline with the day's news, labeled as a sponsored post. Choose any available dates on the calendar.",
-    includes: [
-      "Custom image, headline, and up to 250 characters of body copy",
-      "A call-to-action link",
-      "Up to 2 in-article slots per day",
-    ],
-    cta: "Reserve Dates",
-    highlight: false,
-  },
-  {
-    name: "Presenting Sponsor",
-    price: "$25 / day",
-    description:
-      "The top sponsorship slot. You're featured as the day's presenting sponsor with a mention in the opening, plus a full in-article placement — outside the 2-slot limit.",
-    includes: [
-      "\"Today's Gist is brought to you by [Your Business]\" opening mention",
-      "Full in-article ad placement (does not count against the 2-slot cap)",
-      "Exclusive — only 1 presenting sponsor per day",
-    ],
-    cta: "Reserve Dates",
-    highlight: true,
-  },
-];
+export const dynamic = "force-dynamic";
 
-export default function SponsorPage() {
+const TIER_DEFAULTS = {
+  spotlight: "Free",
+  in_article: "$15/day",
+  presenting: "$25/day",
+};
+
+async function getPrices() {
+  try {
+    const rows = await prisma.setting.findMany({
+      where: { key: { in: ["sponsorship_price_spotlight", "sponsorship_price_in_article", "sponsorship_price_presenting"] } },
+    });
+    const map = Object.fromEntries(rows.map((r) => [r.key, r.value]));
+    return {
+      spotlight: map["sponsorship_price_spotlight"] || TIER_DEFAULTS.spotlight,
+      in_article: map["sponsorship_price_in_article"] || TIER_DEFAULTS.in_article,
+      presenting: map["sponsorship_price_presenting"] || TIER_DEFAULTS.presenting,
+    };
+  } catch {
+    return TIER_DEFAULTS;
+  }
+}
+
+export default async function SponsorPage() {
+  const prices = await getPrices();
+
+  const TIERS = [
+    {
+      key: "spotlight",
+      name: "Small Business Spotlight",
+      price: prices.spotlight,
+      description:
+        "Get your business in front of Decatur readers every week. Your listing rotates in a group of up to 5 local businesses and appears in every newsletter we send.",
+      includes: [
+        "Your logo, business name, and a 1–2 sentence description",
+        "A direct link to your website",
+        "Rotating placement — everyone gets equal visibility",
+      ],
+      cta: "Apply for Free",
+      highlight: false,
+    },
+    {
+      key: "in_article",
+      name: "In-Article Sponsorship",
+      price: prices.in_article,
+      description:
+        "Your message appears inline with the day's news, labeled as a sponsored post. Choose any available dates on the calendar.",
+      includes: [
+        "Custom image, headline, and up to 250 characters of body copy",
+        "A call-to-action link",
+        "Up to 2 in-article slots per day",
+      ],
+      cta: "Reserve Dates",
+      highlight: false,
+    },
+    {
+      key: "presenting",
+      name: "Presenting Sponsor",
+      price: prices.presenting,
+      description:
+        "The top sponsorship slot. You're featured as the day's presenting sponsor with a mention in the opening, plus a full in-article placement — outside the 2-slot limit.",
+      includes: [
+        "\"Today's Gist is brought to you by [Your Business]\" opening mention",
+        "Full in-article ad placement (does not count against the 2-slot cap)",
+        "Exclusive — only 1 presenting sponsor per day",
+      ],
+      cta: "Reserve Dates",
+      highlight: true,
+    },
+  ];
+
   return (
     <div className="min-h-screen bg-white">
       {/* Header */}
@@ -62,7 +92,7 @@ export default function SponsorPage() {
         <div className="grid md:grid-cols-3 gap-6">
           {TIERS.map((tier) => (
             <div
-              key={tier.name}
+              key={tier.key}
               className={`rounded-2xl border p-6 flex flex-col ${
                 tier.highlight
                   ? "border-green-500 shadow-lg shadow-green-100 ring-2 ring-green-500"

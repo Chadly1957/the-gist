@@ -7,6 +7,9 @@ const ALLOWED_KEYS = [
   "unosend_list_id",
   "unosend_from_email",
   "unosend_from_name",
+  "sponsorship_price_spotlight",
+  "sponsorship_price_in_article",
+  "sponsorship_price_presenting",
 ];
 
 export async function GET() {

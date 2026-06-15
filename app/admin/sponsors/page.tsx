@@ -60,24 +60,52 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 export default function AdminSponsorsPage() {
-  const [tab, setTab] = useState<"spotlights" | "bookings" | "profiles">("spotlights");
+  const [tab, setTab] = useState<"spotlights" | "bookings" | "profiles" | "pricing">("spotlights");
   const [spotlights, setSpotlights] = useState<Spotlight[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
+  // Pricing state
+  const [prices, setPrices] = useState({
+    sponsorship_price_spotlight: "Free",
+    sponsorship_price_in_article: "$15/day",
+    sponsorship_price_presenting: "$25/day",
+  });
+  const [priceSaving, setPriceSaving] = useState(false);
+  const [priceSaved, setPriceSaved] = useState(false);
+
   async function load() {
     setLoading(true);
-    const res = await fetch("/api/admin/sponsors");
-    const data = await res.json();
+    const [sponsorRes, settingsRes] = await Promise.all([
+      fetch("/api/admin/sponsors"),
+      fetch("/api/admin/settings"),
+    ]);
+    const data = await sponsorRes.json();
+    const settingsData = await settingsRes.json();
     setSpotlights(data.spotlights || []);
     setBookings(data.bookings || []);
     setProfiles(data.profiles || []);
+    setPrices((p) => ({ ...p, ...Object.fromEntries(
+      Object.entries(settingsData.settings || {}).filter(([k]) => k.startsWith("sponsorship_price_"))
+    )}));
     setLoading(false);
   }
 
   useEffect(() => { load(); }, []);
+
+  async function savePrices() {
+    setPriceSaving(true);
+    await fetch("/api/admin/settings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ settings: prices }),
+    });
+    setPriceSaving(false);
+    setPriceSaved(true);
+    setTimeout(() => setPriceSaved(false), 3000);
+  }
 
   async function updateSpotlight(id: string, patch: object) {
     await fetch(`/api/admin/sponsors/spotlight/${id}`, {
@@ -122,7 +150,7 @@ export default function AdminSponsorsPage() {
 
       {/* Tabs */}
       <div className="flex gap-1 mb-6 border-b border-gray-200">
-        {(["spotlights", "bookings", "profiles"] as const).map((t) => (
+        {(["spotlights", "bookings", "profiles", "pricing"] as const).map((t) => (
           <button key={t} onClick={() => setTab(t)}
             className={`px-4 py-2 text-sm font-medium capitalize transition-colors border-b-2 -mb-px ${tab === t ? "border-green-600 text-green-700" : "border-transparent text-gray-500 hover:text-gray-700"}`}>
             {t}
@@ -286,6 +314,46 @@ export default function AdminSponsorsPage() {
                   </a>
                 </div>
               ))}
+            </div>
+          )}
+
+          {/* PRICING */}
+          {tab === "pricing" && (
+            <div className="max-w-md space-y-6">
+              <p className="text-sm text-gray-500">
+                Update the prices displayed on the public <a href="/sponsor" target="_blank" className="text-green-700 underline">/sponsor</a> page.
+              </p>
+
+              <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
+                {[
+                  { key: "sponsorship_price_spotlight", label: "Small Business Spotlight", hint: 'e.g. "Free"' },
+                  { key: "sponsorship_price_in_article", label: "In-Article Sponsorship", hint: 'e.g. "$15/day"' },
+                  { key: "sponsorship_price_presenting", label: "Presenting Sponsor", hint: 'e.g. "$25/day"' },
+                ].map(({ key, label, hint }) => (
+                  <div key={key}>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">{label}</label>
+                    <input
+                      type="text"
+                      value={prices[key as keyof typeof prices]}
+                      onChange={(e) => setPrices((p) => ({ ...p, [key]: e.target.value }))}
+                      placeholder={hint}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                    />
+                    <p className="text-xs text-gray-400 mt-0.5">{hint}</p>
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={savePrices}
+                  disabled={priceSaving}
+                  className="bg-green-700 hover:bg-green-800 disabled:opacity-50 text-white text-sm font-semibold px-5 py-2 rounded-lg transition-colors"
+                >
+                  {priceSaving ? "Saving…" : "Save Prices"}
+                </button>
+                {priceSaved && <span className="text-sm text-green-600 font-medium">Saved!</span>}
+              </div>
             </div>
           )}
         </>
