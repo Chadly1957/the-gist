@@ -4,7 +4,7 @@ import { useState, useRef } from "react";
 
 export interface Block {
   id: string;
-  type: "header" | "text" | "image" | "articles" | "divider" | "button" | "footer";
+  type: "header" | "text" | "image" | "articles" | "divider" | "button" | "footer" | "spotlight" | "presenting_sponsor";
   content: Record<string, string>;
 }
 
@@ -22,6 +22,8 @@ const BLOCK_TYPES: { type: Block["type"]; label: string; icon: string }[] = [
   { type: "image", label: "Image", icon: "IMG" },
   { type: "button", label: "Button / CTA", icon: "BTN" },
   { type: "divider", label: "Divider", icon: "—" },
+  { type: "spotlight", label: "Business Spotlight", icon: "★" },
+  { type: "presenting_sponsor", label: "Presenting Sponsor", icon: "✦" },
 ];
 
 export default function BlockEditor({ blocks, onChange }: BlockEditorProps) {
@@ -40,6 +42,8 @@ export default function BlockEditor({ blocks, onChange }: BlockEditorProps) {
         text: "You're receiving this because you signed up at thegistdecatur.com",
         unsubscribeText: "Unsubscribe",
       },
+      spotlight: {},
+      presenting_sponsor: {},
     };
     const newBlock: Block = { id: generateId(), type, content: defaults[type] };
     onChange([...blocks, newBlock]);
@@ -207,6 +211,30 @@ function BlockPreview({ block }: { block: Block }) {
           <div>
             <p className="text-sm font-semibold text-gray-800">{block.content.label || "Article List"}</p>
             <p className="text-xs text-gray-400">Populated automatically with scraped articles when composing</p>
+          </div>
+        </div>
+      );
+    case "spotlight":
+      return (
+        <div className="flex items-center gap-3 py-2">
+          <div className="w-8 h-8 rounded-lg bg-yellow-100 flex items-center justify-center">
+            <span className="text-yellow-600 text-sm">★</span>
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-gray-800">Small Business Spotlight</p>
+            <p className="text-xs text-gray-400">Auto-filled with 5 rotating approved listings</p>
+          </div>
+        </div>
+      );
+    case "presenting_sponsor":
+      return (
+        <div className="flex items-center gap-3 py-2">
+          <div className="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center">
+            <span className="text-purple-600 text-sm">✦</span>
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-gray-800">Presenting Sponsor</p>
+            <p className="text-xs text-gray-400">Auto-filled with approved presenting sponsor for the newsletter date</p>
           </div>
         </div>
       );
@@ -420,6 +448,10 @@ function BlockFields({
       );
     case "image":
       return <ImageBlockFields block={block} onChange={onChange} />;
+    case "spotlight":
+      return <p className="text-xs text-gray-400">No configuration needed. This block auto-populates with the 5 most-eligible approved spotlight listings at send time.</p>;
+    case "presenting_sponsor":
+      return <p className="text-xs text-gray-400">No configuration needed. This block auto-populates with the approved presenting sponsor for the selected newsletter date. Hidden if no sponsor is booked.</p>;
     case "articles":
       return (
         <div className="space-y-3">

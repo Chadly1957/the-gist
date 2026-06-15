@@ -2,8 +2,36 @@
 
 export interface Block {
   id: string;
-  type: "header" | "text" | "image" | "articles" | "divider" | "footer" | "button";
+  type: "header" | "text" | "image" | "articles" | "divider" | "footer" | "button" | "spotlight" | "presenting_sponsor";
   content: Record<string, unknown>;
+}
+
+export interface SpotlightItem {
+  businessName: string;
+  logoUrl?: string | null;
+  description: string;
+  ctaLabel: string;
+  ctaUrl: string;
+}
+
+export interface PresentingSponsorItem {
+  businessName: string;
+  logoUrl?: string | null;
+  headline: string;
+  body: string;
+  ctaUrl: string;
+  ctaLabel: string;
+  imageUrl?: string | null;
+  presentingBlurb?: string | null;
+}
+
+export interface InArticleAdItem {
+  businessName: string;
+  headline: string;
+  body: string;
+  ctaUrl: string;
+  ctaLabel: string;
+  imageUrl?: string | null;
 }
 
 export interface ArticleForRender {
@@ -78,13 +106,12 @@ function renderImage(content: Record<string, unknown>): string {
 
 function renderArticles(
   content: Record<string, unknown>,
-  articles: ArticleForRender[]
+  articles: ArticleForRender[],
+  ads: InArticleAdItem[] = []
 ): string {
-  if (articles.length === 0) return "";
+  if (articles.length === 0 && ads.length === 0) return "";
 
-  const cards = articles
-    .map(
-      (a) => `
+  const articleCards = articles.map((a) => `
       <a href="${a.articleUrl}" class="article-card" style="display:block;margin-bottom:24px;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;text-decoration:none;">
         ${a.imageUrl ? `<img src="${a.imageUrl}" alt="" class="article-img" style="width:100%;height:180px;object-fit:cover;display:block;" />` : `<div class="article-img-placeholder"></div>`}
         <div class="article-body" style="padding:16px;">
@@ -93,14 +120,77 @@ function renderArticles(
           <div class="article-desc" style="font-size:14px;color:#4b5563;line-height:1.6;margin:0 0 12px;font-family:sans-serif;">${a.description}</div>
           <a href="${a.articleUrl}" class="read-more" style="display:inline-block;background:#166534;color:#ffffff;padding:8px 18px;border-radius:4px;text-decoration:none;font-size:13px;font-family:sans-serif;font-weight:600;">Read More</a>
         </div>
-      </a>`
-    )
-    .join("");
+      </a>`);
+
+  // Weave ads between articles at even intervals
+  const combined: string[] = [];
+  const interval = ads.length > 0 ? Math.ceil(articleCards.length / (ads.length + 1)) : articleCards.length;
+  let adIdx = 0;
+  articleCards.forEach((card, i) => {
+    combined.push(card);
+    if (ads[adIdx] && (i + 1) % interval === 0) {
+      combined.push(renderInArticleAd(ads[adIdx]));
+      adIdx++;
+    }
+  });
+  while (adIdx < ads.length) { combined.push(renderInArticleAd(ads[adIdx++])); }
 
   return `
     <div class="block">
       ${content.label ? `<div class="section-label">${content.label}</div>` : ""}
+      ${combined.join("")}
+    </div>`;
+}
+
+function renderSpotlight(items: SpotlightItem[]): string {
+  if (items.length === 0) return "";
+  const cards = items.map((s) => `
+    <div style="padding:12px;border:1px solid #e5e7eb;border-radius:8px;margin-bottom:12px;display:flex;align-items:center;gap:12px;">
+      ${s.logoUrl ? `<img src="${s.logoUrl}" alt="${s.businessName}" style="width:48px;height:48px;border-radius:6px;object-fit:contain;border:1px solid #f3f4f6;flex-shrink:0;" />` : ""}
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:14px;font-weight:700;color:#111827;font-family:sans-serif;margin-bottom:3px;">${s.businessName}</div>
+        <div style="font-size:13px;color:#4b5563;line-height:1.5;font-family:sans-serif;">${s.description}</div>
+      </div>
+      <a href="${s.ctaUrl}" style="display:inline-block;background:#166534;color:#ffffff;padding:6px 14px;border-radius:4px;text-decoration:none;font-size:12px;font-family:sans-serif;font-weight:600;white-space:nowrap;flex-shrink:0;">${s.ctaLabel}</a>
+    </div>`).join("");
+
+  return `
+    <div style="padding:20px 40px;">
+      <div style="font-family:sans-serif;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#6b7280;margin-bottom:14px;padding-bottom:8px;border-bottom:2px solid #e5e7eb;">
+        Local Business Spotlight
+      </div>
       ${cards}
+    </div>`;
+}
+
+function renderPresentingSponsor(item: PresentingSponsorItem): string {
+  const blurb = item.presentingBlurb ||
+    `Today&rsquo;s Gist Decatur is brought to you by <strong>${item.businessName}</strong>.`;
+  return `
+    <div style="padding:20px 40px;">
+      <div style="background:#fefce8;border:1px solid #fde047;border-radius:8px;padding:16px;margin-bottom:16px;">
+        <div style="font-family:sans-serif;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#854d0e;margin-bottom:8px;">Presenting Sponsor</div>
+        <p style="font-size:14px;color:#713f12;line-height:1.6;font-family:sans-serif;margin:0;">${blurb}</p>
+      </div>
+      ${item.imageUrl ? `<img src="${item.imageUrl}" alt="" style="max-width:100%;height:auto;display:block;border-radius:6px;margin-bottom:14px;" />` : ""}
+      <div style="font-size:18px;font-weight:700;color:#111827;margin:0 0 8px;font-family:Georgia,serif;line-height:1.3;">${item.headline}</div>
+      <div style="font-size:14px;color:#4b5563;line-height:1.6;margin:0 0 14px;font-family:sans-serif;">${item.body}</div>
+      <a href="${item.ctaUrl}" style="display:inline-block;background:#166534;color:#ffffff;padding:10px 20px;border-radius:4px;text-decoration:none;font-size:13px;font-family:sans-serif;font-weight:600;">${item.ctaLabel}</a>
+    </div>`;
+}
+
+function renderInArticleAd(ad: InArticleAdItem): string {
+  return `
+    <div style="border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;margin-bottom:24px;background:#fafafa;">
+      <div style="padding:6px 14px;background:#f3f4f6;font-family:sans-serif;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#9ca3af;">
+        Advertisement
+      </div>
+      ${ad.imageUrl ? `<img src="${ad.imageUrl}" alt="" style="width:100%;height:200px;object-fit:cover;display:block;" />` : ""}
+      <div style="padding:16px;">
+        <div style="font-size:18px;font-weight:700;color:#111827;margin:0 0 8px;font-family:Georgia,serif;line-height:1.3;">${ad.headline}</div>
+        <div style="font-size:14px;color:#4b5563;line-height:1.6;margin:0 0 14px;font-family:sans-serif;">${ad.body}</div>
+        <a href="${ad.ctaUrl}" style="display:inline-block;background:#166534;color:#ffffff;padding:8px 18px;border-radius:4px;text-decoration:none;font-size:13px;font-family:sans-serif;font-weight:600;">${ad.ctaLabel}</a>
+      </div>
     </div>`;
 }
 
@@ -126,8 +216,15 @@ function renderFooter(content: Record<string, unknown>): string {
 
 export function renderTemplate(
   blocks: Block[],
-  articles: ArticleForRender[] = []
+  articles: ArticleForRender[] = [],
+  sponsors: {
+    spotlights?: SpotlightItem[];
+    presentingSponsor?: PresentingSponsorItem | null;
+    inArticleAds?: InArticleAdItem[];
+  } = {}
 ): string {
+  const { spotlights = [], presentingSponsor = null, inArticleAds = [] } = sponsors;
+
   const bodyContent = blocks
     .map((block) => {
       switch (block.type) {
@@ -138,13 +235,17 @@ export function renderTemplate(
         case "image":
           return renderImage(block.content);
         case "articles":
-          return renderArticles(block.content, articles);
+          return renderArticles(block.content, articles, inArticleAds);
         case "divider":
           return renderDivider();
         case "button":
           return renderButton(block.content);
         case "footer":
           return renderFooter(block.content);
+        case "spotlight":
+          return renderSpotlight(spotlights);
+        case "presenting_sponsor":
+          return presentingSponsor ? renderPresentingSponsor(presentingSponsor) : "";
         default:
           return "";
       }

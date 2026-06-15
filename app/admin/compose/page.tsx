@@ -29,6 +29,7 @@ export default function ComposePage() {
     `The Gist Decatur — ${new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}`
   );
   const [blurb, setBlurb] = useState("");
+  const [newsletterDate, setNewsletterDate] = useState(new Date().toISOString().split("T")[0]);
   const [loading, setLoading] = useState(false);
   const [scraping, setScraping] = useState(false);
   const [sending, setSending] = useState(false);
@@ -124,6 +125,7 @@ export default function ComposePage() {
         templateId: selectedTemplateId,
         articleIds: selectedArticles.map((a) => a.id),
         blurb,
+        newsletterDate,
       }),
     });
     const data = await res.json();
@@ -306,6 +308,20 @@ export default function ComposePage() {
             </div>
           ) : (
             <div className="p-6 max-w-2xl space-y-5">
+              {/* Newsletter date */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">
+                  Newsletter Date
+                </label>
+                <input
+                  type="date"
+                  value={newsletterDate}
+                  onChange={(e) => setNewsletterDate(e.target.value)}
+                  className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                />
+                <p className="text-xs text-gray-400 mt-1">Used to load sponsors booked for this date.</p>
+              </div>
+
               {/* Subject */}
               <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">

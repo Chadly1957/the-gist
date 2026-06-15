@@ -2,13 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getAdminSession } from "@/lib/auth";
 import { getUnosendClient } from "@/lib/unosend";
-import { renderTemplate, Block } from "@/lib/template-renderer";
+import { renderTemplate, Block, SpotlightItem, PresentingSponsorItem, InArticleAdItem } from "@/lib/template-renderer";
 
 export async function POST(req: NextRequest) {
   const session = await getAdminSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { subject, templateId, articleIds, blurb } = await req.json();
+  const { subject, templateId, articleIds, blurb, newsletterDate } = await req.json();
 
   if (!subject || !templateId || !articleIds?.length) {
     return NextResponse.json(
@@ -40,15 +40,60 @@ export async function POST(req: NextRequest) {
     ) as Block[];
   }
 
+  // Fetch sponsor data for this newsletter date
+  const date = newsletterDate || new Date().toISOString().split("T")[0];
+
+  const [rawSpotlights, dateBookings] = await Promise.all([
+    prisma.spotlightListing.findMany({
+      where: { status: "approved" },
+      orderBy: [{ lastShownAt: "asc" }, { shownCount: "asc" }],
+      take: 5,
+    }),
+    prisma.adBooking.findMany({
+      where: { date, status: "approved" },
+      include: { sponsor: { select: { businessName: true } } },
+    }),
+  ]);
+
+  const spotlights: SpotlightItem[] = rawSpotlights.map((s) => ({
+    businessName: s.businessName,
+    logoUrl: s.logoUrl,
+    description: s.description,
+    ctaLabel: s.ctaLabel,
+    ctaUrl: s.ctaUrl,
+  }));
+
+  const presentingRaw = dateBookings.find((b) => b.type === "presenting");
+  const presentingSponsor: PresentingSponsorItem | null = presentingRaw
+    ? {
+        businessName: presentingRaw.sponsor.businessName,
+        headline: presentingRaw.headline,
+        body: presentingRaw.body,
+        ctaUrl: presentingRaw.ctaUrl,
+        ctaLabel: presentingRaw.ctaLabel,
+        imageUrl: presentingRaw.imageUrl,
+        presentingBlurb: presentingRaw.presentingBlurb,
+      }
+    : null;
+
+  const inArticleAds: InArticleAdItem[] = dateBookings
+    .filter((b) => b.type === "in_article")
+    .map((b) => ({
+      businessName: b.sponsor.businessName,
+      headline: b.headline,
+      body: b.body,
+      ctaUrl: b.ctaUrl,
+      ctaLabel: b.ctaLabel,
+      imageUrl: b.imageUrl,
+    }));
+
   // Render HTML and substitute unsubscribe URL
   const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "").replace(/\/$/, "");
   const unsubscribeUrl = `${appUrl}/unsubscribe`;
   const htmlBody = renderTemplate(
     blocks,
-    articles.map((a) => ({
-      ...a,
-      publishedAt: a.publishedAt,
-    }))
+    articles.map((a) => ({ ...a, publishedAt: a.publishedAt })),
+    { spotlights, presentingSponsor, inArticleAds }
   ).replace(/\{\{UNSUBSCRIBE_URL\}\}/g, unsubscribeUrl);
 
   // Send via Unosend
@@ -74,10 +119,16 @@ export async function POST(req: NextRequest) {
     recipientCount = await prisma.subscriber.count({ where: { active: true } });
   }
 
-  // Record the send
-  await prisma.newsletterSend.create({
-    data: { subject, htmlBody, recipientCount, status },
-  });
+  // Record the send and update spotlight rotation counters
+  await Promise.all([
+    prisma.newsletterSend.create({ data: { subject, htmlBody, recipientCount, status } }),
+    ...rawSpotlights.map((s) =>
+      prisma.spotlightListing.update({
+        where: { id: s.id },
+        data: { lastShownAt: new Date(), shownCount: { increment: 1 } },
+      })
+    ),
+  ]);
 
   if (status === "draft") {
     return NextResponse.json({
