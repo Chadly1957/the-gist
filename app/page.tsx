@@ -1,60 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
-
-function NewsletterPreview() {
-  return (
-    <div className="relative w-full max-w-sm mx-auto lg:mx-0">
-      {/* Shadow card behind */}
-      <div className="absolute inset-0 translate-x-3 translate-y-3 bg-green-200 rounded-2xl opacity-40" />
-      {/* Main card */}
-      <div className="relative bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
-        {/* Email header */}
-        <div className="bg-green-900 px-5 py-4 text-center">
-          <div className="flex items-center justify-center gap-2 mb-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-green-400" />
-            <span className="text-white font-bold text-sm tracking-tight">The Gist Decatur</span>
-          </div>
-          <p className="text-green-300 text-xs">Your daily local briefing</p>
-          <p className="text-green-400 text-xs mt-0.5">Monday, June 16 · Decatur, AL</p>
-        </div>
-        {/* Article cards */}
-        <div className="px-4 py-4 space-y-3">
-          <div className="rounded-xl border border-gray-100 overflow-hidden">
-            <div className="h-16 bg-gradient-to-r from-gray-100 to-gray-50" />
-            <div className="p-3">
-              <div className="h-2 w-16 bg-green-200 rounded mb-2" />
-              <div className="h-3 w-full bg-gray-200 rounded mb-1" />
-              <div className="h-3 w-4/5 bg-gray-100 rounded" />
-            </div>
-          </div>
-          <div className="rounded-xl border border-gray-100 overflow-hidden">
-            <div className="h-14 bg-gradient-to-r from-green-50 to-gray-50" />
-            <div className="p-3">
-              <div className="h-2 w-20 bg-green-200 rounded mb-2" />
-              <div className="h-3 w-full bg-gray-200 rounded mb-1" />
-              <div className="h-3 w-3/4 bg-gray-100 rounded" />
-            </div>
-          </div>
-          {/* Spotlight teaser */}
-          <div className="rounded-xl border border-yellow-100 bg-yellow-50 p-3 flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-yellow-200 shrink-0" />
-            <div>
-              <div className="h-2 w-24 bg-yellow-300 rounded mb-1.5" />
-              <div className="h-2 w-32 bg-yellow-200 rounded" />
-            </div>
-          </div>
-        </div>
-        <div className="px-4 pb-4">
-          <div className="h-8 bg-green-700 rounded-lg flex items-center justify-center">
-            <div className="h-2 w-16 bg-green-500 rounded" />
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 export default function LandingPage() {
   const [email, setEmail] = useState("");
@@ -179,9 +127,21 @@ export default function LandingPage() {
               )}
             </div>
 
-            {/* Right: newsletter mockup */}
-            <div className="hidden lg:block">
-              <NewsletterPreview />
+            {/* Right: Decatur photo */}
+            <div className="hidden lg:flex items-center justify-center">
+              <div className="relative w-full max-w-md">
+                <div className="absolute inset-0 translate-x-3 translate-y-3 bg-green-200 rounded-3xl opacity-40" />
+                <div className="relative rounded-3xl overflow-hidden shadow-2xl">
+                  <Image
+                    src="/hero-decatur.jpg"
+                    alt="Historic Decatur pavilion"
+                    width={640}
+                    height={700}
+                    className="w-full h-auto object-cover"
+                    priority
+                  />
+                </div>
+              </div>
             </div>
           </div>
         </section>
