@@ -40,14 +40,16 @@ export async function POST(req: NextRequest) {
     ) as Block[];
   }
 
-  // Render HTML
+  // Render HTML and substitute unsubscribe URL
+  const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "").replace(/\/$/, "");
+  const unsubscribeUrl = `${appUrl}/unsubscribe`;
   const htmlBody = renderTemplate(
     blocks,
     articles.map((a) => ({
       ...a,
       publishedAt: a.publishedAt,
     }))
-  );
+  ).replace(/\{\{UNSUBSCRIBE_URL\}\}/g, unsubscribeUrl);
 
   // Send via Unosend
   const rows = await prisma.setting.findMany();
