@@ -145,14 +145,20 @@ function renderArticles(
 function renderSpotlight(items: SpotlightItem[]): string {
   if (items.length === 0) return "";
   const cards = items.map((s) => `
-    <div style="padding:12px;border:1px solid #e5e7eb;border-radius:8px;margin-bottom:12px;display:flex;align-items:center;gap:12px;">
-      ${s.logoUrl ? `<img src="${s.logoUrl}" alt="${s.businessName}" style="width:48px;height:48px;border-radius:6px;object-fit:contain;border:1px solid #f3f4f6;flex-shrink:0;" />` : ""}
-      <div style="flex:1;min-width:0;">
-        <div style="font-size:14px;font-weight:700;color:#111827;font-family:sans-serif;margin-bottom:3px;">${s.businessName}</div>
-        <div style="font-size:13px;color:#4b5563;line-height:1.5;font-family:sans-serif;">${s.description}</div>
-      </div>
-      <a href="${s.ctaUrl}" style="display:inline-block;background:#166534;color:#ffffff;padding:6px 14px;border-radius:4px;text-decoration:none;font-size:12px;font-family:sans-serif;font-weight:600;white-space:nowrap;flex-shrink:0;">${s.ctaLabel}</a>
-    </div>`).join("");
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid #e5e7eb;border-radius:8px;margin-bottom:12px;">
+      <tr>
+        <td width="60" valign="middle" style="padding:12px 0 12px 12px;">
+          ${s.logoUrl ? `<img src="${s.logoUrl}" alt="${s.businessName}" width="48" height="48" style="display:block;width:48px;height:48px;border-radius:6px;object-fit:contain;border:1px solid #f3f4f6;" />` : ""}
+        </td>
+        <td valign="middle" style="padding:12px;">
+          <div style="font-size:14px;font-weight:700;color:#111827;font-family:sans-serif;margin-bottom:3px;">${s.businessName}</div>
+          <div style="font-size:13px;color:#4b5563;line-height:1.5;font-family:sans-serif;">${s.description}</div>
+        </td>
+        <td width="140" valign="middle" align="center" style="padding:12px 12px 12px 0;">
+          <a href="${s.ctaUrl}" style="display:inline-block;background:#166534;color:#ffffff;padding:8px 16px;border-radius:4px;text-decoration:none;font-size:12px;font-family:sans-serif;font-weight:600;white-space:nowrap;">${s.ctaLabel}</a>
+        </td>
+      </tr>
+    </table>`).join("");
 
   return `
     <div style="padding:20px 40px;">
