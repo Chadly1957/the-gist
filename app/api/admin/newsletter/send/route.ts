@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getAdminSession } from "@/lib/auth";
-import { getUnosendClient } from "@/lib/unosend";
+import { getResendClient } from "@/lib/resend";
 import { renderTemplate, Block, SpotlightItem, PresentingSponsorItem, InArticleAdItem } from "@/lib/template-renderer";
 
 export async function POST(req: NextRequest) {
@@ -104,14 +104,14 @@ export async function POST(req: NextRequest) {
     { spotlights, presentingSponsor, inArticleAds }
   ).replace(/\{\{UNSUBSCRIBE_URL\}\}/g, unsubscribeUrl);
 
-  // Send via Unosend
-  const unosend = await getUnosendClient(allSettings);
+  // Send via Resend
+  const resend = await getResendClient(allSettings);
 
   let recipientCount = 0;
   let status = "sent";
 
-  if (!unosend) {
-    // Save as draft if Unosend not configured
+  if (!resend) {
+    // Save as draft if Resend not configured
     status = "draft";
   } else {
     const activeSubscribers = await prisma.subscriber.findMany({
@@ -120,12 +120,12 @@ export async function POST(req: NextRequest) {
     });
 
     if (activeSubscribers.length > 0) {
-      const result = await unosend.sendBatch(
+      const result = await resend.sendBatch(
         activeSubscribers.map((s) => ({ to: s.email, subject, htmlBody }))
       );
       if (!result.success) {
         return NextResponse.json(
-          { error: `Unosend error: ${result.error}` },
+          { error: `Resend error: ${result.error}` },
           { status: 502 }
         );
       }
@@ -148,7 +148,7 @@ export async function POST(req: NextRequest) {
   if (status === "draft") {
     return NextResponse.json({
       message:
-        "Newsletter saved as draft. Configure Unosend API in Settings to send to your list.",
+        "Newsletter saved as draft. Configure Resend API in Settings to send to your list.",
     });
   }
 

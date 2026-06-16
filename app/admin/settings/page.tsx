@@ -3,9 +3,9 @@
 import { useEffect, useState } from "react";
 
 interface Settings {
-  unosend_api_key: string;
-  unosend_from_email: string;
-  unosend_from_name: string;
+  resend_api_key: string;
+  resend_from_email: string;
+  resend_from_name: string;
   spotlight_count: string;
   in_article_count: string;
 }
@@ -15,21 +15,21 @@ interface DnsRecord {
   name: string;
   value: string;
   status?: string;
-  purpose?: string;
+  record?: string;
 }
 
 interface Domain {
   id: string;
-  domain: string;
+  name: string;
   status?: string;
-  dns_records?: { records: DnsRecord[] };
+  records?: DnsRecord[];
 }
 
 export default function SettingsPage() {
   const [settings, setSettings] = useState<Settings>({
-    unosend_api_key: "",
-    unosend_from_email: "newsletter@thegistdecatur.com",
-    unosend_from_name: "The Gist Decatur",
+    resend_api_key: "",
+    resend_from_email: "newsletter@thegistdecatur.com",
+    resend_from_name: "The Gist Decatur",
     spotlight_count: "5",
     in_article_count: "2",
   });
@@ -130,12 +130,12 @@ export default function SettingsPage() {
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
         <p className="text-gray-500 text-sm mt-1">
-          Configure your Unosend API integration and sending domain.
+          Configure your Resend API integration and sending domain.
         </p>
       </div>
 
       <form onSubmit={handleSave} className="space-y-6">
-        {/* Unosend */}
+        {/* Resend */}
         <div className="bg-white rounded-xl border border-gray-200 p-6">
           <div className="flex items-center gap-3 mb-5">
             <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center">
@@ -144,7 +144,7 @@ export default function SettingsPage() {
               </svg>
             </div>
             <div>
-              <h2 className="text-sm font-semibold text-gray-800">Unosend</h2>
+              <h2 className="text-sm font-semibold text-gray-800">Resend</h2>
               <p className="text-xs text-gray-400">Email delivery API key</p>
             </div>
           </div>
@@ -156,11 +156,11 @@ export default function SettingsPage() {
               </label>
               <input
                 type="password"
-                value={settings.unosend_api_key}
+                value={settings.resend_api_key}
                 onChange={(e) =>
-                  setSettings((s) => ({ ...s, unosend_api_key: e.target.value }))
+                  setSettings((s) => ({ ...s, resend_api_key: e.target.value }))
                 }
-                placeholder="sk_live_…"
+                placeholder="re_…"
                 className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
               />
             </div>
@@ -172,9 +172,9 @@ export default function SettingsPage() {
                 </label>
                 <input
                   type="email"
-                  value={settings.unosend_from_email}
+                  value={settings.resend_from_email}
                   onChange={(e) =>
-                    setSettings((s) => ({ ...s, unosend_from_email: e.target.value }))
+                    setSettings((s) => ({ ...s, resend_from_email: e.target.value }))
                   }
                   className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
                 />
@@ -185,9 +185,9 @@ export default function SettingsPage() {
                 </label>
                 <input
                   type="text"
-                  value={settings.unosend_from_name}
+                  value={settings.resend_from_name}
                   onChange={(e) =>
-                    setSettings((s) => ({ ...s, unosend_from_name: e.target.value }))
+                    setSettings((s) => ({ ...s, resend_from_name: e.target.value }))
                   }
                   className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
                 />
@@ -258,7 +258,7 @@ export default function SettingsPage() {
               </div>
               {!hasApiKey && !loading && (
                 <p className="text-xs text-red-500">
-                  No Unosend API key detected (Settings field or UNOSEND_API_KEY env var). Add one above to connect a domain.
+                  No Resend API key detected (Settings field or RESEND_API_KEY env var). Add one above to connect a domain.
                 </p>
               )}
               <p className="text-xs text-gray-400">
@@ -269,7 +269,7 @@ export default function SettingsPage() {
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-semibold text-gray-800">{domain.domain}</p>
+                  <p className="text-sm font-semibold text-gray-800">{domain.name}</p>
                   <span
                     className={`inline-block mt-1 text-xs font-medium px-2 py-0.5 rounded-full ${
                       domain.status === "verified" || domain.status === "active"
@@ -290,7 +290,7 @@ export default function SettingsPage() {
                 </button>
               </div>
 
-              {domain.dns_records && domain.dns_records.records.length > 0 && (
+              {domain.records && domain.records.length > 0 && (
                 <div className="border border-gray-200 rounded-lg overflow-hidden">
                   <table className="w-full text-xs">
                     <thead className="bg-gray-50 text-gray-500">
@@ -303,9 +303,9 @@ export default function SettingsPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
-                      {domain.dns_records.records.map((rec, i) => (
+                      {domain.records.map((rec, i) => (
                         <tr key={i}>
-                          <td className="px-3 py-2 font-medium uppercase">{rec.purpose}</td>
+                          <td className="px-3 py-2 font-medium uppercase">{rec.record}</td>
                           <td className="px-3 py-2 font-mono">{rec.type}</td>
                           <td className="px-3 py-2 font-mono break-all">{rec.name}</td>
                           <td className="px-3 py-2 font-mono break-all">{rec.value}</td>
@@ -317,9 +317,9 @@ export default function SettingsPage() {
                 </div>
               )}
 
-              {(!domain.dns_records || domain.dns_records.records.length === 0) && (
+              {(!domain.records || domain.records.length === 0) && (
                 <p className="text-sm text-amber-600">
-                  Unosend didn&apos;t return any DNS records for this domain. See the raw response below.
+                  Resend didn&apos;t return any DNS records for this domain. See the raw response below.
                 </p>
               )}
 

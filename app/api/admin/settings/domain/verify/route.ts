@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getAdminSession } from "@/lib/auth";
-import { getUnosendClient } from "@/lib/unosend";
+import { getResendClient } from "@/lib/resend";
 
 export async function POST() {
   const session = await getAdminSession();
@@ -9,14 +9,14 @@ export async function POST() {
 
   const rows = await prisma.setting.findMany();
   const settings = Object.fromEntries(rows.map((r) => [r.key, r.value]));
-  const domainId = settings["unosend_domain_id"];
+  const domainId = settings["resend_domain_id"];
   if (!domainId) {
     return NextResponse.json({ error: "No domain connected yet." }, { status: 400 });
   }
 
-  const client = await getUnosendClient(settings);
+  const client = await getResendClient(settings);
   if (!client) {
-    return NextResponse.json({ error: "Unosend is not configured." }, { status: 400 });
+    return NextResponse.json({ error: "Resend is not configured." }, { status: 400 });
   }
 
   const result = await client.verifyDomain(domainId);

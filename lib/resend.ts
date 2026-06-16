@@ -1,34 +1,35 @@
-// Unosend API client
-// Docs reference: https://docs.unosend.co
+// Resend API client
+// Docs reference: https://resend.com/docs
 // Configure API key and sending domain in Admin > Settings
 
-interface UnosendConfig {
+interface ResendConfig {
   apiKey: string;
   fromEmail: string;
   fromName: string;
   baseUrl?: string;
 }
 
-interface UnosendResponse<T = unknown> {
+interface ResendResult<T = unknown> {
   success: boolean;
   data?: T;
   error?: string;
 }
 
-export interface DnsRecord {
-  name: string;
+export interface DomainRecord {
+  record?: string;
   type: string;
+  name: string;
   value: string;
+  ttl?: string;
   status?: string;
-  purpose?: string;
-  recordType?: string;
+  priority?: number;
 }
 
 export interface DomainData {
   id: string;
-  domain: string;
+  name: string;
   status?: string;
-  dns_records?: { records: DnsRecord[] };
+  records?: DomainRecord[];
   created_at?: string;
 }
 
@@ -38,22 +39,23 @@ interface BatchRecipient {
   htmlBody: string;
 }
 
+// Resend's batch endpoint accepts at most 100 emails per request
 const BATCH_CHUNK_SIZE = 100;
 
-export class UnosendClient {
-  private config: UnosendConfig;
+export class ResendClient {
+  private config: ResendConfig;
   private baseUrl: string;
 
-  constructor(config: UnosendConfig) {
+  constructor(config: ResendConfig) {
     this.config = config;
-    this.baseUrl = config.baseUrl || "https://api.unosend.co";
+    this.baseUrl = config.baseUrl || "https://api.resend.com";
   }
 
   private async request<T>(
     method: string,
     path: string,
     body?: unknown
-  ): Promise<UnosendResponse<T>> {
+  ): Promise<ResendResult<T>> {
     try {
       const res = await fetch(`${this.baseUrl}${path}`, {
         method,
@@ -61,16 +63,16 @@ export class UnosendClient {
           "Content-Type": "application/json",
           Authorization: `Bearer ${this.config.apiKey}`,
         },
-        body: body ? JSON.stringify(body) : undefined,
+        body: body !== undefined ? JSON.stringify(body) : undefined,
       });
 
       const json = await res.json();
 
       if (!res.ok) {
-        return { success: false, error: json.message || json.error || `HTTP ${res.status}` };
+        return { success: false, error: json.message || `HTTP ${res.status}` };
       }
 
-      return { success: true, data: json.data as T };
+      return { success: true, data: json as T };
     } catch (err) {
       return {
         success: false,
@@ -89,20 +91,19 @@ export class UnosendClient {
     to: string;
     subject: string;
     htmlBody: string;
-  }): Promise<UnosendResponse<{ id: string }>> {
+  }): Promise<ResendResult<{ id: string }>> {
     return this.request("POST", "/emails", {
       from: this.fromHeader(),
       to: [params.to],
       subject: params.subject,
       html: params.htmlBody,
-      tracking: { open: true, click: true },
     });
   }
 
-  // Sends in chunks of BATCH_CHUNK_SIZE via /emails/batch to avoid oversized payloads
+  // Sends in chunks of BATCH_CHUNK_SIZE via /emails/batch (Resend's batch limit)
   async sendBatch(
     recipients: BatchRecipient[]
-  ): Promise<UnosendResponse<{ id: string }[]>> {
+  ): Promise<ResendResult<{ id: string }[]>> {
     const from = this.fromHeader();
     const ids: { id: string }[] = [];
 
@@ -111,15 +112,12 @@ export class UnosendClient {
       const result = await this.request<{ data: { id: string }[] }>(
         "POST",
         "/emails/batch",
-        {
-          emails: chunk.map((r) => ({
-            from,
-            to: [r.to],
-            subject: r.subject,
-            html: r.htmlBody,
-            tracking: { open: true, click: true },
-          })),
-        }
+        chunk.map((r) => ({
+          from,
+          to: [r.to],
+          subject: r.subject,
+          html: r.htmlBody,
+        }))
       );
 
       if (!result.success) return { success: false, error: result.error };
@@ -129,40 +127,43 @@ export class UnosendClient {
     return { success: true, data: ids };
   }
 
-  async createDomain(name: string): Promise<UnosendResponse<DomainData>> {
+  async createDomain(name: string): Promise<ResendResult<DomainData>> {
     return this.request("POST", "/domains", { name });
   }
 
-  async getDomain(id: string): Promise<UnosendResponse<DomainData>> {
+  async getDomain(id: string): Promise<ResendResult<DomainData>> {
     return this.request("GET", `/domains/${id}`);
   }
 
-  async verifyDomain(id: string): Promise<UnosendResponse<DomainData>> {
-    return this.request("POST", `/domains/${id}/verify`);
+  async verifyDomain(id: string): Promise<ResendResult<DomainData>> {
+    const result = await this.request<{ id: string }>("POST", `/domains/${id}/verify`);
+    if (!result.success) return { success: false, error: result.error };
+    // Verify only returns {id, object}; fetch the full domain to get updated records/status
+    return this.getDomain(id);
   }
 
   // Lightweight auth check, used by the Settings "Test Connection" button
-  async testConnection(): Promise<UnosendResponse<unknown>> {
+  async testConnection(): Promise<ResendResult<unknown>> {
     return this.request("GET", "/domains");
   }
 }
 
 // Build client from DB settings or env fallback
-export async function getUnosendClient(
+export async function getResendClient(
   settings: Record<string, string>
-): Promise<UnosendClient | null> {
+): Promise<ResendClient | null> {
   const apiKey =
-    settings["unosend_api_key"] || process.env.UNOSEND_API_KEY || "";
+    settings["resend_api_key"] || process.env.RESEND_API_KEY || "";
   const fromEmail =
-    settings["unosend_from_email"] ||
-    process.env.UNOSEND_FROM_EMAIL ||
+    settings["resend_from_email"] ||
+    process.env.RESEND_FROM_EMAIL ||
     "newsletter@thegistdecatur.com";
   const fromName =
-    settings["unosend_from_name"] ||
-    process.env.UNOSEND_FROM_NAME ||
+    settings["resend_from_name"] ||
+    process.env.RESEND_FROM_NAME ||
     "The Gist Decatur";
 
   if (!apiKey) return null;
 
-  return new UnosendClient({ apiKey, fromEmail, fromName });
+  return new ResendClient({ apiKey, fromEmail, fromName });
 }

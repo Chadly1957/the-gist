@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getAdminSession } from "@/lib/auth";
-import { getUnosendClient } from "@/lib/unosend";
+import { getResendClient } from "@/lib/resend";
 
 export async function POST() {
   const session = await getAdminSession();
@@ -10,7 +10,7 @@ export async function POST() {
   const rows = await prisma.setting.findMany();
   const settings = Object.fromEntries(rows.map((r) => [r.key, r.value]));
 
-  const client = await getUnosendClient(settings);
+  const client = await getResendClient(settings);
   if (!client) {
     return NextResponse.json(
       { message: "API key must be configured first." },
@@ -20,7 +20,7 @@ export async function POST() {
 
   const result = await client.testConnection();
   if (result.success) {
-    return NextResponse.json({ message: "Connected to Unosend!" });
+    return NextResponse.json({ message: "Connected to Resend!" });
   }
 
   return NextResponse.json(
