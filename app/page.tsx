@@ -130,8 +130,7 @@ export default function LandingPage() {
             {/* Right: Decatur photo */}
             <div className="hidden lg:flex items-center justify-center">
               <div className="relative w-full max-w-md">
-                <div className="absolute inset-0 translate-x-3 translate-y-3 bg-green-200 rounded-3xl opacity-40" />
-                <div className="relative rounded-3xl overflow-hidden shadow-2xl">
+                <div className="rounded-3xl overflow-hidden">
                   <Image
                     src="/hero-decatur.jpg"
                     alt="Historic Decatur pavilion"
