@@ -21,7 +21,7 @@ const BLOCK_TYPES: { type: Block["type"]; label: string; icon: string }[] = [
   { type: "text", label: "Text Block", icon: "T" },
   { type: "image", label: "Image", icon: "IMG" },
   { type: "button", label: "Button / CTA", icon: "BTN" },
-  { type: "divider", label: "Divider", icon: "—" },
+  { type: "divider", label: "Divider", icon: "─" },
   { type: "spotlight", label: "Business Spotlight", icon: "★" },
   { type: "presenting_sponsor", label: "Presenting Sponsor", icon: "✦" },
 ];
@@ -357,7 +357,7 @@ function ImageBlockFields({
       {/* Padding */}
       <div>
         <label className="block text-xs font-semibold text-gray-600 mb-2">
-          Padding (px) — <span className="font-normal text-gray-400">set all to 0 for full-width banners</span>
+          Padding (px): <span className="font-normal text-gray-400">set all to 0 for full-width banners</span>
         </label>
         <div className="grid grid-cols-4 gap-2">
           {(["Top", "Right", "Bottom", "Left"] as const).map((side) => {

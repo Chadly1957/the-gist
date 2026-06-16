@@ -46,7 +46,7 @@ function LoginForm() {
       clearTimeout(timeout);
       setStatus("error");
       if (err instanceof Error && err.name === "AbortError") {
-        setError("Session may have been created — try navigating to /admin directly, or wait a moment and try again.");
+        setError("Session may have been created. Try navigating to /admin directly, or wait a moment and try again.");
       } else {
         setError("Connection error. Please try again.");
       }

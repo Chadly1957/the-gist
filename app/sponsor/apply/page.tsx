@@ -55,7 +55,7 @@ export default function SponsorApplyPage() {
           </div>
           <h2 className="text-xl font-bold text-gray-900 mb-2">You&apos;re all set!</h2>
           <p className="text-gray-500 text-sm mb-6">
-            Your sponsor portal is ready. Bookmark this link — it&apos;s your personal access to submit listings, book ad dates, and check your status.
+            Your sponsor portal is ready. Bookmark this link, it&apos;s your personal access to submit listings, book ad dates, and check your status.
           </p>
 
           <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mb-6 text-left">
@@ -70,7 +70,7 @@ export default function SponsorApplyPage() {
             Go to My Sponsor Portal
           </a>
           <p className="text-xs text-gray-400 mt-4">
-            Save this link — you&apos;ll need it to manage your sponsorship.
+            Save this link, you&apos;ll need it to manage your sponsorship.
           </p>
         </div>
       </div>

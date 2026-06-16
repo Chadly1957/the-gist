@@ -276,7 +276,7 @@ function PortalContent() {
         {view === "spotlight" && (
           <div>
             <h1 className="text-2xl font-bold text-gray-900 mb-1">Small Business Spotlight</h1>
-            <p className="text-sm text-gray-500 mb-6">Free rotating placement in every newsletter. Submit your listing and we&apos;ll review it within 1–2 business days.</p>
+            <p className="text-sm text-gray-500 mb-6">Free rotating placement in every newsletter. Submit your listing and we&apos;ll review it within 1-2 business days.</p>
 
             {sSuccess ? (
               <div className="bg-green-50 border border-green-100 rounded-xl p-6 text-center">
@@ -311,7 +311,7 @@ function PortalContent() {
                 <div>
                   <label className="block text-xs font-semibold text-gray-600 mb-1">About Your Business * <span className="font-normal text-gray-400">({sForm.description.length}/300)</span></label>
                   <textarea value={sForm.description} onChange={(e) => setSForm((f) => ({ ...f, description: e.target.value }))} required rows={3} maxLength={300}
-                    placeholder="1–2 sentences about what you do and why readers should visit."
+                    placeholder="1-2 sentences about what you do and why readers should visit."
                     className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none" />
                 </div>
 
@@ -343,7 +343,7 @@ function PortalContent() {
         {view === "booking" && (
           <div>
             <h1 className="text-2xl font-bold text-gray-900 mb-1">Book an Ad Date</h1>
-            <p className="text-sm text-gray-500 mb-6">Choose your ad type, pick a date, and fill in your ad content. We&apos;ll review and confirm within 1–2 business days. Payment is collected separately.</p>
+            <p className="text-sm text-gray-500 mb-6">Choose your ad type, pick a date, and fill in your ad content. We&apos;ll review and confirm within 1-2 business days. Payment is collected separately.</p>
 
             {bSuccess ? (
               <div className="bg-green-50 border border-green-100 rounded-xl p-6 text-center">
@@ -364,7 +364,7 @@ function PortalContent() {
                     {(["in_article", "presenting"] as const).map((t) => (
                       <button key={t} type="button" onClick={() => setBType(t)}
                         className={`p-3 rounded-xl border text-left transition-colors ${bType === t ? "border-green-500 bg-green-50" : "border-gray-200 hover:border-gray-300"}`}>
-                        <p className="text-sm font-semibold text-gray-800">{t === "in_article" ? "In-Article — $15/day" : "Presenting Sponsor — $25/day"}</p>
+                        <p className="text-sm font-semibold text-gray-800">{t === "in_article" ? "In-Article: $15/day" : "Presenting Sponsor: $25/day"}</p>
                         <p className="text-xs text-gray-400 mt-0.5">{t === "in_article" ? "Mixed in with news articles" : "Opening mention + in-article ad"}</p>
                       </button>
                     ))}

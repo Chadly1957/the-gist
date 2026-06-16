@@ -244,7 +244,7 @@ export default function SubscribersPage() {
               {subscribers.map((sub) => (
                 <tr key={sub.id} className="border-b border-gray-100 last:border-0 hover:bg-gray-50">
                   <td className="px-5 py-3 font-medium text-gray-800">{sub.email}</td>
-                  <td className="px-5 py-3 text-gray-500">{sub.firstName || <span className="text-gray-300">—</span>}</td>
+                  <td className="px-5 py-3 text-gray-500">{sub.firstName || <span className="text-gray-300">N/A</span>}</td>
                   <td className="px-5 py-3 text-gray-500 text-xs">
                     {new Date(sub.subscribedAt).toLocaleDateString("en-US", {
                       month: "short", day: "numeric", year: "numeric",
@@ -277,7 +277,7 @@ export default function SubscribersPage() {
       {/* Pagination */}
       {totalPages > 1 && (
         <div className="flex items-center justify-between mt-4 text-sm text-gray-500">
-          <p>Showing {((page - 1) * 50) + 1}–{Math.min(page * 50, total)} of {total.toLocaleString()}</p>
+          <p>Showing {((page - 1) * 50) + 1} to {Math.min(page * 50, total)} of {total.toLocaleString()}</p>
           <div className="flex items-center gap-2">
             <button
               onClick={() => { setPage(page - 1); fetchSubscribers(search, page - 1); }}

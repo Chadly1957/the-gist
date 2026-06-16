@@ -71,7 +71,7 @@ export default async function AdminDashboard() {
           },
           {
             label: "Last Send",
-            value: lastSendDate ? stats.lastSend!.recipientCount.toString() : "—",
+            value: lastSendDate ? stats.lastSend!.recipientCount.toString() : "N/A",
             sub: lastSendDate ? `sent ${lastSendDate}` : "No sends yet",
             color: "text-orange-600",
             bg: "bg-orange-50",

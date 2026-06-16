@@ -106,7 +106,7 @@ export default function SourcesPage() {
         <div className="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-100">
           <p className="text-xs text-blue-700 font-medium">Tips for adding sources:</p>
           <ul className="text-xs text-blue-600 mt-1 space-y-0.5 list-disc list-inside">
-            <li>Substack newsletters: use the homepage URL — RSS is auto-detected</li>
+            <li>Substack newsletters: use the homepage URL, RSS is auto-detected</li>
             <li>News sites: paste the homepage or a section URL (e.g. /local-news)</li>
             <li>Direct RSS feeds: paste the feed URL directly (e.g. /feed.xml)</li>
           </ul>

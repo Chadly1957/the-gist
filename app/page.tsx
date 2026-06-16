@@ -74,7 +74,7 @@ export default function LandingPage() {
               </h1>
 
               <p className="text-lg text-gray-500 leading-relaxed mb-10 max-w-md">
-                Every morning, The Gist Decatur curates the most important local news, events, and conversations — in a quick read you&apos;ll actually finish.
+                Every morning, The Gist Decatur curates the most important local news, events, and conversations in a quick read you&apos;ll actually finish.
               </p>
 
               {status === "success" ? (
@@ -207,7 +207,7 @@ export default function LandingPage() {
                   Reach Decatur<br />readers every day.
                 </h2>
                 <p className="text-green-200 text-base leading-relaxed mb-8 max-w-md">
-                  Connect your business with engaged, local subscribers who actually read their newsletter. Three tiers designed for every budget — starting free.
+                  Connect your business with engaged, local subscribers who actually read their newsletter. Three tiers designed for every budget, starting free.
                 </p>
                 <Link
                   href="/sponsor"
@@ -238,7 +238,7 @@ export default function LandingPage() {
                   {
                     name: "Presenting Sponsor",
                     price: "$25 / day",
-                    desc: "Opening mention + full in-article ad. Exclusive — one per day.",
+                    desc: "Opening mention + full in-article ad. Exclusive: one per day.",
                     accent: "bg-green-800 border-green-600",
                   },
                 ].map((tier) => (

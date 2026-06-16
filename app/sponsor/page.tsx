@@ -37,9 +37,9 @@ export default async function SponsorPage() {
       description:
         "Get your business in front of Decatur readers every week. Your listing rotates in a group of up to 5 local businesses and appears in every newsletter we send.",
       includes: [
-        "Your logo, business name, and a 1–2 sentence description",
+        "Your logo, business name, and a 1-2 sentence description",
         "A direct link to your website",
-        "Rotating placement — everyone gets equal visibility",
+        "Rotating placement, everyone gets equal visibility",
       ],
       cta: "Apply for Free",
       highlight: false,
@@ -63,11 +63,11 @@ export default async function SponsorPage() {
       name: "Presenting Sponsor",
       price: prices.presenting,
       description:
-        "The top sponsorship slot. You're featured as the day's presenting sponsor with a mention in the opening, plus a full in-article placement — outside the 2-slot limit.",
+        "The top sponsorship slot. You're featured as the day's presenting sponsor with a mention in the opening, plus a full in-article placement, outside the 2-slot limit.",
       includes: [
         "\"Today's Gist is brought to you by [Your Business]\" opening mention",
         "Full in-article ad placement (does not count against the 2-slot cap)",
-        "Exclusive — only 1 presenting sponsor per day",
+        "Exclusive: only 1 presenting sponsor per day",
       ],
       cta: "Reserve Dates",
       highlight: true,
@@ -145,7 +145,7 @@ export default async function SponsorPage() {
           <a href="mailto:hello@thegistdecatur.com" className="text-green-700 hover:underline">
             Get in touch
           </a>{" "}
-          — we&apos;re happy to help you find the right fit.
+          and we&apos;re happy to help you find the right fit.
         </p>
       </div>
     </div>

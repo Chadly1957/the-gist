@@ -26,7 +26,7 @@ export default function ComposePage() {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
   const [subject, setSubject] = useState(
-    `The Gist Decatur — ${new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}`
+    `The Gist Decatur: ${new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}`
   );
   const [blurb, setBlurb] = useState("");
   const [newsletterDate, setNewsletterDate] = useState(new Date().toISOString().split("T")[0]);
