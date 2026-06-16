@@ -93,7 +93,7 @@ export default function AdminLayout({
       <aside className="w-56 bg-gray-900 flex flex-col shrink-0">
         <div className="px-5 py-6 border-b border-gray-800">
           <div className="flex items-center gap-2">
-            <Logo className="h-7 w-auto" />
+            <Logo className="h-14 w-auto" />
           </div>
           <p className="text-gray-500 text-xs mt-0.5 ml-4">Admin</p>
         </div>

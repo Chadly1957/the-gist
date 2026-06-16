@@ -169,7 +169,7 @@ function PortalContent() {
       <div className="bg-white border-b border-gray-200 px-6 py-4">
         <div className="max-w-3xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Logo className="h-6 w-auto" />
+            <Logo className="h-12 w-auto" />
             <span className="text-gray-300 mx-2">|</span>
             <span className="text-sm text-gray-600">{profile.businessName}</span>
           </div>

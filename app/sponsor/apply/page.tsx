@@ -85,7 +85,7 @@ export default function SponsorApplyPage() {
         </Link>
 
         <div className="flex items-center mb-6">
-          <Logo className="h-6 w-auto" />
+          <Logo className="h-12 w-auto" />
         </div>
 
         <h1 className="text-2xl font-bold text-gray-900 mb-1">Apply to Sponsor</h1>

@@ -66,7 +66,7 @@ function UnsubscribeForm() {
     <>
       <div className="text-center mb-6">
         <div className="flex items-center justify-center mb-4">
-          <Logo className="h-6 w-auto" />
+          <Logo className="h-12 w-auto" />
         </div>
         <h1 className="text-2xl font-bold text-gray-900 mb-2">Unsubscribe</h1>
         <p className="text-gray-500 text-sm">

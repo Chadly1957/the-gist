@@ -43,7 +43,7 @@ export default function LandingPage() {
       <header className="sticky top-0 z-10 bg-white/90 backdrop-blur-sm border-b border-gray-100">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Logo className="h-7 w-auto" />
+            <Logo className="h-14 w-auto" />
           </div>
           <nav className="flex items-center gap-6">
             <Link href="/sponsor" className="text-sm font-semibold text-green-700 hover:text-green-800 transition-colors">
@@ -294,7 +294,7 @@ export default function LandingPage() {
       <footer className="border-t border-gray-100 py-8">
         <div className="max-w-6xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
-            <Logo className="h-5 w-auto" />
+            <Logo className="h-10 w-auto" />
           </div>
           <div className="flex items-center gap-6 text-xs text-gray-400">
             <Link href="/sponsor" className="hover:text-gray-600 transition-colors">Advertise</Link>

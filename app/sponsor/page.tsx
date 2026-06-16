@@ -79,7 +79,7 @@ export default async function SponsorPage() {
       {/* Header */}
       <div className="bg-green-900 text-white px-6 py-16 text-center">
         <div className="flex items-center justify-center mb-6">
-          <Logo className="h-8 w-auto" />
+          <Logo className="h-16 w-auto" />
         </div>
         <h1 className="text-4xl font-bold mb-4">Reach Decatur Every Day</h1>
         <p className="text-green-200 text-lg max-w-xl mx-auto">
