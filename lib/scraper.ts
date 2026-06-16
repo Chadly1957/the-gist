@@ -159,6 +159,8 @@ async function scrapeViaRSS(
           extractFirstImage(item.content ?? itemAny["content:encoded"] ?? "") ||
           null;
 
+        const title = stripHtml(item.title ?? "");
+
         const description = truncate(
           item.contentSnippet ||
             stripHtml(item.content ?? itemAny["content:encoded"] ?? "") ||
@@ -166,10 +168,10 @@ async function scrapeViaRSS(
             ""
         );
 
-        if (!item.title || !description) continue;
+        if (!title || !description) continue;
 
         articles.push({
-          title: item.title.trim(),
+          title,
           description,
           imageUrl,
           articleUrl: itemUrl,
@@ -178,13 +180,45 @@ async function scrapeViaRSS(
         });
       }
 
-      if (articles.length > 0) return articles;
+      if (articles.length > 0) {
+        // Many feeds omit image data; fall back to scraping each
+        // image-less article's own page for an og:image.
+        const missingImage = articles.filter((a) => !a.imageUrl);
+        if (missingImage.length > 0) {
+          const imageResults = await Promise.allSettled(
+            missingImage.map((a) => scrapeOgImage(a.articleUrl))
+          );
+          missingImage.forEach((article, i) => {
+            const result = imageResults[i];
+            if (result.status === "fulfilled" && result.value) {
+              article.imageUrl = result.value;
+            }
+          });
+        }
+        return articles;
+      }
     } catch {
       // Try next candidate
     }
   }
 
   return [];
+}
+
+// Lightweight fetch of just the og:image for a single article page
+async function scrapeOgImage(url: string): Promise<string | null> {
+  try {
+    const html = await fetchWithTimeout(url, 7000);
+    const $ = cheerio.load(html);
+    const image =
+      $('meta[property="og:image"]').attr("content") ||
+      $('meta[name="twitter:image"]').attr("content") ||
+      $('meta[property="og:image:url"]').attr("content") ||
+      null;
+    return image ? resolveUrl(image, url) : null;
+  } catch {
+    return null;
+  }
 }
 
 // Fall back to scraping the source homepage for article links, then meta-scrape each
