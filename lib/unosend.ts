@@ -1,24 +1,12 @@
 // Unosend API client
-// Docs reference: https://unosend.com/api
-// Configure API key and list ID in Admin > Settings
+// Docs reference: https://docs.unosend.co
+// Configure API key and sending domain in Admin > Settings
 
 interface UnosendConfig {
   apiKey: string;
-  listId: string;
   fromEmail: string;
   fromName: string;
   baseUrl?: string;
-}
-
-interface AddSubscriberParams {
-  email: string;
-  firstName?: string;
-}
-
-interface SendCampaignParams {
-  subject: string;
-  htmlBody: string;
-  listId?: string; // override default list
 }
 
 interface UnosendResponse<T = unknown> {
@@ -27,13 +15,39 @@ interface UnosendResponse<T = unknown> {
   error?: string;
 }
 
+export interface DnsRecord {
+  record?: string;
+  type: string;
+  name: string;
+  value: string;
+  ttl?: string | number;
+  status?: string;
+  priority?: number;
+}
+
+export interface DomainData {
+  id: string;
+  name: string;
+  status?: string;
+  dns_records?: DnsRecord[];
+  created_at?: string;
+}
+
+interface BatchRecipient {
+  to: string;
+  subject: string;
+  htmlBody: string;
+}
+
+const BATCH_CHUNK_SIZE = 100;
+
 export class UnosendClient {
   private config: UnosendConfig;
   private baseUrl: string;
 
   constructor(config: UnosendConfig) {
     this.config = config;
-    this.baseUrl = config.baseUrl || "https://api.unosend.com/v1";
+    this.baseUrl = config.baseUrl || "https://api.unosend.co";
   }
 
   private async request<T>(
@@ -51,13 +65,13 @@ export class UnosendClient {
         body: body ? JSON.stringify(body) : undefined,
       });
 
-      const data = await res.json();
+      const json = await res.json();
 
       if (!res.ok) {
-        return { success: false, error: data.message || `HTTP ${res.status}` };
+        return { success: false, error: json.message || json.error || `HTTP ${res.status}` };
       }
 
-      return { success: true, data };
+      return { success: true, data: json.data as T };
     } catch (err) {
       return {
         success: false,
@@ -66,54 +80,71 @@ export class UnosendClient {
     }
   }
 
-  async addSubscriber(
-    params: AddSubscriberParams
-  ): Promise<UnosendResponse> {
-    return this.request("POST", `/lists/${this.config.listId}/subscribers`, {
-      email: params.email,
-      first_name: params.firstName || "",
-      status: "subscribed",
-    });
+  private fromHeader(): string {
+    return this.config.fromName
+      ? `${this.config.fromName} <${this.config.fromEmail}>`
+      : this.config.fromEmail;
   }
 
-  async removeSubscriber(email: string): Promise<UnosendResponse> {
-    return this.request(
-      "DELETE",
-      `/lists/${this.config.listId}/subscribers/${encodeURIComponent(email)}`
-    );
-  }
-
-  async getListStats(): Promise<
-    UnosendResponse<{ total: number; active: number }>
-  > {
-    return this.request("GET", `/lists/${this.config.listId}/stats`);
-  }
-
-  async sendCampaign(
-    params: SendCampaignParams
-  ): Promise<UnosendResponse<{ campaignId: string }>> {
-    return this.request("POST", "/campaigns", {
-      subject: params.subject,
-      html: params.htmlBody,
-      list_id: params.listId || this.config.listId,
-      from_email: this.config.fromEmail,
-      from_name: this.config.fromName,
-      send_immediately: true,
-    });
-  }
-
-  async sendTestEmail(params: {
+  async sendEmail(params: {
     to: string;
     subject: string;
     htmlBody: string;
-  }): Promise<UnosendResponse> {
+  }): Promise<UnosendResponse<{ id: string }>> {
     return this.request("POST", "/emails", {
-      to: params.to,
+      from: this.fromHeader(),
+      to: [params.to],
       subject: params.subject,
       html: params.htmlBody,
-      from_email: this.config.fromEmail,
-      from_name: this.config.fromName,
+      tracking: { open: true, click: true },
     });
+  }
+
+  // Sends in chunks of BATCH_CHUNK_SIZE via /emails/batch to avoid oversized payloads
+  async sendBatch(
+    recipients: BatchRecipient[]
+  ): Promise<UnosendResponse<{ id: string }[]>> {
+    const from = this.fromHeader();
+    const ids: { id: string }[] = [];
+
+    for (let i = 0; i < recipients.length; i += BATCH_CHUNK_SIZE) {
+      const chunk = recipients.slice(i, i + BATCH_CHUNK_SIZE);
+      const result = await this.request<{ data: { id: string }[] }>(
+        "POST",
+        "/emails/batch",
+        {
+          emails: chunk.map((r) => ({
+            from,
+            to: [r.to],
+            subject: r.subject,
+            html: r.htmlBody,
+            tracking: { open: true, click: true },
+          })),
+        }
+      );
+
+      if (!result.success) return { success: false, error: result.error };
+      ids.push(...(result.data?.data || []));
+    }
+
+    return { success: true, data: ids };
+  }
+
+  async createDomain(name: string): Promise<UnosendResponse<DomainData>> {
+    return this.request("POST", "/domains", { name });
+  }
+
+  async getDomain(id: string): Promise<UnosendResponse<DomainData>> {
+    return this.request("GET", `/domains/${id}`);
+  }
+
+  async verifyDomain(id: string): Promise<UnosendResponse<DomainData>> {
+    return this.request("POST", `/domains/${id}/verify`);
+  }
+
+  // Lightweight auth check, used by the Settings "Test Connection" button
+  async testConnection(): Promise<UnosendResponse<unknown>> {
+    return this.request("GET", "/domains");
   }
 }
 
@@ -123,8 +154,6 @@ export async function getUnosendClient(
 ): Promise<UnosendClient | null> {
   const apiKey =
     settings["unosend_api_key"] || process.env.UNOSEND_API_KEY || "";
-  const listId =
-    settings["unosend_list_id"] || process.env.UNOSEND_LIST_ID || "";
   const fromEmail =
     settings["unosend_from_email"] ||
     process.env.UNOSEND_FROM_EMAIL ||
@@ -134,7 +163,7 @@ export async function getUnosendClient(
     process.env.UNOSEND_FROM_NAME ||
     "The Gist Decatur";
 
-  if (!apiKey || !listId) return null;
+  if (!apiKey) return null;
 
-  return new UnosendClient({ apiKey, listId, fromEmail, fromName });
+  return new UnosendClient({ apiKey, fromEmail, fromName });
 }

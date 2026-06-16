@@ -4,7 +4,6 @@ import { getAdminSession } from "@/lib/auth";
 
 const ALLOWED_KEYS = [
   "unosend_api_key",
-  "unosend_list_id",
   "unosend_from_email",
   "unosend_from_name",
   "sponsorship_price_spotlight",

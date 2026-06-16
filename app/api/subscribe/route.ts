@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { getUnosendClient } from "@/lib/unosend";
 
 export async function POST(req: NextRequest) {
   try {
@@ -30,13 +29,6 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Sync to Unosend if configured
-    const settings = await getSettings();
-    const client = await getUnosendClient(settings);
-    if (client) {
-      await client.addSubscriber({ email, firstName });
-    }
-
     return NextResponse.json({
       message: "You're subscribed! Welcome to The Gist Decatur.",
     });
@@ -47,9 +39,4 @@ export async function POST(req: NextRequest) {
       { status: 500 }
     );
   }
-}
-
-async function getSettings(): Promise<Record<string, string>> {
-  const rows = await prisma.setting.findMany();
-  return Object.fromEntries(rows.map((r) => [r.key, r.value]));
 }

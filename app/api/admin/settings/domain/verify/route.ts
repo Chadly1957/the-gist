@@ -9,22 +9,20 @@ export async function POST() {
 
   const rows = await prisma.setting.findMany();
   const settings = Object.fromEntries(rows.map((r) => [r.key, r.value]));
+  const domainId = settings["unosend_domain_id"];
+  if (!domainId) {
+    return NextResponse.json({ error: "No domain connected yet." }, { status: 400 });
+  }
 
   const client = await getUnosendClient(settings);
   if (!client) {
-    return NextResponse.json(
-      { message: "API key must be configured first." },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: "Unosend is not configured." }, { status: 400 });
   }
 
-  const result = await client.testConnection();
-  if (result.success) {
-    return NextResponse.json({ message: "Connected to Unosend!" });
+  const result = await client.verifyDomain(domainId);
+  if (!result.success) {
+    return NextResponse.json({ error: result.error }, { status: 502 });
   }
 
-  return NextResponse.json(
-    { message: `Connection failed: ${result.error}` },
-    { status: 400 }
-  );
+  return NextResponse.json({ domain: result.data });
 }

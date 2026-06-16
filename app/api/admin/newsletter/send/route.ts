@@ -114,15 +114,24 @@ export async function POST(req: NextRequest) {
     // Save as draft if Unosend not configured
     status = "draft";
   } else {
-    const result = await unosend.sendCampaign({ subject, htmlBody });
-    if (!result.success) {
-      return NextResponse.json(
-        { error: `Unosend error: ${result.error}` },
-        { status: 502 }
+    const activeSubscribers = await prisma.subscriber.findMany({
+      where: { active: true },
+      select: { email: true },
+    });
+
+    if (activeSubscribers.length > 0) {
+      const result = await unosend.sendBatch(
+        activeSubscribers.map((s) => ({ to: s.email, subject, htmlBody }))
       );
+      if (!result.success) {
+        return NextResponse.json(
+          { error: `Unosend error: ${result.error}` },
+          { status: 502 }
+        );
+      }
     }
-    // Get subscriber count for record
-    recipientCount = await prisma.subscriber.count({ where: { active: true } });
+
+    recipientCount = activeSubscribers.length;
   }
 
   // Record the send and update spotlight rotation counters

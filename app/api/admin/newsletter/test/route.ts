@@ -104,7 +104,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const result = await unosend.sendTestEmail({ to: testEmail, subject: `[TEST] ${subject}`, htmlBody });
+  const result = await unosend.sendEmail({ to: testEmail, subject: `[TEST] ${subject}`, htmlBody });
   if (!result.success) {
     return NextResponse.json({ error: `Send failed: ${result.error}` }, { status: 502 });
   }
