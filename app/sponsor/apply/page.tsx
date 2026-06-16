@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import Logo from "@/components/Logo";
+import { normalizeUrl } from "@/lib/url";
 
 export default function SponsorApplyPage() {
   const [form, setForm] = useState({
@@ -29,7 +30,7 @@ export default function SponsorApplyPage() {
       const res = await fetch("/api/sponsor/apply", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ ...form, website: normalizeUrl(form.website) }),
       });
       const data = await res.json();
       if (res.ok) {
@@ -144,10 +145,11 @@ export default function SponsorApplyPage() {
             <div>
               <label className="block text-xs font-semibold text-gray-600 mb-1">Website</label>
               <input
-                type="url"
+                type="text"
                 value={form.website}
                 onChange={(e) => update("website", e.target.value)}
-                placeholder="https://..."
+                onBlur={(e) => update("website", normalizeUrl(e.target.value))}
+                placeholder="decaturcoffee.com"
                 className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
               />
             </div>

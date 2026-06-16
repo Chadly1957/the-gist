@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { normalizeUrl } from "@/lib/url";
 
 export const dynamic = "force-dynamic";
 
@@ -27,7 +28,7 @@ export async function POST(req: NextRequest) {
       contactName: contactName.trim(),
       email: normalized,
       phone: phone?.trim() || null,
-      website: website?.trim() || null,
+      website: website ? normalizeUrl(website) : null,
     },
   });
 
