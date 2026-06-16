@@ -30,12 +30,14 @@ export default function ComposePage() {
   );
   const [blurb, setBlurb] = useState("");
   const [newsletterDate, setNewsletterDate] = useState(new Date().toISOString().split("T")[0]);
-  const [loading, setLoading] = useState(false);
   const [scraping, setScraping] = useState(false);
   const [sending, setSending] = useState(false);
   const [sendResult, setSendResult] = useState<{ ok: boolean; message: string } | null>(null);
   const [preview, setPreview] = useState(false);
   const [scrapeError, setScrapeError] = useState("");
+  const [showTestForm, setShowTestForm] = useState(false);
+  const [testEmail, setTestEmail] = useState("");
+  const [testSending, setTestSending] = useState(false);
 
   useEffect(() => {
     // Load templates
@@ -131,6 +133,32 @@ export default function ComposePage() {
     const data = await res.json();
     setSendResult({ ok: res.ok, message: data.message || data.error || "Unknown error" });
     setSending(false);
+  }
+
+  async function handleTestSend() {
+    if (!testEmail) return;
+    if (selectedArticles.length === 0) {
+      setSendResult({ ok: false, message: "Select at least one article before sending a test." });
+      return;
+    }
+    setTestSending(true);
+    setSendResult(null);
+    const res = await fetch("/api/admin/newsletter/test", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        testEmail,
+        subject,
+        templateId: selectedTemplateId,
+        articleIds: selectedArticles.map((a) => a.id),
+        blurb,
+        newsletterDate,
+      }),
+    });
+    const data = await res.json();
+    setSendResult({ ok: res.ok, message: data.message || data.error || "Unknown error" });
+    setTestSending(false);
+    if (res.ok) setShowTestForm(false);
   }
 
   const previewHtml = preview ? buildPreviewHtml() : "";
@@ -259,27 +287,60 @@ export default function ComposePage() {
       {/* Right panel: Compose & preview */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Toolbar */}
-        <div className="flex items-center justify-between px-6 py-3 border-b border-gray-200 bg-white shrink-0 gap-4">
-          <h2 className="text-base font-bold text-gray-900 shrink-0">Compose Issue</h2>
-          <div className="flex items-center gap-2 ml-auto">
-            <button
-              onClick={() => setPreview(!preview)}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
-                preview
-                  ? "bg-gray-900 text-white border-gray-900"
-                  : "text-gray-600 border-gray-200 hover:bg-gray-50"
-              }`}
-            >
-              {preview ? "Edit" : "Preview Email"}
-            </button>
-            <button
-              onClick={handleSend}
-              disabled={sending || selectedArticles.length === 0}
-              className="bg-green-700 hover:bg-green-800 disabled:bg-green-300 text-white px-5 py-1.5 rounded-lg text-sm font-semibold transition-colors"
-            >
-              {sending ? "Sending…" : `Send to List`}
-            </button>
+        <div className="border-b border-gray-200 bg-white shrink-0">
+          <div className="flex items-center justify-between px-6 py-3 gap-4">
+            <h2 className="text-base font-bold text-gray-900 shrink-0">Compose Issue</h2>
+            <div className="flex items-center gap-2 ml-auto">
+              <button
+                onClick={() => setPreview(!preview)}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
+                  preview
+                    ? "bg-gray-900 text-white border-gray-900"
+                    : "text-gray-600 border-gray-200 hover:bg-gray-50"
+                }`}
+              >
+                {preview ? "Edit" : "Preview Email"}
+              </button>
+              <button
+                onClick={() => { setShowTestForm((v) => !v); setSendResult(null); }}
+                className="px-3 py-1.5 rounded-lg text-sm font-medium border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors"
+              >
+                Send Test
+              </button>
+              <button
+                onClick={handleSend}
+                disabled={sending || selectedArticles.length === 0}
+                className="bg-green-700 hover:bg-green-800 disabled:bg-green-300 text-white px-5 py-1.5 rounded-lg text-sm font-semibold transition-colors"
+              >
+                {sending ? "Sending…" : "Send to List"}
+              </button>
+            </div>
           </div>
+
+          {/* Inline test send form */}
+          {showTestForm && (
+            <div className="px-6 pb-3 flex items-center gap-2 border-t border-gray-100 pt-3">
+              <svg className="w-4 h-4 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
+              <input
+                type="email"
+                value={testEmail}
+                onChange={(e) => setTestEmail(e.target.value)}
+                placeholder="test@example.com"
+                className="flex-1 max-w-xs px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                onKeyDown={(e) => e.key === "Enter" && handleTestSend()}
+              />
+              <button
+                onClick={handleTestSend}
+                disabled={testSending || !testEmail}
+                className="bg-gray-800 hover:bg-gray-900 text-white px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors disabled:opacity-50"
+              >
+                {testSending ? "Sending…" : "Send Test Email"}
+              </button>
+              <p className="text-xs text-gray-400">Sends only to this address · subject prefixed with [TEST]</p>
+            </div>
+          )}
         </div>
 
         {sendResult && (

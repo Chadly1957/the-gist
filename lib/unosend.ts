@@ -101,6 +101,20 @@ export class UnosendClient {
       send_immediately: true,
     });
   }
+
+  async sendTestEmail(params: {
+    to: string;
+    subject: string;
+    htmlBody: string;
+  }): Promise<UnosendResponse> {
+    return this.request("POST", "/emails", {
+      to: params.to,
+      subject: params.subject,
+      html: params.htmlBody,
+      from_email: this.config.fromEmail,
+      from_name: this.config.fromName,
+    });
+  }
 }
 
 // Build client from DB settings or env fallback
