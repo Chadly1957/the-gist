@@ -15,13 +15,14 @@ interface DnsRecord {
   name: string;
   value: string;
   status?: string;
+  purpose?: string;
 }
 
 interface Domain {
   id: string;
-  name: string;
+  domain: string;
   status?: string;
-  dns_records?: DnsRecord[];
+  dns_records?: { records: DnsRecord[] };
 }
 
 export default function SettingsPage() {
@@ -268,7 +269,7 @@ export default function SettingsPage() {
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-semibold text-gray-800">{domain.name}</p>
+                  <p className="text-sm font-semibold text-gray-800">{domain.domain}</p>
                   <span
                     className={`inline-block mt-1 text-xs font-medium px-2 py-0.5 rounded-full ${
                       domain.status === "verified" || domain.status === "active"
@@ -289,11 +290,12 @@ export default function SettingsPage() {
                 </button>
               </div>
 
-              {domain.dns_records && domain.dns_records.length > 0 && (
+              {domain.dns_records && domain.dns_records.records.length > 0 && (
                 <div className="border border-gray-200 rounded-lg overflow-hidden">
                   <table className="w-full text-xs">
                     <thead className="bg-gray-50 text-gray-500">
                       <tr>
+                        <th className="text-left px-3 py-2 font-medium">Purpose</th>
                         <th className="text-left px-3 py-2 font-medium">Type</th>
                         <th className="text-left px-3 py-2 font-medium">Name</th>
                         <th className="text-left px-3 py-2 font-medium">Value</th>
@@ -301,8 +303,9 @@ export default function SettingsPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
-                      {domain.dns_records.map((rec, i) => (
+                      {domain.dns_records.records.map((rec, i) => (
                         <tr key={i}>
+                          <td className="px-3 py-2 font-medium uppercase">{rec.purpose}</td>
                           <td className="px-3 py-2 font-mono">{rec.type}</td>
                           <td className="px-3 py-2 font-mono break-all">{rec.name}</td>
                           <td className="px-3 py-2 font-mono break-all">{rec.value}</td>
@@ -314,7 +317,7 @@ export default function SettingsPage() {
                 </div>
               )}
 
-              {(!domain.dns_records || domain.dns_records.length === 0) && (
+              {(!domain.dns_records || domain.dns_records.records.length === 0) && (
                 <p className="text-sm text-amber-600">
                   Unosend didn&apos;t return any DNS records for this domain. See the raw response below.
                 </p>

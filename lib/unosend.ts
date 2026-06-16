@@ -16,20 +16,19 @@ interface UnosendResponse<T = unknown> {
 }
 
 export interface DnsRecord {
-  record?: string;
-  type: string;
   name: string;
+  type: string;
   value: string;
-  ttl?: string | number;
   status?: string;
-  priority?: number;
+  purpose?: string;
+  recordType?: string;
 }
 
 export interface DomainData {
   id: string;
-  name: string;
+  domain: string;
   status?: string;
-  dns_records?: DnsRecord[];
+  dns_records?: { records: DnsRecord[] };
   created_at?: string;
 }
 
