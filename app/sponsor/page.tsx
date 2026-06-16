@@ -77,12 +77,21 @@ export default async function SponsorPage() {
   return (
     <div className="min-h-screen bg-white">
       {/* Header */}
-      <div className="bg-green-900 text-white px-6 py-16 text-center">
-        <div className="flex items-center justify-center mb-6">
+      <div className="bg-gray-50 px-6 py-16 text-center relative">
+        <Link
+          href="/"
+          className="absolute top-6 left-6 inline-flex items-center gap-1.5 text-sm font-medium text-gray-500 hover:text-gray-800 transition-colors"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+          </svg>
+          Back to Home
+        </Link>
+        <Link href="/" className="flex items-center justify-center mb-6">
           <Logo className="h-16 w-auto" />
-        </div>
-        <h1 className="text-4xl font-bold mb-4">Reach Decatur Every Day</h1>
-        <p className="text-green-200 text-lg max-w-xl mx-auto">
+        </Link>
+        <h1 className="text-4xl font-bold mb-4 text-gray-900">Reach Decatur Every Day</h1>
+        <p className="text-gray-500 text-lg max-w-xl mx-auto">
           Sponsor The Gist Decatur and put your business in front of engaged, local readers who care about their community.
         </p>
       </div>
