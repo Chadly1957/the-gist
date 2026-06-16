@@ -32,6 +32,7 @@ export default function SettingsPage() {
     spotlight_count: "5",
     in_article_count: "2",
   });
+  const [hasApiKey, setHasApiKey] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -50,6 +51,7 @@ export default function SettingsPage() {
       .then((r) => r.json())
       .then((data) => {
         setSettings((prev) => ({ ...prev, ...data.settings }));
+        setHasApiKey(Boolean(data.hasApiKey));
         setLoading(false);
       });
 
@@ -196,7 +198,7 @@ export default function SettingsPage() {
               <button
                 type="button"
                 onClick={handleTestConnection}
-                disabled={testing || !settings.unosend_api_key}
+                disabled={testing || !hasApiKey}
                 className="px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
               >
                 {testing ? "Testing…" : "Test Connection"}
@@ -247,12 +249,17 @@ export default function SettingsPage() {
                 <button
                   type="button"
                   onClick={handleConnectDomain}
-                  disabled={connecting || !settings.unosend_api_key}
+                  disabled={connecting || !hasApiKey}
                   className="px-4 py-2 bg-green-700 hover:bg-green-800 disabled:opacity-50 text-white text-sm font-semibold rounded-lg transition-colors whitespace-nowrap"
                 >
                   {connecting ? "Connecting…" : "Connect Domain"}
                 </button>
               </div>
+              {!hasApiKey && !loading && (
+                <p className="text-xs text-red-500">
+                  No Unosend API key detected (Settings field or UNOSEND_API_KEY env var). Add one above to connect a domain.
+                </p>
+              )}
               <p className="text-xs text-gray-400">
                 Enter the domain you want to send newsletters from. We&apos;ll give you DNS records to add at your registrar to verify it.
               </p>

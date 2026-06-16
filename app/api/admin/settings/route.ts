@@ -31,7 +31,11 @@ export async function GET() {
     }
   }
 
-  return NextResponse.json({ settings });
+  const hasApiKey = Boolean(
+    rows.find((r) => r.key === "unosend_api_key")?.value || process.env.UNOSEND_API_KEY
+  );
+
+  return NextResponse.json({ settings, hasApiKey });
 }
 
 export async function POST(req: NextRequest) {
