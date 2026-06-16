@@ -25,6 +25,7 @@ interface Booking {
   headline: string;
   body: string;
   ctaUrl: string;
+  ctaLabel: string;
   imageUrl: string | null;
   presentingBlurb: string | null;
   adminNotes: string | null;
@@ -66,6 +67,12 @@ export default function AdminSponsorsPage() {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  // Edit forms
+  const [editingSpotlightId, setEditingSpotlightId] = useState<string | null>(null);
+  const [spotlightForm, setSpotlightForm] = useState({ businessName: "", logoUrl: "", description: "", ctaLabel: "", ctaUrl: "" });
+  const [editingBookingId, setEditingBookingId] = useState<string | null>(null);
+  const [bookingForm, setBookingForm] = useState({ type: "in_article", date: "", headline: "", body: "", ctaUrl: "", ctaLabel: "", imageUrl: "", presentingBlurb: "" });
 
   // Pricing state
   const [prices, setPrices] = useState({
@@ -122,6 +129,22 @@ export default function AdminSponsorsPage() {
     load();
   }
 
+  function startEditSpotlight(s: Spotlight) {
+    setEditingSpotlightId(s.id);
+    setSpotlightForm({
+      businessName: s.businessName,
+      logoUrl: s.logoUrl || "",
+      description: s.description,
+      ctaLabel: s.ctaLabel,
+      ctaUrl: s.ctaUrl,
+    });
+  }
+
+  async function saveSpotlightEdit(id: string) {
+    await updateSpotlight(id, spotlightForm);
+    setEditingSpotlightId(null);
+  }
+
   async function updateBooking(id: string, patch: object) {
     await fetch(`/api/admin/sponsors/bookings/${id}`, {
       method: "PATCH",
@@ -135,6 +158,25 @@ export default function AdminSponsorsPage() {
     if (!confirm("Delete this booking?")) return;
     await fetch(`/api/admin/sponsors/bookings/${id}`, { method: "DELETE" });
     load();
+  }
+
+  function startEditBooking(b: Booking) {
+    setEditingBookingId(b.id);
+    setBookingForm({
+      type: b.type,
+      date: b.date,
+      headline: b.headline,
+      body: b.body,
+      ctaUrl: b.ctaUrl,
+      ctaLabel: b.ctaLabel,
+      imageUrl: b.imageUrl || "",
+      presentingBlurb: b.presentingBlurb || "",
+    });
+  }
+
+  async function saveBookingEdit(id: string) {
+    await updateBooking(id, bookingForm);
+    setEditingBookingId(null);
   }
 
   const pendingCount = spotlights.filter((s) => s.status === "pending").length + bookings.filter((b) => b.status === "pending_review").length;
@@ -198,31 +240,84 @@ export default function AdminSponsorsPage() {
                   </div>
                   {expandedId === s.id && (
                     <div className="border-t border-gray-100 p-4 bg-gray-50 rounded-b-xl space-y-3">
-                      <div className="flex flex-wrap gap-2">
-                        {s.status !== "approved" && (
-                          <button onClick={() => updateSpotlight(s.id, { status: "approved" })}
-                            className="px-3 py-1.5 bg-green-700 text-white rounded-lg text-xs font-semibold hover:bg-green-800">
-                            Approve
-                          </button>
-                        )}
-                        {s.status !== "expired" && (
-                          <button onClick={() => updateSpotlight(s.id, { status: "expired" })}
-                            className="px-3 py-1.5 border border-gray-200 text-gray-600 rounded-lg text-xs font-semibold hover:bg-gray-100">
-                            Expire
-                          </button>
-                        )}
-                        <a href={s.ctaUrl} target="_blank" rel="noopener noreferrer"
-                          className="px-3 py-1.5 border border-gray-200 text-gray-600 rounded-lg text-xs font-semibold hover:bg-gray-100">
-                          Visit Site ↗
-                        </a>
-                        <button onClick={() => deleteSpotlight(s.id)} className="px-3 py-1.5 text-red-500 hover:text-red-700 text-xs font-semibold">
-                          Delete
-                        </button>
-                      </div>
-                      <a href={`/sponsor/portal?token=${s.sponsor.magicToken}`} target="_blank" rel="noopener noreferrer"
-                        className="text-xs text-green-700 underline">
-                        Open sponsor portal ↗
-                      </a>
+                      {editingSpotlightId === s.id ? (
+                        <div className="space-y-3">
+                          <div>
+                            <label className="block text-xs font-semibold text-gray-600 mb-1">Business Name</label>
+                            <input type="text" value={spotlightForm.businessName}
+                              onChange={(e) => setSpotlightForm((f) => ({ ...f, businessName: e.target.value }))}
+                              className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-gray-600 mb-1">Logo URL</label>
+                            <input type="text" value={spotlightForm.logoUrl}
+                              onChange={(e) => setSpotlightForm((f) => ({ ...f, logoUrl: e.target.value }))}
+                              className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-gray-600 mb-1">Description</label>
+                            <textarea value={spotlightForm.description} rows={2} maxLength={300}
+                              onChange={(e) => setSpotlightForm((f) => ({ ...f, description: e.target.value }))}
+                              className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none" />
+                          </div>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <label className="block text-xs font-semibold text-gray-600 mb-1">Button Label</label>
+                              <input type="text" value={spotlightForm.ctaLabel}
+                                onChange={(e) => setSpotlightForm((f) => ({ ...f, ctaLabel: e.target.value }))}
+                                className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-semibold text-gray-600 mb-1">CTA / Website Link</label>
+                              <input type="text" value={spotlightForm.ctaUrl}
+                                onChange={(e) => setSpotlightForm((f) => ({ ...f, ctaUrl: e.target.value }))}
+                                className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            <button onClick={() => saveSpotlightEdit(s.id)}
+                              className="px-3 py-1.5 bg-green-700 text-white rounded-lg text-xs font-semibold hover:bg-green-800">
+                              Save Changes
+                            </button>
+                            <button onClick={() => setEditingSpotlightId(null)}
+                              className="px-3 py-1.5 border border-gray-200 text-gray-600 rounded-lg text-xs font-semibold hover:bg-gray-100">
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="flex flex-wrap gap-2">
+                            {s.status !== "approved" && (
+                              <button onClick={() => updateSpotlight(s.id, { status: "approved" })}
+                                className="px-3 py-1.5 bg-green-700 text-white rounded-lg text-xs font-semibold hover:bg-green-800">
+                                Approve
+                              </button>
+                            )}
+                            {s.status !== "expired" && (
+                              <button onClick={() => updateSpotlight(s.id, { status: "expired" })}
+                                className="px-3 py-1.5 border border-gray-200 text-gray-600 rounded-lg text-xs font-semibold hover:bg-gray-100">
+                                Expire
+                              </button>
+                            )}
+                            <button onClick={() => startEditSpotlight(s)}
+                              className="px-3 py-1.5 border border-gray-200 text-gray-600 rounded-lg text-xs font-semibold hover:bg-gray-100">
+                              Edit
+                            </button>
+                            <a href={s.ctaUrl} target="_blank" rel="noopener noreferrer"
+                              className="px-3 py-1.5 border border-gray-200 text-gray-600 rounded-lg text-xs font-semibold hover:bg-gray-100">
+                              Visit Site ↗
+                            </a>
+                            <button onClick={() => deleteSpotlight(s.id)} className="px-3 py-1.5 text-red-500 hover:text-red-700 text-xs font-semibold">
+                              Delete
+                            </button>
+                          </div>
+                          <a href={`/sponsor/portal?token=${s.sponsor.magicToken}`} target="_blank" rel="noopener noreferrer"
+                            className="text-xs text-green-700 underline">
+                            Open sponsor portal ↗
+                          </a>
+                        </>
+                      )}
                     </div>
                   )}
                 </div>
@@ -258,38 +353,116 @@ export default function AdminSponsorsPage() {
                   </div>
                   {expandedId === b.id && (
                     <div className="border-t border-gray-100 p-4 bg-gray-50 rounded-b-xl space-y-3">
-                      <div className="text-xs text-gray-600 space-y-1">
-                        <p><strong>Body:</strong> {b.body}</p>
-                        <p><strong>CTA:</strong> <a href={b.ctaUrl} target="_blank" rel="noopener noreferrer" className="text-green-700 underline">{b.ctaUrl}</a></p>
-                        {b.presentingBlurb && <p><strong>Custom blurb:</strong> {b.presentingBlurb}</p>}
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        {b.status === "pending_review" && (
-                          <button onClick={() => updateBooking(b.id, { status: "approved" })}
-                            className="px-3 py-1.5 bg-green-700 text-white rounded-lg text-xs font-semibold hover:bg-green-800">
-                            Approve
-                          </button>
-                        )}
-                        {b.status === "pending_review" && (
-                          <button onClick={() => updateBooking(b.id, { status: "rejected" })}
-                            className="px-3 py-1.5 border border-gray-200 text-gray-600 rounded-lg text-xs font-semibold hover:bg-gray-100">
-                            Reject
-                          </button>
-                        )}
-                        <button onClick={() => updateBooking(b.id, { isPaid: !b.isPaid })}
-                          className="px-3 py-1.5 border border-gray-200 text-gray-600 rounded-lg text-xs font-semibold hover:bg-gray-100">
-                          Mark as {b.isPaid ? "Unpaid" : "Paid"}
-                        </button>
-                        {b.status === "approved" && (
-                          <button onClick={() => updateBooking(b.id, { status: "completed" })}
-                            className="px-3 py-1.5 border border-gray-200 text-gray-600 rounded-lg text-xs font-semibold hover:bg-gray-100">
-                            Mark Complete
-                          </button>
-                        )}
-                        <button onClick={() => deleteBooking(b.id)} className="px-3 py-1.5 text-red-500 hover:text-red-700 text-xs font-semibold">
-                          Delete
-                        </button>
-                      </div>
+                      {editingBookingId === b.id ? (
+                        <div className="space-y-3">
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <label className="block text-xs font-semibold text-gray-600 mb-1">Ad Type</label>
+                              <select value={bookingForm.type}
+                                onChange={(e) => setBookingForm((f) => ({ ...f, type: e.target.value }))}
+                                className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500">
+                                <option value="in_article">In-Article</option>
+                                <option value="presenting">Presenting</option>
+                              </select>
+                            </div>
+                            <div>
+                              <label className="block text-xs font-semibold text-gray-600 mb-1">Newsletter Date</label>
+                              <input type="date" value={bookingForm.date}
+                                onChange={(e) => setBookingForm((f) => ({ ...f, date: e.target.value }))}
+                                className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+                            </div>
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-gray-600 mb-1">Ad Image URL</label>
+                            <input type="text" value={bookingForm.imageUrl}
+                              onChange={(e) => setBookingForm((f) => ({ ...f, imageUrl: e.target.value }))}
+                              className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-gray-600 mb-1">Headline</label>
+                            <input type="text" value={bookingForm.headline}
+                              onChange={(e) => setBookingForm((f) => ({ ...f, headline: e.target.value }))}
+                              className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-gray-600 mb-1">Body Copy</label>
+                            <textarea value={bookingForm.body} rows={3} maxLength={250}
+                              onChange={(e) => setBookingForm((f) => ({ ...f, body: e.target.value }))}
+                              className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none" />
+                          </div>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <label className="block text-xs font-semibold text-gray-600 mb-1">CTA Label</label>
+                              <input type="text" value={bookingForm.ctaLabel}
+                                onChange={(e) => setBookingForm((f) => ({ ...f, ctaLabel: e.target.value }))}
+                                className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-semibold text-gray-600 mb-1">CTA Link</label>
+                              <input type="text" value={bookingForm.ctaUrl}
+                                onChange={(e) => setBookingForm((f) => ({ ...f, ctaUrl: e.target.value }))}
+                                className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+                            </div>
+                          </div>
+                          {bookingForm.type === "presenting" && (
+                            <div>
+                              <label className="block text-xs font-semibold text-gray-600 mb-1">Custom Intro Blurb</label>
+                              <textarea value={bookingForm.presentingBlurb} rows={2}
+                                onChange={(e) => setBookingForm((f) => ({ ...f, presentingBlurb: e.target.value }))}
+                                className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none" />
+                            </div>
+                          )}
+                          <div className="flex gap-2">
+                            <button onClick={() => saveBookingEdit(b.id)}
+                              className="px-3 py-1.5 bg-green-700 text-white rounded-lg text-xs font-semibold hover:bg-green-800">
+                              Save Changes
+                            </button>
+                            <button onClick={() => setEditingBookingId(null)}
+                              className="px-3 py-1.5 border border-gray-200 text-gray-600 rounded-lg text-xs font-semibold hover:bg-gray-100">
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="text-xs text-gray-600 space-y-1">
+                            <p><strong>Body:</strong> {b.body}</p>
+                            <p><strong>CTA:</strong> <a href={b.ctaUrl} target="_blank" rel="noopener noreferrer" className="text-green-700 underline">{b.ctaUrl}</a></p>
+                            {b.presentingBlurb && <p><strong>Custom blurb:</strong> {b.presentingBlurb}</p>}
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            {b.status === "pending_review" && (
+                              <button onClick={() => updateBooking(b.id, { status: "approved" })}
+                                className="px-3 py-1.5 bg-green-700 text-white rounded-lg text-xs font-semibold hover:bg-green-800">
+                                Approve
+                              </button>
+                            )}
+                            {b.status === "pending_review" && (
+                              <button onClick={() => updateBooking(b.id, { status: "rejected" })}
+                                className="px-3 py-1.5 border border-gray-200 text-gray-600 rounded-lg text-xs font-semibold hover:bg-gray-100">
+                                Reject
+                              </button>
+                            )}
+                            <button onClick={() => updateBooking(b.id, { isPaid: !b.isPaid })}
+                              className="px-3 py-1.5 border border-gray-200 text-gray-600 rounded-lg text-xs font-semibold hover:bg-gray-100">
+                              Mark as {b.isPaid ? "Unpaid" : "Paid"}
+                            </button>
+                            {b.status === "approved" && (
+                              <button onClick={() => updateBooking(b.id, { status: "completed" })}
+                                className="px-3 py-1.5 border border-gray-200 text-gray-600 rounded-lg text-xs font-semibold hover:bg-gray-100">
+                                Mark Complete
+                              </button>
+                            )}
+                            <button onClick={() => startEditBooking(b)}
+                              className="px-3 py-1.5 border border-gray-200 text-gray-600 rounded-lg text-xs font-semibold hover:bg-gray-100">
+                              Edit
+                            </button>
+                            <button onClick={() => deleteBooking(b.id)} className="px-3 py-1.5 text-red-500 hover:text-red-700 text-xs font-semibold">
+                              Delete
+                            </button>
+                          </div>
+                        </>
+                      )}
                     </div>
                   )}
                 </div>

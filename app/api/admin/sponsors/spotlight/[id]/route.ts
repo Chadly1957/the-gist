@@ -9,14 +9,18 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await req.json();
-  const { status, notes } = body;
+  const { status, businessName, logoUrl, description, ctaLabel, ctaUrl } = body;
 
   const data: Record<string, unknown> = {};
   if (status) {
     data.status = status;
     if (status === "approved") data.approvedAt = new Date();
   }
-  if (notes !== undefined) data.adminNotes = notes;
+  if (businessName !== undefined) data.businessName = businessName;
+  if (logoUrl !== undefined) data.logoUrl = logoUrl;
+  if (description !== undefined) data.description = description;
+  if (ctaLabel !== undefined) data.ctaLabel = ctaLabel;
+  if (ctaUrl !== undefined) data.ctaUrl = ctaUrl;
 
   const updated = await prisma.spotlightListing.update({
     where: { id: params.id },

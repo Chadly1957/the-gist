@@ -9,7 +9,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await req.json();
-  const { status, isPaid, adminNotes } = body;
+  const { status, isPaid, adminNotes, type, date, headline, body: adBody, ctaUrl, ctaLabel, imageUrl, presentingBlurb } = body;
 
   const data: Record<string, unknown> = {};
   if (status !== undefined) {
@@ -18,6 +18,14 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   }
   if (isPaid !== undefined) data.isPaid = isPaid;
   if (adminNotes !== undefined) data.adminNotes = adminNotes;
+  if (type !== undefined) data.type = type;
+  if (date !== undefined) data.date = date;
+  if (headline !== undefined) data.headline = headline;
+  if (adBody !== undefined) data.body = adBody;
+  if (ctaUrl !== undefined) data.ctaUrl = ctaUrl;
+  if (ctaLabel !== undefined) data.ctaLabel = ctaLabel;
+  if (imageUrl !== undefined) data.imageUrl = imageUrl;
+  if (presentingBlurb !== undefined) data.presentingBlurb = presentingBlurb;
 
   const updated = await prisma.adBooking.update({
     where: { id: params.id },
