@@ -54,6 +54,159 @@ function StatusBadge({ status }: { status: string }) {
   return <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${s.color}`}>{s.label}</span>;
 }
 
+interface DayAvailability {
+  inArticle: number;
+  presenting: number;
+}
+
+function BookingDatePicker({
+  selectedDates,
+  onToggleDate,
+  adType,
+}: {
+  selectedDates: string[];
+  onToggleDate: (date: string) => void;
+  adType: "in_article" | "presenting";
+}) {
+  const [open, setOpen] = useState(false);
+  const [viewDate, setViewDate] = useState(() => {
+    const d = new Date();
+    return new Date(d.getFullYear(), d.getMonth(), 1);
+  });
+  const [availability, setAvailability] = useState<Record<string, Record<string, DayAvailability>>>({});
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const year = viewDate.getFullYear();
+  const month = viewDate.getMonth();
+  const monthKey = `${year}-${month + 1}`;
+
+  useEffect(() => {
+    if (availability[monthKey]) return;
+    fetch(`/api/sponsor/calendar?year=${year}&month=${month + 1}`)
+      .then((r) => r.json())
+      .then((data) => setAvailability((prev) => ({ ...prev, [monthKey]: data.availability || {} })));
+  }, [monthKey, year, month, availability]);
+
+  useEffect(() => {
+    if (!open) return;
+    function handleClick(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [open]);
+
+  const todayStr = new Date().toISOString().split("T")[0];
+
+  function isUnavailable(dateStr: string) {
+    if (dateStr < todayStr) return true;
+    const day = availability[monthKey]?.[dateStr];
+    if (!day) return false;
+    return adType === "in_article" ? day.inArticle >= 2 : day.presenting >= 1;
+  }
+
+  const firstDay = new Date(year, month, 1);
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const startOffset = firstDay.getDay();
+  const cells: (string | null)[] = [
+    ...Array(startOffset).fill(null),
+    ...Array.from(
+      { length: daysInMonth },
+      (_, i) => `${year}-${String(month + 1).padStart(2, "0")}-${String(i + 1).padStart(2, "0")}`
+    ),
+  ];
+
+  const summary =
+    selectedDates.length === 0
+      ? "Select date(s)…"
+      : selectedDates.length === 1
+      ? new Date(selectedDates[0] + "T00:00:00").toLocaleDateString(undefined, {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+        })
+      : `${selectedDates.length} dates selected`;
+
+  return (
+    <div className="relative" ref={containerRef}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="w-full flex items-center justify-between px-3 py-2 border border-gray-200 rounded-lg text-sm text-left focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
+      >
+        <span className={selectedDates.length ? "text-gray-800" : "text-gray-400"}>{summary}</span>
+        <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      {open && (
+        <div className="absolute z-10 mt-2 w-72 bg-white border border-gray-200 rounded-xl shadow-lg p-3">
+          <div className="flex items-center justify-between mb-2">
+            <button
+              type="button"
+              onClick={() => setViewDate(new Date(year, month - 1, 1))}
+              className="p-1 text-gray-400 hover:text-gray-700"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+            <p className="text-sm font-semibold text-gray-700">
+              {firstDay.toLocaleDateString(undefined, { month: "long", year: "numeric" })}
+            </p>
+            <button
+              type="button"
+              onClick={() => setViewDate(new Date(year, month + 1, 1))}
+              className="p-1 text-gray-400 hover:text-gray-700"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+          </div>
+          <div className="grid grid-cols-7 gap-1 text-center text-[10px] text-gray-400 mb-1">
+            {["S", "M", "T", "W", "T", "F", "S"].map((d, i) => (
+              <div key={i}>{d}</div>
+            ))}
+          </div>
+          <div className="grid grid-cols-7 gap-1">
+            {cells.map((dateStr, i) => {
+              if (!dateStr) return <div key={i} />;
+              const disabled = isUnavailable(dateStr);
+              const selected = selectedDates.includes(dateStr);
+              const dayNum = parseInt(dateStr.split("-")[2], 10);
+              return (
+                <button
+                  key={dateStr}
+                  type="button"
+                  disabled={disabled}
+                  onClick={() => onToggleDate(dateStr)}
+                  className={`text-xs py-1.5 rounded-lg transition-colors ${
+                    disabled
+                      ? "text-gray-300 cursor-not-allowed"
+                      : selected
+                      ? "bg-green-600 text-white font-semibold"
+                      : "text-gray-700 hover:bg-green-50"
+                  }`}
+                >
+                  {dayNum}
+                </button>
+              );
+            })}
+          </div>
+          <div className="flex items-center justify-between mt-3 pt-2 border-t border-gray-100">
+            <p className="text-xs text-gray-400">{selectedDates.length} selected</p>
+            <button type="button" onClick={() => setOpen(false)} className="text-xs font-medium text-green-700 hover:underline">
+              Done
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function PortalContent() {
   const searchParams = useSearchParams();
   const token = searchParams.get("token") || "";
@@ -73,13 +226,18 @@ function PortalContent() {
 
   // Booking form
   const [bType, setBType] = useState<"in_article" | "presenting">("in_article");
-  const [bDate, setBDate] = useState("");
+  const [bDates, setBDates] = useState<string[]>([]);
   const [bForm, setBForm] = useState({ headline: "", body: "", ctaUrl: "", ctaLabel: "Learn More", imageUrl: "", presentingBlurb: "" });
   const [bUploading, setBUploading] = useState(false);
   const [bSubmitting, setBSubmitting] = useState(false);
   const [bError, setBError] = useState("");
   const [bSuccess, setBSuccess] = useState(false);
+  const [bPartialErrors, setBPartialErrors] = useState<{ date: string; error: string }[]>([]);
   const bFileRef = useRef<HTMLInputElement>(null);
+
+  function toggleBookingDate(date: string) {
+    setBDates((prev) => (prev.includes(date) ? prev.filter((d) => d !== date) : [...prev, date]));
+  }
 
   useEffect(() => {
     if (!token) { setError("No portal link provided."); setLoading(false); return; }
@@ -130,18 +288,37 @@ function PortalContent() {
 
   async function submitBooking(e: React.FormEvent) {
     e.preventDefault();
-    setBSubmitting(true); setBError("");
-    try {
-      const res = await fetch("/api/sponsor/booking", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, type: bType, date: bDate, ...bForm }),
-      });
-      const data = await res.json();
-      if (res.ok) { setBSuccess(true); setProfile((p) => p ? { ...p, bookings: [...p.bookings, data.booking] } : p); }
-      else setBError(data.error || "Submission failed.");
-    } catch (_e) { setBError("Connection error."); }
-    finally { setBSubmitting(false); }
+    if (bDates.length === 0) { setBError("Select at least one date."); return; }
+    setBSubmitting(true); setBError(""); setBPartialErrors([]);
+
+    const succeeded: Booking[] = [];
+    const failed: { date: string; error: string }[] = [];
+
+    for (const date of bDates) {
+      try {
+        const res = await fetch("/api/sponsor/booking", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token, type: bType, date, ...bForm }),
+        });
+        const data = await res.json();
+        if (res.ok) succeeded.push(data.booking);
+        else failed.push({ date, error: data.error || "Submission failed." });
+      } catch (_e) {
+        failed.push({ date, error: "Connection error." });
+      }
+    }
+
+    if (succeeded.length > 0) {
+      setProfile((p) => (p ? { ...p, bookings: [...p.bookings, ...succeeded] } : p));
+    }
+    if (succeeded.length > 0) {
+      setBSuccess(true);
+      setBPartialErrors(failed);
+    } else {
+      setBError(failed.map((f) => `${f.date}: ${f.error}`).join(" "));
+    }
+    setBSubmitting(false);
   }
 
   if (loading) return (
@@ -160,8 +337,6 @@ function PortalContent() {
   );
 
   if (!profile) return null;
-
-  const today = new Date().toISOString().split("T")[0];
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -349,8 +524,16 @@ function PortalContent() {
               <div className="bg-green-50 border border-green-100 rounded-xl p-6 text-center">
                 <p className="text-green-800 font-semibold mb-1">Booking submitted!</p>
                 <p className="text-sm text-green-600">We&apos;ll review it and reach out to confirm and collect payment.</p>
+                {bPartialErrors.length > 0 && (
+                  <div className="mt-3 text-left bg-amber-50 border border-amber-100 rounded-lg p-3">
+                    <p className="text-xs font-semibold text-amber-700 mb-1">Some dates couldn&apos;t be booked:</p>
+                    {bPartialErrors.map((f) => (
+                      <p key={f.date} className="text-xs text-amber-700">{f.date}: {f.error}</p>
+                    ))}
+                  </div>
+                )}
                 <div className="flex gap-3 justify-center mt-4">
-                  <button onClick={() => { setBSuccess(false); setBForm({ headline: "", body: "", ctaUrl: "", ctaLabel: "Learn More", imageUrl: "", presentingBlurb: "" }); setBDate(""); }}
+                  <button onClick={() => { setBSuccess(false); setBPartialErrors([]); setBForm({ headline: "", body: "", ctaUrl: "", ctaLabel: "Learn More", imageUrl: "", presentingBlurb: "" }); setBDates([]); }}
                     className="text-sm text-green-700 underline">Book another date</button>
                   <button onClick={() => { setBSuccess(false); setView("overview"); }} className="text-sm text-gray-500 underline">Back to portal</button>
                 </div>
@@ -362,7 +545,7 @@ function PortalContent() {
                   <label className="block text-xs font-semibold text-gray-600 mb-2">Ad Type *</label>
                   <div className="grid grid-cols-2 gap-2">
                     {(["in_article", "presenting"] as const).map((t) => (
-                      <button key={t} type="button" onClick={() => setBType(t)}
+                      <button key={t} type="button" onClick={() => { setBType(t); setBDates([]); }}
                         className={`p-3 rounded-xl border text-left transition-colors ${bType === t ? "border-green-500 bg-green-50" : "border-gray-200 hover:border-gray-300"}`}>
                         <p className="text-sm font-semibold text-gray-800">{t === "in_article" ? "In-Article: $15/day" : "Presenting Sponsor: $25/day"}</p>
                         <p className="text-xs text-gray-400 mt-0.5">{t === "in_article" ? "Mixed in with news articles" : "Opening mention + in-article ad"}</p>
@@ -372,10 +555,10 @@ function PortalContent() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-1">Newsletter Date *</label>
-                  <input type="date" value={bDate} min={today} onChange={(e) => setBDate(e.target.value)} required
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Newsletter Date(s) *</label>
+                  <BookingDatePicker selectedDates={bDates} onToggleDate={toggleBookingDate} adType={bType} />
                   <p className="text-xs text-gray-400 mt-1">
+                    Click to select one or more dates. Grayed-out days are already fully booked.{" "}
                     {bType === "in_article" ? "Up to 2 in-article slots per day." : "Only 1 presenting sponsor per day."}
                   </p>
                 </div>
