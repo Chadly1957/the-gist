@@ -21,10 +21,11 @@ function UnsubscribeForm() {
     setStatus("loading");
     setErrorMsg("");
     try {
+      const recipientId = searchParams.get("r");
       const res = await fetch("/api/unsubscribe", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email, recipientId }),
       });
       const data = await res.json();
       if (res.ok) {

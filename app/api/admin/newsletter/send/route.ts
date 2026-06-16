@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { getAdminSession } from "@/lib/auth";
 import { getResendClient } from "@/lib/resend";
 import { renderTemplate, Block, SpotlightItem, PresentingSponsorItem, InArticleAdItem } from "@/lib/template-renderer";
+import { signTrackingUrl } from "@/lib/tracking";
 
 export async function POST(req: NextRequest) {
   const session = await getAdminSession();
@@ -95,55 +96,82 @@ export async function POST(req: NextRequest) {
       imageUrl: b.imageUrl,
     }));
 
-  // Render HTML and substitute unsubscribe URL
+  // Send via Resend
+  const resend = await getResendClient(allSettings);
+  const activeSubscribers = resend
+    ? await prisma.subscriber.findMany({ where: { active: true }, select: { id: true, email: true } })
+    : [];
+  const willSend = !!resend && activeSubscribers.length > 0;
+
+  // Render HTML once. Open/click tracking links embed a recipient-id
+  // placeholder that gets swapped in per-recipient below, so the template
+  // only needs to be rendered a single time regardless of list size.
   const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "").replace(/\/$/, "");
-  const unsubscribeUrl = `${appUrl}/unsubscribe`;
   const htmlBody = renderTemplate(
     blocks,
     articles.map((a) => ({ ...a, publishedAt: a.publishedAt })),
-    { spotlights, presentingSponsor, inArticleAds }
-  ).replace(/\{\{UNSUBSCRIBE_URL\}\}/g, unsubscribeUrl);
-
-  // Send via Resend
-  const resend = await getResendClient(allSettings);
+    { spotlights, presentingSponsor, inArticleAds },
+    willSend ? { baseUrl: appUrl, sign: signTrackingUrl } : undefined
+  ).replace(
+    /\{\{UNSUBSCRIBE_URL\}\}/g,
+    willSend
+      ? `${appUrl}/unsubscribe?r=RIDPLACEHOLDER&email=EMAILPLACEHOLDER`
+      : `${appUrl}/unsubscribe`
+  );
 
   let recipientCount = 0;
-  let status = "sent";
+  const status = resend ? "sent" : "draft";
 
-  if (!resend) {
-    // Save as draft if Resend not configured
-    status = "draft";
-  } else {
-    const activeSubscribers = await prisma.subscriber.findMany({
-      where: { active: true },
-      select: { email: true },
-    });
+  const newsletterSend = await prisma.newsletterSend.create({
+    data: { subject, htmlBody, recipientCount: 0, status },
+  });
 
-    if (activeSubscribers.length > 0) {
-      const result = await resend.sendBatch(
-        activeSubscribers.map((s) => ({ to: s.email, subject, htmlBody }))
+  if (willSend) {
+    const recipients = await Promise.all(
+      activeSubscribers.map((s) =>
+        prisma.newsletterRecipient.create({
+          data: { newsletterSendId: newsletterSend.id, subscriberId: s.id, email: s.email },
+        })
+      )
+    );
+
+    const personalized = recipients.map((r) => ({
+      to: r.email,
+      subject,
+      htmlBody: htmlBody
+        .replaceAll("RIDPLACEHOLDER", r.id)
+        .replaceAll("EMAILPLACEHOLDER", encodeURIComponent(r.email)),
+    }));
+
+    const result = await resend.sendBatch(personalized);
+    if (!result.success) {
+      await prisma.newsletterSend.update({ where: { id: newsletterSend.id }, data: { status: "failed" } });
+      return NextResponse.json(
+        { error: `Resend error: ${result.error}` },
+        { status: 502 }
       );
-      if (!result.success) {
-        return NextResponse.json(
-          { error: `Resend error: ${result.error}` },
-          { status: 502 }
-        );
-      }
     }
 
-    recipientCount = activeSubscribers.length;
+    recipientCount = recipients.length;
+    await Promise.all([
+      prisma.newsletterSend.update({ where: { id: newsletterSend.id }, data: { recipientCount } }),
+      ...(result.data ?? []).map((d, i) =>
+        d?.id
+          ? prisma.newsletterRecipient.update({ where: { id: recipients[i].id }, data: { resendEmailId: d.id } })
+          : Promise.resolve()
+      ),
+    ]);
   }
 
-  // Record the send and update spotlight rotation counters
-  await Promise.all([
-    prisma.newsletterSend.create({ data: { subject, htmlBody, recipientCount, status } }),
-    ...rawSpotlights.map((s) =>
+  // Update spotlight rotation counters
+  await Promise.all(
+    rawSpotlights.map((s) =>
       prisma.spotlightListing.update({
         where: { id: s.id },
         data: { lastShownAt: new Date(), shownCount: { increment: 1 } },
       })
-    ),
-  ]);
+    )
+  );
 
   if (status === "draft") {
     return NextResponse.json({

@@ -59,12 +59,43 @@ model Setting {
 }
 
 model NewsletterSend {
-  id             String   @id @default(cuid())
+  id             String                 @id @default(cuid())
   subject        String
   htmlBody       String
-  sentAt         DateTime @default(now())
-  recipientCount Int      @default(0)
-  status         String   @default("sent")
+  sentAt         DateTime               @default(now())
+  recipientCount Int                    @default(0)
+  status         String                 @default("sent")
+  recipients     NewsletterRecipient[]
+}
+
+model NewsletterRecipient {
+  id               String         @id @default(cuid())
+  newsletterSendId String
+  newsletterSend   NewsletterSend @relation(fields: [newsletterSendId], references: [id], onDelete: Cascade)
+  subscriberId     String?
+  email            String
+  resendEmailId    String?
+  openedAt         DateTime?
+  openCount        Int            @default(0)
+  clickedAt        DateTime?
+  clickCount       Int            @default(0)
+  unsubscribedAt   DateTime?
+  createdAt        DateTime       @default(now())
+  clicks           LinkClick[]
+
+  @@index([newsletterSendId])
+}
+
+model LinkClick {
+  id                     String              @id @default(cuid())
+  newsletterRecipientId  String
+  newsletterRecipient    NewsletterRecipient @relation(fields: [newsletterRecipientId], references: [id], onDelete: Cascade)
+  url                    String
+  linkType               String // article | button | spotlight | presenting_sponsor | in_article_ad
+  label                  String?
+  createdAt              DateTime            @default(now())
+
+  @@index([newsletterRecipientId])
 }
 
 model SponsorProfile {

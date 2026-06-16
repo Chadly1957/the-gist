@@ -43,6 +43,35 @@ export interface ArticleForRender {
   publishedAt: Date | string;
 }
 
+// Passed by server callers only (e.g. the send route) so this module never
+// has to import a Node-only signing implementation itself — it stays safe
+// to bundle into client components that render live previews.
+export interface TrackingConfig {
+  baseUrl: string;
+  sign: (url: string) => string;
+}
+
+// The actual recipient id is substituted in after rendering, once per
+// recipient, so the template only needs to be rendered once per send.
+const RECIPIENT_PLACEHOLDER = "RIDPLACEHOLDER";
+
+function trackedUrl(
+  tracking: TrackingConfig | undefined,
+  url: string,
+  type: string,
+  label?: string
+): string {
+  if (!tracking || !url) return url;
+  const params = new URLSearchParams({
+    r: RECIPIENT_PLACEHOLDER,
+    u: url,
+    t: type,
+    s: tracking.sign(url),
+  });
+  if (label) params.set("l", label);
+  return `${tracking.baseUrl}/api/track/click?${params.toString()}`;
+}
+
 const EMAIL_STYLES = `
   body { margin: 0; padding: 0; background: #f5f5f5; font-family: Georgia, serif; }
   .wrapper { max-width: 600px; margin: 0 auto; background: #ffffff; }
@@ -107,20 +136,24 @@ function renderImage(content: Record<string, unknown>): string {
 function renderArticles(
   content: Record<string, unknown>,
   articles: ArticleForRender[],
-  ads: InArticleAdItem[] = []
+  ads: InArticleAdItem[] = [],
+  tracking?: TrackingConfig
 ): string {
   if (articles.length === 0 && ads.length === 0) return "";
 
-  const articleCards = articles.map((a) => `
-      <a href="${a.articleUrl}" class="article-card" style="display:block;margin-bottom:24px;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;text-decoration:none;">
+  const articleCards = articles.map((a) => {
+    const cardUrl = trackedUrl(tracking, a.articleUrl, "article", a.title);
+    return `
+      <a href="${cardUrl}" class="article-card" style="display:block;margin-bottom:24px;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;text-decoration:none;">
         ${a.imageUrl ? `<img src="${a.imageUrl}" alt="" class="article-img" style="width:100%;height:180px;object-fit:cover;display:block;" />` : `<div class="article-img-placeholder"></div>`}
         <div class="article-body" style="padding:16px;">
           <div class="article-source" style="font-family:sans-serif;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:#16a34a;margin-bottom:6px;">${a.sourceName}</div>
           <div class="article-title" style="font-size:18px;font-weight:700;color:#111827;margin:0 0 8px;font-family:Georgia,serif;line-height:1.3;">${a.title}</div>
           <div class="article-desc" style="font-size:14px;color:#4b5563;line-height:1.6;margin:0 0 12px;font-family:sans-serif;">${a.description}</div>
-          <a href="${a.articleUrl}" class="read-more" style="display:inline-block;background:#166534;color:#ffffff;padding:8px 18px;border-radius:4px;text-decoration:none;font-size:13px;font-family:sans-serif;font-weight:600;">Read More</a>
+          <a href="${cardUrl}" class="read-more" style="display:inline-block;background:#166534;color:#ffffff;padding:8px 18px;border-radius:4px;text-decoration:none;font-size:13px;font-family:sans-serif;font-weight:600;">Read More</a>
         </div>
-      </a>`);
+      </a>`;
+  });
 
   // Weave ads between articles at even intervals
   const combined: string[] = [];
@@ -129,11 +162,11 @@ function renderArticles(
   articleCards.forEach((card, i) => {
     combined.push(card);
     if (ads[adIdx] && (i + 1) % interval === 0) {
-      combined.push(renderInArticleAd(ads[adIdx]));
+      combined.push(renderInArticleAd(ads[adIdx], tracking));
       adIdx++;
     }
   });
-  while (adIdx < ads.length) { combined.push(renderInArticleAd(ads[adIdx++])); }
+  while (adIdx < ads.length) { combined.push(renderInArticleAd(ads[adIdx++], tracking)); }
 
   return `
     <div class="block">
@@ -142,9 +175,11 @@ function renderArticles(
     </div>`;
 }
 
-function renderSpotlight(items: SpotlightItem[]): string {
+function renderSpotlight(items: SpotlightItem[], tracking?: TrackingConfig): string {
   if (items.length === 0) return "";
-  const cards = items.map((s) => `
+  const cards = items.map((s) => {
+    const ctaUrl = trackedUrl(tracking, s.ctaUrl, "spotlight", s.businessName);
+    return `
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid #e5e7eb;border-radius:8px;margin-bottom:12px;">
       <tr>
         <td width="60" valign="middle" style="padding:12px 0 12px 12px;">
@@ -155,10 +190,11 @@ function renderSpotlight(items: SpotlightItem[]): string {
           <div style="font-size:13px;color:#4b5563;line-height:1.5;font-family:sans-serif;">${s.description}</div>
         </td>
         <td width="140" valign="middle" align="center" style="padding:12px 12px 12px 0;">
-          <a href="${s.ctaUrl}" style="display:inline-block;background:#166534;color:#ffffff;padding:8px 16px;border-radius:4px;text-decoration:none;font-size:12px;font-family:sans-serif;font-weight:600;white-space:nowrap;">${s.ctaLabel}</a>
+          <a href="${ctaUrl}" style="display:inline-block;background:#166534;color:#ffffff;padding:8px 16px;border-radius:4px;text-decoration:none;font-size:12px;font-family:sans-serif;font-weight:600;white-space:nowrap;">${s.ctaLabel}</a>
         </td>
       </tr>
-    </table>`).join("");
+    </table>`;
+  }).join("");
 
   return `
     <div style="padding:20px 40px;">
@@ -169,9 +205,10 @@ function renderSpotlight(items: SpotlightItem[]): string {
     </div>`;
 }
 
-function renderPresentingSponsor(item: PresentingSponsorItem): string {
+function renderPresentingSponsor(item: PresentingSponsorItem, tracking?: TrackingConfig): string {
   const blurb = item.presentingBlurb ||
     `Today&rsquo;s Gist Decatur is brought to you by <strong>${item.businessName}</strong>.`;
+  const ctaUrl = trackedUrl(tracking, item.ctaUrl, "presenting_sponsor", item.businessName);
   return `
     <div style="padding:20px 40px;">
       <div style="background:#fefce8;border:1px solid #fde047;border-radius:8px;padding:16px;margin-bottom:16px;">
@@ -181,11 +218,12 @@ function renderPresentingSponsor(item: PresentingSponsorItem): string {
       ${item.imageUrl ? `<img src="${item.imageUrl}" alt="" style="max-width:100%;height:auto;display:block;border-radius:6px;margin-bottom:14px;" />` : ""}
       <div style="font-size:18px;font-weight:700;color:#111827;margin:0 0 8px;font-family:Georgia,serif;line-height:1.3;">${item.headline}</div>
       <div style="font-size:14px;color:#4b5563;line-height:1.6;margin:0 0 14px;font-family:sans-serif;">${item.body}</div>
-      <a href="${item.ctaUrl}" style="display:inline-block;background:#166534;color:#ffffff;padding:10px 20px;border-radius:4px;text-decoration:none;font-size:13px;font-family:sans-serif;font-weight:600;">${item.ctaLabel}</a>
+      <a href="${ctaUrl}" style="display:inline-block;background:#166534;color:#ffffff;padding:10px 20px;border-radius:4px;text-decoration:none;font-size:13px;font-family:sans-serif;font-weight:600;">${item.ctaLabel}</a>
     </div>`;
 }
 
-function renderInArticleAd(ad: InArticleAdItem): string {
+function renderInArticleAd(ad: InArticleAdItem, tracking?: TrackingConfig): string {
+  const ctaUrl = trackedUrl(tracking, ad.ctaUrl, "in_article_ad", ad.businessName);
   return `
     <div style="border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;margin-bottom:24px;background:#fafafa;">
       <div style="padding:6px 14px;background:#f3f4f6;font-family:sans-serif;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#9ca3af;">
@@ -195,7 +233,7 @@ function renderInArticleAd(ad: InArticleAdItem): string {
       <div style="padding:16px;">
         <div style="font-size:18px;font-weight:700;color:#111827;margin:0 0 8px;font-family:Georgia,serif;line-height:1.3;">${ad.headline}</div>
         <div style="font-size:14px;color:#4b5563;line-height:1.6;margin:0 0 14px;font-family:sans-serif;">${ad.body}</div>
-        <a href="${ad.ctaUrl}" style="display:inline-block;background:#166534;color:#ffffff;padding:8px 18px;border-radius:4px;text-decoration:none;font-size:13px;font-family:sans-serif;font-weight:600;">${ad.ctaLabel}</a>
+        <a href="${ctaUrl}" style="display:inline-block;background:#166534;color:#ffffff;padding:8px 18px;border-radius:4px;text-decoration:none;font-size:13px;font-family:sans-serif;font-weight:600;">${ad.ctaLabel}</a>
       </div>
     </div>`;
 }
@@ -204,11 +242,12 @@ function renderDivider(): string {
   return `<div class="block" style="padding:8px 40px;"><hr class="divider" style="border:none;border-top:1px solid #e5e7eb;margin:0;" /></div>`;
 }
 
-function renderButton(content: Record<string, unknown>): string {
+function renderButton(content: Record<string, unknown>, tracking?: TrackingConfig): string {
   if (!content.url) return "";
+  const url = trackedUrl(tracking, String(content.url), "button", content.label ? String(content.label) : undefined);
   return `
     <div class="button-block">
-      <a href="${content.url}" class="cta-button">${content.label || "Read More"}</a>
+      <a href="${url}" class="cta-button">${content.label || "Read More"}</a>
     </div>`;
 }
 
@@ -227,7 +266,8 @@ export function renderTemplate(
     spotlights?: SpotlightItem[];
     presentingSponsor?: PresentingSponsorItem | null;
     inArticleAds?: InArticleAdItem[];
-  } = {}
+  } = {},
+  tracking?: TrackingConfig
 ): string {
   const { spotlights = [], presentingSponsor = null, inArticleAds = [] } = sponsors;
 
@@ -241,22 +281,26 @@ export function renderTemplate(
         case "image":
           return renderImage(block.content);
         case "articles":
-          return renderArticles(block.content, articles, inArticleAds);
+          return renderArticles(block.content, articles, inArticleAds, tracking);
         case "divider":
           return renderDivider();
         case "button":
-          return renderButton(block.content);
+          return renderButton(block.content, tracking);
         case "footer":
           return renderFooter(block.content);
         case "spotlight":
-          return renderSpotlight(spotlights);
+          return renderSpotlight(spotlights, tracking);
         case "presenting_sponsor":
-          return presentingSponsor ? renderPresentingSponsor(presentingSponsor) : "";
+          return presentingSponsor ? renderPresentingSponsor(presentingSponsor, tracking) : "";
         default:
           return "";
       }
     })
     .join("\n");
+
+  const openPixel = tracking
+    ? `<img src="${tracking.baseUrl}/api/track/open?r=${RECIPIENT_PLACEHOLDER}" width="1" height="1" alt="" style="display:none;width:1px;height:1px;border:0;" />`
+    : "";
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -271,6 +315,7 @@ export function renderTemplate(
   <div class="wrapper">
     ${bodyContent}
   </div>
+  ${openPixel}
 </body>
 </html>`;
 }
