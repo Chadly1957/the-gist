@@ -47,14 +47,15 @@ export default function SettingsPage() {
   const [verifying, setVerifying] = useState(false);
   const [domainError, setDomainError] = useState("");
 
+  async function loadSettings() {
+    const res = await fetch("/api/admin/settings");
+    const data = await res.json();
+    setSettings((prev) => ({ ...prev, ...data.settings }));
+    setHasApiKey(Boolean(data.hasApiKey));
+  }
+
   useEffect(() => {
-    fetch("/api/admin/settings")
-      .then((r) => r.json())
-      .then((data) => {
-        setSettings((prev) => ({ ...prev, ...data.settings }));
-        setHasApiKey(Boolean(data.hasApiKey));
-        setLoading(false);
-      });
+    loadSettings().then(() => setLoading(false));
 
     fetch("/api/admin/settings/domain")
       .then((r) => r.json())
@@ -105,6 +106,7 @@ export default function SettingsPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ settings }),
     });
+    await loadSettings();
     setSaving(false);
     setSaved(true);
     setTimeout(() => setSaved(false), 3000);
