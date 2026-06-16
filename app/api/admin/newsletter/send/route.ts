@@ -43,11 +43,18 @@ export async function POST(req: NextRequest) {
   // Fetch sponsor data for this newsletter date
   const date = newsletterDate || new Date().toISOString().split("T")[0];
 
+  // Load settings first so we can use configured limits
+  const allSettings = Object.fromEntries(
+    (await prisma.setting.findMany()).map((r) => [r.key, r.value])
+  );
+  const spotlightCount = Math.max(1, parseInt(allSettings.spotlight_count || "5") || 5);
+  const inArticleCount = Math.max(1, parseInt(allSettings.in_article_count || "2") || 2);
+
   const [rawSpotlights, dateBookings] = await Promise.all([
     prisma.spotlightListing.findMany({
       where: { status: "approved" },
       orderBy: [{ lastShownAt: "asc" }, { shownCount: "asc" }],
-      take: 5,
+      take: spotlightCount,
     }),
     prisma.adBooking.findMany({
       where: { date, status: "approved" },
@@ -78,6 +85,7 @@ export async function POST(req: NextRequest) {
 
   const inArticleAds: InArticleAdItem[] = dateBookings
     .filter((b) => b.type === "in_article")
+    .slice(0, inArticleCount)
     .map((b) => ({
       businessName: b.sponsor.businessName,
       headline: b.headline,
@@ -97,9 +105,7 @@ export async function POST(req: NextRequest) {
   ).replace(/\{\{UNSUBSCRIBE_URL\}\}/g, unsubscribeUrl);
 
   // Send via Unosend
-  const rows = await prisma.setting.findMany();
-  const settings = Object.fromEntries(rows.map((r) => [r.key, r.value]));
-  const unosend = await getUnosendClient(settings);
+  const unosend = await getUnosendClient(allSettings);
 
   let recipientCount = 0;
   let status = "sent";

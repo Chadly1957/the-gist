@@ -10,6 +10,8 @@ const ALLOWED_KEYS = [
   "sponsorship_price_spotlight",
   "sponsorship_price_in_article",
   "sponsorship_price_presenting",
+  "spotlight_count",
+  "in_article_count",
 ];
 
 export async function GET() {

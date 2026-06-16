@@ -7,6 +7,8 @@ interface Settings {
   unosend_list_id: string;
   unosend_from_email: string;
   unosend_from_name: string;
+  spotlight_count: string;
+  in_article_count: string;
 }
 
 export default function SettingsPage() {
@@ -15,6 +17,8 @@ export default function SettingsPage() {
     unosend_list_id: "",
     unosend_from_email: "newsletter@thegistdecatur.com",
     unosend_from_name: "The Gist Decatur",
+    spotlight_count: "5",
+    in_article_count: "2",
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -164,6 +168,52 @@ export default function SettingsPage() {
                   {testResult.message}
                 </span>
               )}
+            </div>
+          </div>
+        </div>
+
+        {/* Newsletter Limits */}
+        <div className="bg-white rounded-xl border border-gray-200 p-6">
+          <div className="flex items-center gap-3 mb-5">
+            <div className="w-8 h-8 rounded-lg bg-green-50 flex items-center justify-center">
+              <svg className="w-4 h-4 text-green-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+            </div>
+            <div>
+              <h2 className="text-sm font-semibold text-gray-800">Newsletter Limits</h2>
+              <p className="text-xs text-gray-400">Control how many sponsor slots appear per newsletter</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                Spotlight businesses per issue
+              </label>
+              <input
+                type="number"
+                min="1"
+                max="10"
+                value={settings.spotlight_count}
+                onChange={(e) => setSettings((s) => ({ ...s, spotlight_count: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+              />
+              <p className="text-xs text-gray-400 mt-1">Rotating businesses shown in each newsletter (default: 5)</p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                In-article ads per issue
+              </label>
+              <input
+                type="number"
+                min="1"
+                max="10"
+                value={settings.in_article_count}
+                onChange={(e) => setSettings((s) => ({ ...s, in_article_count: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+              />
+              <p className="text-xs text-gray-400 mt-1">Max in-article ads woven into the newsletter (default: 2)</p>
             </div>
           </div>
         </div>
