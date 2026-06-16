@@ -154,7 +154,7 @@ function PortalContent() {
     <div className="min-h-screen flex items-center justify-center p-4">
       <div className="text-center">
         <p className="text-gray-500 text-sm mb-2">{error}</p>
-        <a href="/sponsor/apply" className="text-sm text-green-700 underline">Apply for a new portal</a>
+        <a href="/sponsor/apply" className="text-sm text-green-700 underline">Resend my portal link or apply for a new one</a>
       </div>
     </div>
   );

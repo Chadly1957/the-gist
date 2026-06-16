@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { normalizeUrl } from "@/lib/url";
+import { sendSponsorPortalEmail } from "@/lib/sponsor-email";
 
 export const dynamic = "force-dynamic";
 
@@ -16,9 +17,11 @@ export async function POST(req: NextRequest) {
   const existing = await prisma.sponsorProfile.findUnique({ where: { email: normalized } });
   if (existing) {
     const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "").replace(/\/$/, "");
+    const portalUrl = `${appUrl}/sponsor/portal?token=${existing.magicToken}`;
+    await sendSponsorPortalEmail(normalized, existing.contactName, portalUrl);
     return NextResponse.json({
-      message: "A profile already exists for this email.",
-      portalUrl: `${appUrl}/sponsor/portal?token=${existing.magicToken}`,
+      message: "A profile already exists for this email. We've emailed you your portal link.",
+      portalUrl,
     });
   }
 
@@ -33,8 +36,11 @@ export async function POST(req: NextRequest) {
   });
 
   const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "").replace(/\/$/, "");
+  const portalUrl = `${appUrl}/sponsor/portal?token=${profile.magicToken}`;
+  await sendSponsorPortalEmail(normalized, profile.contactName, portalUrl);
+
   return NextResponse.json({
-    message: "Profile created!",
-    portalUrl: `${appUrl}/sponsor/portal?token=${profile.magicToken}`,
+    message: "Profile created! We've also emailed you your portal link.",
+    portalUrl,
   });
 }

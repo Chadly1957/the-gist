@@ -17,8 +17,32 @@ export default function SponsorApplyPage() {
   const [result, setResult] = useState<{ portalUrl: string; message: string } | null>(null);
   const [error, setError] = useState("");
 
+  const [showResend, setShowResend] = useState(false);
+  const [resendEmail, setResendEmail] = useState("");
+  const [resendSubmitting, setResendSubmitting] = useState(false);
+  const [resendMessage, setResendMessage] = useState("");
+
   function update(key: string, val: string) {
     setForm((f) => ({ ...f, [key]: val }));
+  }
+
+  async function handleResend() {
+    if (!resendEmail.trim()) return;
+    setResendSubmitting(true);
+    setResendMessage("");
+    try {
+      const res = await fetch("/api/sponsor/resend", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: resendEmail }),
+      });
+      const data = await res.json();
+      setResendMessage(res.ok ? data.message : data.error || "Something went wrong.");
+    } catch {
+      setResendMessage("Connection error. Please try again.");
+    } finally {
+      setResendSubmitting(false);
+    }
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -165,6 +189,46 @@ export default function SponsorApplyPage() {
             {submitting ? "Creating your portal…" : "Create My Sponsor Portal"}
           </button>
         </form>
+
+        <div className="mt-5 text-center">
+          <button
+            type="button"
+            onClick={() => { setShowResend((v) => !v); setResendMessage(""); }}
+            className="text-xs text-gray-400 hover:text-gray-600"
+          >
+            Already applied? Resend my portal link
+          </button>
+        </div>
+
+        {showResend && (
+          <div className="mt-3 flex gap-2">
+            <input
+              type="email"
+              value={resendEmail}
+              onChange={(e) => setResendEmail(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  handleResend();
+                }
+              }}
+              placeholder="you@business.com"
+              className="flex-1 px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+            />
+            <button
+              type="button"
+              onClick={handleResend}
+              disabled={resendSubmitting}
+              className="px-4 py-2 border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 transition-colors whitespace-nowrap"
+            >
+              {resendSubmitting ? "Sending…" : "Send Link"}
+            </button>
+          </div>
+        )}
+
+        {resendMessage && (
+          <p className="text-xs text-gray-500 mt-2 text-center">{resendMessage}</p>
+        )}
       </div>
     </div>
   );
