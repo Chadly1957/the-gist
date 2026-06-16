@@ -47,6 +47,7 @@ export default function ComposePage() {
         setTemplates(data.templates || []);
         const def = (data.templates || []).find((t: Template) => t.isDefault);
         if (def) setSelectedTemplateId(def.id);
+        else if (data.templates?.length) setSelectedTemplateId(data.templates[0].id);
       });
     // Load already-scraped articles
     fetch("/api/admin/articles")
