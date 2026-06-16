@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
+import Logo from "@/components/Logo";
 
 export const dynamic = "force-dynamic";
 
@@ -77,9 +78,8 @@ export default async function SponsorPage() {
     <div className="min-h-screen bg-white">
       {/* Header */}
       <div className="bg-green-900 text-white px-6 py-16 text-center">
-        <div className="flex items-center justify-center gap-2 mb-6">
-          <span className="w-2 h-2 rounded-full bg-green-400 inline-block" />
-          <span className="font-bold text-sm tracking-tight">The Gist Decatur</span>
+        <div className="flex items-center justify-center mb-6">
+          <Logo className="h-8 w-auto" />
         </div>
         <h1 className="text-4xl font-bold mb-4">Reach Decatur Every Day</h1>
         <p className="text-green-200 text-lg max-w-xl mx-auto">

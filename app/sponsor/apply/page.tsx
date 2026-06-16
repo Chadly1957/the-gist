@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import Logo from "@/components/Logo";
 
 export default function SponsorApplyPage() {
   const [form, setForm] = useState({
@@ -83,9 +84,8 @@ export default function SponsorApplyPage() {
           ← Sponsorship options
         </Link>
 
-        <div className="flex items-center gap-2 mb-6">
-          <span className="w-2 h-2 rounded-full bg-green-500 inline-block" />
-          <span className="font-bold text-sm text-gray-800 tracking-tight">The Gist Decatur</span>
+        <div className="flex items-center mb-6">
+          <Logo className="h-6 w-auto" />
         </div>
 
         <h1 className="text-2xl font-bold text-gray-900 mb-1">Apply to Sponsor</h1>

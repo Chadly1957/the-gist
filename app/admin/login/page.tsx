@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
+import Logo from "@/components/Logo";
 
 function LoginForm() {
   const router = useRouter();
@@ -56,9 +57,8 @@ function LoginForm() {
     <div className="min-h-screen bg-gray-900 flex items-center justify-center px-4">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <div className="flex items-center justify-center gap-2 mb-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-green-500 inline-block" />
-            <span className="text-white font-bold text-lg">The Gist Decatur</span>
+          <div className="flex items-center justify-center mb-2">
+            <Logo className="h-9 w-auto" />
           </div>
           <p className="text-gray-400 text-sm">Admin Portal</p>
         </div>

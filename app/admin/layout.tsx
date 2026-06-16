@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
+import Logo from "@/components/Logo";
 
 const NAV_ITEMS = [
   {
@@ -92,10 +93,7 @@ export default function AdminLayout({
       <aside className="w-56 bg-gray-900 flex flex-col shrink-0">
         <div className="px-5 py-6 border-b border-gray-800">
           <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-green-500 inline-block" />
-            <span className="text-white font-bold text-sm tracking-tight">
-              The Gist Decatur
-            </span>
+            <Logo className="h-7 w-auto" />
           </div>
           <p className="text-gray-500 text-xs mt-0.5 ml-4">Admin</p>
         </div>

@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
+import Logo from "@/components/Logo";
 
 interface Spotlight {
   id: string;
@@ -168,8 +169,7 @@ function PortalContent() {
       <div className="bg-white border-b border-gray-200 px-6 py-4">
         <div className="max-w-3xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-green-500 inline-block" />
-            <span className="font-bold text-sm text-gray-800">The Gist Decatur</span>
+            <Logo className="h-6 w-auto" />
             <span className="text-gray-300 mx-2">|</span>
             <span className="text-sm text-gray-600">{profile.businessName}</span>
           </div>

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
+import Logo from "@/components/Logo";
 
 function UnsubscribeForm() {
   const searchParams = useSearchParams();
@@ -64,9 +65,8 @@ function UnsubscribeForm() {
   return (
     <>
       <div className="text-center mb-6">
-        <div className="flex items-center justify-center gap-2 mb-4">
-          <span className="w-2 h-2 rounded-full bg-green-500 inline-block" />
-          <span className="font-bold text-gray-800 text-sm tracking-tight">The Gist Decatur</span>
+        <div className="flex items-center justify-center mb-4">
+          <Logo className="h-6 w-auto" />
         </div>
         <h1 className="text-2xl font-bold text-gray-900 mb-2">Unsubscribe</h1>
         <p className="text-gray-500 text-sm">
