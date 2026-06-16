@@ -313,6 +313,19 @@ export default function SettingsPage() {
                   </table>
                 </div>
               )}
+
+              {(!domain.dns_records || domain.dns_records.length === 0) && (
+                <p className="text-sm text-amber-600">
+                  Unosend didn&apos;t return any DNS records for this domain. See the raw response below.
+                </p>
+              )}
+
+              <details className="text-xs text-gray-400">
+                <summary className="cursor-pointer hover:text-gray-600">View raw API response</summary>
+                <pre className="mt-2 p-3 bg-gray-50 rounded-lg overflow-x-auto whitespace-pre-wrap break-all">
+                  {JSON.stringify(domain, null, 2)}
+                </pre>
+              </details>
               <p className="text-xs text-gray-400">
                 Add these records at your domain registrar, then click Check Verification.
               </p>
