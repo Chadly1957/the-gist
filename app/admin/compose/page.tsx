@@ -38,6 +38,25 @@ export default function ComposePage() {
   const [showTestForm, setShowTestForm] = useState(false);
   const [testEmail, setTestEmail] = useState("");
   const [testSending, setTestSending] = useState(false);
+  const [savedKeywords, setSavedKeywords] = useState<string[]>([]);
+  const [activeKeyword, setActiveKeyword] = useState("");
+  const [newKeyword, setNewKeyword] = useState("");
+  const [clearingPool, setClearingPool] = useState(false);
+
+  useEffect(() => {
+    const saved = localStorage.getItem("gist_keyword_filters");
+    if (saved) {
+      try {
+        setSavedKeywords(JSON.parse(saved));
+      } catch {
+        // ignore malformed local storage value
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem("gist_keyword_filters", JSON.stringify(savedKeywords));
+  }, [savedKeywords]);
 
   useEffect(() => {
     // Load templates
@@ -74,12 +93,42 @@ export default function ComposePage() {
     );
   }
 
+  const filteredArticles = activeKeyword
+    ? articles.filter((a) =>
+        `${a.title} ${a.description}`.toLowerCase().includes(activeKeyword.toLowerCase())
+      )
+    : articles;
+
   function selectAll() {
-    setArticles((prev) => prev.map((a) => ({ ...a, selected: true })));
+    const ids = new Set(filteredArticles.map((a) => a.id));
+    setArticles((prev) => prev.map((a) => (ids.has(a.id) ? { ...a, selected: true } : a)));
   }
 
   function deselectAll() {
-    setArticles((prev) => prev.map((a) => ({ ...a, selected: false })));
+    const ids = new Set(filteredArticles.map((a) => a.id));
+    setArticles((prev) => prev.map((a) => (ids.has(a.id) ? { ...a, selected: false } : a)));
+  }
+
+  function applyKeyword(keyword: string) {
+    const kw = keyword.trim();
+    if (!kw) return;
+    setSavedKeywords((prev) => (prev.includes(kw) ? prev : [...prev, kw]));
+    setActiveKeyword(kw);
+    setNewKeyword("");
+  }
+
+  function removeSavedKeyword(keyword: string) {
+    setSavedKeywords((prev) => prev.filter((k) => k !== keyword));
+    if (activeKeyword === keyword) setActiveKeyword("");
+  }
+
+  async function handleClearPool() {
+    if (!confirm("Clear all saved articles from the pool? This can't be undone.")) return;
+    setClearingPool(true);
+    await fetch("/api/admin/articles", { method: "DELETE" });
+    setArticles([]);
+    setActiveKeyword("");
+    setClearingPool(false);
   }
 
   const selectedArticles = articles.filter((a) => a.selected);
@@ -168,11 +217,22 @@ export default function ComposePage() {
     <div className="flex h-screen overflow-hidden">
       {/* Left panel: Article selection */}
       <div className="w-[420px] flex flex-col border-r border-gray-200 bg-white shrink-0 overflow-hidden">
-        <div className="px-5 py-4 border-b border-gray-100">
-          <h2 className="text-base font-bold text-gray-900">Article Pool</h2>
-          <p className="text-xs text-gray-400 mt-0.5">
-            Select articles to include in today's issue
-          </p>
+        <div className="px-5 py-4 border-b border-gray-100 flex items-start justify-between gap-3">
+          <div>
+            <h2 className="text-base font-bold text-gray-900">Article Pool</h2>
+            <p className="text-xs text-gray-400 mt-0.5">
+              Select articles to include in today's issue
+            </p>
+          </div>
+          {articles.length > 0 && (
+            <button
+              onClick={handleClearPool}
+              disabled={clearingPool}
+              className="text-xs text-red-400 hover:text-red-600 font-medium shrink-0 disabled:opacity-50"
+            >
+              {clearingPool ? "Clearing…" : "Clear"}
+            </button>
+          )}
         </div>
 
         {/* Scrape button */}
@@ -201,9 +261,13 @@ export default function ComposePage() {
           </button>
           {articles.length > 0 && (
             <div className="flex items-center gap-2 ml-auto">
-              <button onClick={selectAll} className="text-xs text-gray-400 hover:text-gray-700">All</button>
+              <button onClick={selectAll} className="text-xs text-gray-400 hover:text-gray-700">
+                {activeKeyword ? "All Shown" : "All"}
+              </button>
               <span className="text-gray-200">|</span>
-              <button onClick={deselectAll} className="text-xs text-gray-400 hover:text-gray-700">None</button>
+              <button onClick={deselectAll} className="text-xs text-gray-400 hover:text-gray-700">
+                {activeKeyword ? "None Shown" : "None"}
+              </button>
             </div>
           )}
         </div>
@@ -213,6 +277,60 @@ export default function ComposePage() {
             <p className="text-xs text-red-500">{scrapeError}</p>
           </div>
         )}
+
+        {/* Keyword filters */}
+        <div className="px-5 py-3 border-b border-gray-100 space-y-2">
+          <div className="flex items-center gap-2">
+            <select
+              value={activeKeyword}
+              onChange={(e) => setActiveKeyword(e.target.value)}
+              className="flex-1 min-w-0 px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
+            >
+              <option value="">All articles</option>
+              {savedKeywords.map((k) => (
+                <option key={k} value={k}>
+                  {k}
+                </option>
+              ))}
+            </select>
+            {activeKeyword && savedKeywords.includes(activeKeyword) && (
+              <button
+                onClick={() => removeSavedKeyword(activeKeyword)}
+                title="Remove saved keyword"
+                className="text-gray-300 hover:text-red-500 shrink-0"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </button>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              value={newKeyword}
+              onChange={(e) => setNewKeyword(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && applyKeyword(newKeyword)}
+              placeholder="Filter by keyword (e.g. Decatur)…"
+              className="flex-1 min-w-0 px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-green-500"
+            />
+            <button
+              onClick={() => applyKeyword(newKeyword)}
+              disabled={!newKeyword.trim()}
+              className="text-xs font-semibold text-green-700 hover:text-green-800 disabled:text-gray-300 shrink-0 px-1"
+            >
+              Save
+            </button>
+          </div>
+          {activeKeyword && (
+            <p className="text-xs text-gray-400">
+              Showing {filteredArticles.length} of {articles.length} matching &ldquo;{activeKeyword}&rdquo;{" "}
+              <button onClick={() => setActiveKeyword("")} className="text-green-700 hover:underline">
+                clear filter
+              </button>
+            </p>
+          )}
+        </div>
 
         {/* Article list */}
         <div className="flex-1 overflow-y-auto">
@@ -224,9 +342,16 @@ export default function ComposePage() {
               <p className="text-sm font-medium">No articles yet</p>
               <p className="text-xs mt-1">Click "Fetch Latest Articles" to scrape your sources</p>
             </div>
+          ) : filteredArticles.length === 0 ? (
+            <div className="p-8 text-center text-gray-400">
+              <p className="text-sm font-medium">No articles match &ldquo;{activeKeyword}&rdquo;</p>
+              <button onClick={() => setActiveKeyword("")} className="text-xs mt-1 text-green-700 hover:underline">
+                Clear filter
+              </button>
+            </div>
           ) : (
             <div className="divide-y divide-gray-100">
-              {articles.map((article) => (
+              {filteredArticles.map((article) => (
                 <label
                   key={article.id}
                   className={`flex gap-3 p-4 cursor-pointer transition-colors ${

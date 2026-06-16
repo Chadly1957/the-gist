@@ -13,3 +13,12 @@ export async function GET() {
 
   return NextResponse.json({ articles });
 }
+
+export async function DELETE() {
+  const session = await getAdminSession();
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  await prisma.article.deleteMany({});
+
+  return NextResponse.json({ ok: true });
+}
