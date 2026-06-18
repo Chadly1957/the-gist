@@ -38,6 +38,12 @@ interface Profile {
   bookings: Booking[];
 }
 
+interface Analytics {
+  spotlightClicks: number;
+  adClicks: number;
+  bookingClicks: Record<string, number>;
+}
+
 type View = "overview" | "spotlight" | "booking";
 
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
@@ -212,6 +218,7 @@ function PortalContent() {
   const token = searchParams.get("token") || "";
 
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [analytics, setAnalytics] = useState<Analytics | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [view, setView] = useState<View>("overview");
@@ -245,7 +252,11 @@ function PortalContent() {
       .then((r) => r.json())
       .then((data) => {
         if (data.error) { setError(data.error); }
-        else { setProfile(data.profile); setSForm((f) => ({ ...f, businessName: data.profile.businessName })); }
+        else {
+          setProfile(data.profile);
+          setAnalytics(data.analytics ?? null);
+          setSForm((f) => ({ ...f, businessName: data.profile.businessName }));
+        }
       })
       .catch(() => setError("Failed to load. Please try again."))
       .finally(() => setLoading(false));
@@ -368,6 +379,27 @@ function PortalContent() {
               <p className="text-gray-500 text-sm mt-1">Welcome back, {profile.contactName}.</p>
             </div>
 
+            {/* Analytics summary — only shown once there's data */}
+            {analytics && (analytics.spotlightClicks > 0 || analytics.adClicks > 0) && (
+              <div className="bg-green-50 border border-green-100 rounded-xl p-4">
+                <p className="text-xs font-semibold text-green-800 uppercase tracking-wide mb-3">Your Performance</p>
+                <div className="grid grid-cols-2 gap-3">
+                  {analytics.spotlightClicks > 0 && (
+                    <div className="bg-white rounded-lg p-3 border border-green-100 text-center">
+                      <p className="text-2xl font-bold text-green-700">{analytics.spotlightClicks}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">Spotlight clicks</p>
+                    </div>
+                  )}
+                  {analytics.adClicks > 0 && (
+                    <div className="bg-white rounded-lg p-3 border border-green-100 text-center">
+                      <p className="text-2xl font-bold text-green-700">{analytics.adClicks}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">Ad clicks</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* Quick actions */}
             <div className="grid grid-cols-2 gap-3">
               <button
@@ -412,7 +444,14 @@ function PortalContent() {
                         <p className="text-sm font-semibold text-gray-800">{s.businessName}</p>
                         <p className="text-xs text-gray-400 truncate">{s.description}</p>
                       </div>
-                      <StatusBadge status={s.status} />
+                      <div className="flex flex-col items-end gap-1.5 shrink-0">
+                        <StatusBadge status={s.status} />
+                        {analytics && analytics.spotlightClicks > 0 && (
+                          <span className="text-xs text-green-700 font-medium">
+                            {analytics.spotlightClicks} click{analytics.spotlightClicks !== 1 ? "s" : ""}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -424,23 +463,31 @@ function PortalContent() {
               <div>
                 <h2 className="text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide">Ad Bookings</h2>
                 <div className="space-y-2">
-                  {profile.bookings.map((b) => (
-                    <div key={b.id} className="bg-white rounded-xl border border-gray-200 p-4 flex items-center gap-4">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-0.5">
-                          <p className="text-sm font-semibold text-gray-800">{b.date}</p>
-                          <span className="text-xs text-gray-400 capitalize">{b.type === "in_article" ? "In-Article" : "Presenting"}</span>
+                  {profile.bookings.map((b) => {
+                    const clicks = analytics?.bookingClicks?.[b.id] ?? 0;
+                    return (
+                      <div key={b.id} className="bg-white rounded-xl border border-gray-200 p-4 flex items-center gap-4">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-0.5">
+                            <p className="text-sm font-semibold text-gray-800">{b.date}</p>
+                            <span className="text-xs text-gray-400 capitalize">{b.type === "in_article" ? "In-Article" : "Presenting"}</span>
+                          </div>
+                          <p className="text-xs text-gray-400 truncate">{b.headline}</p>
                         </div>
-                        <p className="text-xs text-gray-400 truncate">{b.headline}</p>
+                        <div className="flex flex-col items-end gap-1 shrink-0">
+                          <StatusBadge status={b.status} />
+                          {clicks > 0 && (
+                            <span className="text-xs text-green-700 font-medium">
+                              {clicks} click{clicks !== 1 ? "s" : ""}
+                            </span>
+                          )}
+                          {!b.isPaid && b.status !== "rejected" && (
+                            <span className="text-xs text-orange-600 font-medium">Payment pending</span>
+                          )}
+                        </div>
                       </div>
-                      <div className="flex flex-col items-end gap-1">
-                        <StatusBadge status={b.status} />
-                        {!b.isPaid && b.status !== "rejected" && (
-                          <span className="text-xs text-orange-600 font-medium">Payment pending</span>
-                        )}
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}
