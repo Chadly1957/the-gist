@@ -4,6 +4,7 @@ import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import Logo from "@/components/Logo";
+import SponsorsMarquee from "@/components/SponsorsMarquee";
 
 export default function LandingPage() {
   const [email, setEmail] = useState("");
@@ -142,6 +143,8 @@ export default function LandingPage() {
             </div>
           </div>
         </section>
+
+        <SponsorsMarquee />
 
         {/* ── WHAT YOU GET ── */}
         <section className="bg-gray-50 border-y border-gray-100 py-20">

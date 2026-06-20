@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import Logo from "@/components/Logo";
+import SponsorsMarquee from "@/components/SponsorsMarquee";
 
 export const dynamic = "force-dynamic";
 
@@ -139,6 +140,8 @@ export default async function SponsorPage() {
             </div>
           ))}
         </div>
+
+        <SponsorsMarquee />
 
         <p className="text-center text-sm text-gray-400 mt-10">
           Questions?{" "}
