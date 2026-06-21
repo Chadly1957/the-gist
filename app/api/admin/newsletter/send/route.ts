@@ -119,11 +119,18 @@ export async function POST(req: NextRequest) {
       : `${appUrl}/unsubscribe`
   );
 
+  // Clean snapshot for public archive: no tracking tokens, no personalization
+  const htmlSnapshot = renderTemplate(
+    blocks,
+    articles.map((a) => ({ ...a, publishedAt: a.publishedAt })),
+    { spotlights, presentingSponsor, inArticleAds }
+  ).replace(/\{\{UNSUBSCRIBE_URL\}\}/g, `${appUrl}/unsubscribe`);
+
   let recipientCount = 0;
   const status = resend ? "sent" : "draft";
 
   const newsletterSend = await prisma.newsletterSend.create({
-    data: { subject, htmlBody, recipientCount: 0, status },
+    data: { subject, htmlBody, htmlSnapshot, recipientCount: 0, status },
   });
 
   if (willSend) {

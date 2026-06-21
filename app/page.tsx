@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import Logo from "@/components/Logo";
 import SponsorsMarquee from "@/components/SponsorsMarquee";
+import RecentIssues from "@/components/RecentIssues";
 
 export default function LandingPage() {
   const [email, setEmail] = useState("");
@@ -198,6 +199,8 @@ export default function LandingPage() {
             </div>
           </div>
         </section>
+
+        <RecentIssues />
 
         {/* ── SPONSORSHIP CTA ── */}
         <section className="bg-green-900 py-20">
