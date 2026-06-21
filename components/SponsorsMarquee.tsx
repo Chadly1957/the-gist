@@ -37,32 +37,32 @@ export default function SponsorsMarquee() {
         </p>
       </div>
       <div className="relative overflow-hidden">
-        <div className="flex gap-6 w-max animate-marquee">
+        <div className="flex gap-8 w-max animate-marquee">
           {doubled.map((s, i) => (
             <a
               key={`${s.id}-${i}`}
               href={s.ctaUrl || "#"}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-3 bg-gray-50 border border-gray-100 rounded-xl px-5 py-3 hover:border-green-200 hover:bg-green-50 transition-colors shrink-0"
+              className="flex items-center gap-4 bg-gray-50 border border-gray-100 rounded-xl px-6 py-4 hover:border-green-200 hover:bg-green-50 transition-colors shrink-0"
             >
               {s.logoUrl ? (
                 <Image
                   src={s.logoUrl}
                   alt={s.businessName}
-                  width={32}
-                  height={32}
-                  className="w-8 h-8 object-contain rounded"
+                  width={42}
+                  height={42}
+                  className="w-10 h-10 object-contain rounded"
                   unoptimized
                 />
               ) : (
-                <div className="w-8 h-8 rounded bg-green-100 flex items-center justify-center shrink-0">
-                  <span className="text-green-700 font-bold text-sm">
+                <div className="w-10 h-10 rounded bg-green-100 flex items-center justify-center shrink-0">
+                  <span className="text-green-700 font-bold text-base">
                     {s.businessName.charAt(0)}
                   </span>
                 </div>
               )}
-              <span className="text-sm font-semibold text-gray-800 whitespace-nowrap">
+              <span className="text-base font-semibold text-gray-800 whitespace-nowrap">
                 {s.businessName}
               </span>
             </a>
