@@ -45,7 +45,7 @@ export default function LandingPage() {
       <header className="sticky top-0 z-10 bg-white/90 backdrop-blur-sm border-b border-gray-100">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Logo className="h-14 w-auto" />
+            <Logo className="h-10 sm:h-14 w-auto" />
           </div>
           <nav className="flex items-center gap-6">
             <Link href="/sponsor" className="text-sm font-semibold text-green-700 hover:text-green-800 transition-colors">
@@ -60,7 +60,7 @@ export default function LandingPage() {
 
       <main className="flex-1">
         {/* ── HERO ── */}
-        <section className="max-w-6xl mx-auto px-6 pt-16 pb-20 lg:pt-24 lg:pb-28">
+        <section className="max-w-6xl mx-auto px-6 pt-10 pb-14 sm:pt-16 sm:pb-20 lg:pt-24 lg:pb-28">
           <div className="grid lg:grid-cols-2 gap-12 lg:gap-20 items-center">
             {/* Left: copy + form */}
             <div>
@@ -69,13 +69,13 @@ export default function LandingPage() {
                 Free · Daily · Local
               </div>
 
-              <h1 className="text-5xl sm:text-6xl font-extrabold text-gray-900 leading-[1.08] tracking-tight mb-6">
+              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-gray-900 leading-[1.08] tracking-tight mb-5 sm:mb-6">
                 The stories<br />
                 that matter<br />
                 <span className="text-green-700">in Decatur.</span>
               </h1>
 
-              <p className="text-lg text-gray-500 leading-relaxed mb-10 max-w-md">
+              <p className="text-base sm:text-lg text-gray-500 leading-relaxed mb-8 sm:mb-10 max-w-md">
                 Every morning, The Gist Decatur curates the most important local news, events, and conversations in a quick read you&apos;ll actually finish.
               </p>
 
@@ -92,7 +92,7 @@ export default function LandingPage() {
                   </div>
                 </div>
               ) : (
-                <form onSubmit={handleSubmit} className="max-w-md space-y-3">
+                <form onSubmit={handleSubmit} className="max-w-md space-y-3 w-full">
                   <input
                     type="text"
                     placeholder="First name (optional)"
@@ -100,7 +100,7 @@ export default function LandingPage() {
                     onChange={(e) => setFirstName(e.target.value)}
                     className="w-full px-4 py-3.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent placeholder:text-gray-400"
                   />
-                  <div className="flex gap-2">
+                  <div className="flex flex-col sm:flex-row gap-2">
                     <input
                       type="email"
                       placeholder="Your email address"
@@ -112,7 +112,7 @@ export default function LandingPage() {
                     <button
                       type="submit"
                       disabled={status === "loading"}
-                      className="bg-green-700 hover:bg-green-800 text-white font-semibold px-5 py-3.5 rounded-xl text-sm transition-colors disabled:opacity-60 whitespace-nowrap"
+                      className="bg-green-700 hover:bg-green-800 text-white font-semibold px-5 py-3.5 rounded-xl text-sm transition-colors disabled:opacity-60 whitespace-nowrap w-full sm:w-auto"
                     >
                       {status === "loading" ? "…" : "Subscribe"}
                     </button>
@@ -148,7 +148,7 @@ export default function LandingPage() {
         <SponsorsMarquee />
 
         {/* ── WHAT YOU GET ── */}
-        <section className="bg-gray-50 border-y border-gray-100 py-20">
+        <section className="bg-gray-50 border-y border-gray-100 py-14 sm:py-20">
           <div className="max-w-6xl mx-auto px-6">
             <div className="text-center mb-12">
               <h2 className="text-3xl font-extrabold text-gray-900 mb-3 tracking-tight">
@@ -203,7 +203,7 @@ export default function LandingPage() {
         <RecentIssues />
 
         {/* ── SPONSORSHIP CTA ── */}
-        <section className="bg-green-900 py-20">
+        <section className="bg-green-900 py-14 sm:py-20">
           <div className="max-w-6xl mx-auto px-6">
             <div className="grid lg:grid-cols-2 gap-12 items-center">
               {/* Left: copy */}
@@ -262,7 +262,7 @@ export default function LandingPage() {
         </section>
 
         {/* ── BOTTOM SIGNUP ── */}
-        <section className="py-20">
+        <section className="py-14 sm:py-20">
           <div className="max-w-xl mx-auto px-6 text-center">
             <h2 className="text-3xl font-extrabold text-gray-900 tracking-tight mb-3">
               Join Decatur&apos;s daily briefing.
@@ -274,7 +274,7 @@ export default function LandingPage() {
                 <p className="text-sm text-green-600">{message}</p>
               </div>
             ) : (
-              <form onSubmit={handleSubmit} className="flex gap-2 max-w-md mx-auto">
+              <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-3 max-w-md mx-auto">
                 <input
                   type="email"
                   placeholder="Your email address"
@@ -286,7 +286,7 @@ export default function LandingPage() {
                 <button
                   type="submit"
                   disabled={status === "loading"}
-                  className="bg-green-700 hover:bg-green-800 text-white font-semibold px-5 py-3.5 rounded-xl text-sm transition-colors disabled:opacity-60 whitespace-nowrap"
+                  className="bg-green-700 hover:bg-green-800 text-white font-semibold px-5 py-3.5 rounded-xl text-sm transition-colors disabled:opacity-60 whitespace-nowrap w-full sm:w-auto"
                 >
                   {status === "loading" ? "…" : "Subscribe free"}
                 </button>
@@ -300,7 +300,7 @@ export default function LandingPage() {
       <footer className="border-t border-gray-100 py-8">
         <div className="max-w-6xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
-            <Logo className="h-10 w-auto" />
+            <Logo className="h-8 sm:h-10 w-auto" />
           </div>
           <div className="flex items-center gap-6 text-xs text-gray-400">
             <Link href="/sponsor" className="hover:text-gray-600 transition-colors">Advertise</Link>

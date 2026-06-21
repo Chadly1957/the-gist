@@ -13,15 +13,15 @@ export default async function IssuesPage() {
 
   return (
     <div className="min-h-screen bg-white">
-      <div className="bg-gray-50 border-b border-gray-100 px-6 py-12 text-center">
+      <div className="bg-gray-50 border-b border-gray-100 px-6 py-8 sm:py-12 text-center">
         <Link href="/" className="flex items-center justify-center mb-6">
-          <Logo className="h-14 w-auto" />
+          <Logo className="h-10 sm:h-14 w-auto" />
         </Link>
         <h1 className="text-3xl font-extrabold text-gray-900 mb-2">Past Issues</h1>
         <p className="text-gray-500">Browse every edition of The Gist Decatur.</p>
       </div>
 
-      <div className="max-w-2xl mx-auto px-6 py-12">
+      <div className="max-w-2xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
         {issues.length === 0 ? (
           <p className="text-center text-gray-400 py-16">No issues published yet.</p>
         ) : (

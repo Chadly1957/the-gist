@@ -103,8 +103,8 @@ export default function SponsorApplyPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-start justify-center p-4 pt-12">
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 max-w-md w-full">
+    <div className="min-h-screen bg-gray-50 flex items-start justify-center p-4 pt-6 sm:pt-12">
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 sm:p-8 max-w-md w-full">
         <Link href="/sponsor" className="text-xs text-gray-400 hover:text-gray-600 mb-6 inline-block">
           ← Sponsorship options
         </Link>
@@ -155,7 +155,7 @@ export default function SponsorApplyPage() {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-semibold text-gray-600 mb-1">Phone</label>
               <input

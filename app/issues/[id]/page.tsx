@@ -8,13 +8,14 @@ import Logo from "@/components/Logo";
 export default function IssuePage() {
   const { id } = useParams<{ id: string }>();
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
   const [subject, setSubject] = useState<string>("");
   const [date, setDate] = useState<string>("");
   const [notFound, setNotFound] = useState(false);
   const [iframeHeight, setIframeHeight] = useState(2400);
 
   useEffect(() => {
-    fetch(`/api/issues?`)
+    fetch(`/api/issues`)
       .then((r) => r.json())
       .then((issues: { id: string; subject: string; sentAt: string }[]) => {
         const match = issues.find((i) => i.id === id);
@@ -56,9 +57,9 @@ export default function IssuePage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="bg-white border-b border-gray-100 px-6 py-4 flex items-center justify-between max-w-3xl mx-auto">
+      <div className="bg-white border-b border-gray-100 px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between max-w-3xl mx-auto">
         <Link href="/" className="flex items-center">
-          <Logo className="h-10 w-auto" />
+          <Logo className="h-8 sm:h-10 w-auto" />
         </Link>
         <Link
           href="/issues"
@@ -68,21 +69,24 @@ export default function IssuePage() {
         </Link>
       </div>
 
-      <div className="max-w-3xl mx-auto px-6 py-6">
+      <div className="max-w-3xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
         {subject && (
           <div className="mb-4">
-            <h1 className="text-xl font-bold text-gray-900">{subject}</h1>
+            <h1 className="text-lg sm:text-xl font-bold text-gray-900">{subject}</h1>
             {date && <p className="text-sm text-gray-400 mt-1">{date}</p>}
           </div>
         )}
 
-        <div className="rounded-2xl overflow-hidden border border-gray-200 bg-white shadow-sm">
+        <div
+          ref={wrapperRef}
+          className="rounded-2xl overflow-hidden border border-gray-200 bg-white shadow-sm overflow-x-auto"
+        >
           <iframe
             ref={iframeRef}
             src={`/api/issues/${id}`}
             width="100%"
             height={iframeHeight}
-            style={{ border: "none", display: "block" }}
+            style={{ border: "none", display: "block", minWidth: "320px" }}
             onLoad={handleIframeLoad}
             onError={() => setNotFound(true)}
             title={subject || "Newsletter issue"}
