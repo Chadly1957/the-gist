@@ -6,6 +6,7 @@ interface SponsoredClick {
   type: string;
   label: string;
   clicks: number;
+  impressions: number;
 }
 
 interface SendStats {
@@ -30,6 +31,7 @@ interface Summary {
   uniqueClicks: number;
   unsubscribes: number;
   sponsoredClicks: number;
+  sponsoredImpressions: number;
   avgOpenRate: number;
   avgClickRate: number;
 }
@@ -90,9 +92,9 @@ export default function AnalyticsPage() {
             color: "text-red-600",
           },
           {
-            label: "Sponsored Clicks",
-            value: summary?.sponsoredClicks.toLocaleString() ?? "—",
-            sub: "spotlight, presenting, in-article",
+            label: "Sponsor Impressions",
+            value: summary?.sponsoredImpressions.toLocaleString() ?? "—",
+            sub: `${summary?.sponsoredClicks.toLocaleString() ?? 0} total clicks`,
             color: "text-amber-600",
           },
         ].map((stat) => (
@@ -186,17 +188,26 @@ export default function AnalyticsPage() {
                           Sponsor click breakdown
                         </div>
                         <div className="space-y-1.5">
-                          {send.sponsoredClicks.map((s, i) => (
-                            <div key={i} className="flex items-center justify-between text-sm">
-                              <span className="text-gray-700">
-                                {s.label}{" "}
-                                <span className="text-gray-400 text-xs">
-                                  ({SPONSOR_TYPE_LABELS[s.type] || s.type})
+                          {send.sponsoredClicks.map((s, i) => {
+                            const ctr = s.impressions > 0 ? s.clicks / s.impressions : 0;
+                            return (
+                              <div key={i} className="flex items-center justify-between text-sm gap-4">
+                                <span className="text-gray-700 min-w-0">
+                                  {s.label}{" "}
+                                  <span className="text-gray-400 text-xs">
+                                    ({SPONSOR_TYPE_LABELS[s.type] || s.type})
+                                  </span>
                                 </span>
-                              </span>
-                              <span className="font-medium text-gray-900">{s.clicks} clicks</span>
-                            </div>
-                          ))}
+                                <span className="text-gray-500 shrink-0 text-xs">
+                                  {s.impressions.toLocaleString()} impressions
+                                  {" · "}
+                                  <span className="font-semibold text-gray-900">{s.clicks} clicks</span>
+                                  {" · "}
+                                  <span className="text-green-700">{pct(ctr)} CTR</span>
+                                </span>
+                              </div>
+                            );
+                          })}
                         </div>
                       </td>
                     </tr>

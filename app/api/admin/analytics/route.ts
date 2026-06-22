@@ -19,7 +19,7 @@ export async function GET() {
 
   const sendIds = sends.map((s) => s.id);
 
-  const [recipients, sponsorClicks] = await Promise.all([
+  const [recipients, sponsorClicks, spotlightAppearances] = await Promise.all([
     prisma.newsletterRecipient.findMany({
       where: { newsletterSendId: { in: sendIds } },
       select: { newsletterSendId: true, openCount: true, clickCount: true, unsubscribedAt: true },
@@ -35,7 +35,19 @@ export async function GET() {
         newsletterRecipient: { select: { newsletterSendId: true } },
       },
     }),
+    prisma.newsletterSendSpotlight.findMany({
+      where: { newsletterSendId: { in: sendIds } },
+      select: { newsletterSendId: true, spotlight: { select: { businessName: true } } },
+    }),
   ]);
+
+  // Build map: sendId → spotlight business names that appeared
+  const spotlightsBySend = new Map<string, string[]>();
+  for (const a of spotlightAppearances) {
+    const list = spotlightsBySend.get(a.newsletterSendId) ?? [];
+    list.push(a.spotlight.businessName);
+    spotlightsBySend.set(a.newsletterSendId, list);
+  }
 
   const stats = sends.map((send) => {
     const recips = recipients.filter((r) => r.newsletterSendId === send.id);
@@ -46,6 +58,7 @@ export async function GET() {
     const totalClicks = recips.reduce((sum, r) => sum + r.clickCount, 0);
     const unsubscribes = recips.filter((r) => r.unsubscribedAt).length;
 
+    // Clicks map
     const sponsorMap = new Map<string, { type: string; label: string; clicks: number }>();
     for (const c of sponsorClicks) {
       if (c.newsletterRecipient.newsletterSendId !== send.id) continue;
@@ -54,6 +67,8 @@ export async function GET() {
       if (existing) existing.clicks++;
       else sponsorMap.set(key, { type: c.linkType, label: c.label || "Unknown", clicks: 1 });
     }
+
+    const sponsoredClicks = Array.from(sponsorMap.values()).sort((a, b) => b.clicks - a.clicks);
 
     return {
       id: send.id,
@@ -68,7 +83,9 @@ export async function GET() {
       clickRate: recipientCount > 0 ? uniqueClicks / recipientCount : 0,
       totalClicks,
       unsubscribes,
-      sponsoredClicks: Array.from(sponsorMap.values()).sort((a, b) => b.clicks - a.clicks),
+      // impressions = uniqueOpens; every opener saw all sponsors in that send
+      sponsoredClicks: sponsoredClicks.map((s) => ({ ...s, impressions: uniqueOpens })),
+      spotlightNames: spotlightsBySend.get(send.id) ?? [],
     };
   });
 
@@ -80,8 +97,11 @@ export async function GET() {
       uniqueClicks: acc.uniqueClicks + s.uniqueClicks,
       unsubscribes: acc.unsubscribes + s.unsubscribes,
       sponsoredClicks: acc.sponsoredClicks + s.sponsoredClicks.reduce((sum, sc) => sum + sc.clicks, 0),
+      sponsoredImpressions:
+        acc.sponsoredImpressions +
+        (s.sponsoredClicks.length > 0 ? s.uniqueOpens * s.sponsoredClicks.length : 0),
     }),
-    { recipientCount: 0, uniqueOpens: 0, uniqueClicks: 0, unsubscribes: 0, sponsoredClicks: 0 }
+    { recipientCount: 0, uniqueOpens: 0, uniqueClicks: 0, unsubscribes: 0, sponsoredClicks: 0, sponsoredImpressions: 0 }
   );
 
   return NextResponse.json({

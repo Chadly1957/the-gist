@@ -40,8 +40,11 @@ interface Profile {
 
 interface Analytics {
   spotlightClicks: number;
+  spotlightImpressions: number;
   adClicks: number;
+  adImpressions: number;
   bookingClicks: Record<string, number>;
+  bookingImpressions: Record<string, number>;
 }
 
 type View = "overview" | "spotlight" | "booking";
@@ -380,20 +383,32 @@ function PortalContent() {
             </div>
 
             {/* Analytics summary — only shown once there's data */}
-            {analytics && (analytics.spotlightClicks > 0 || analytics.adClicks > 0) && (
+            {analytics && (analytics.spotlightImpressions > 0 || analytics.adImpressions > 0 || analytics.spotlightClicks > 0 || analytics.adClicks > 0) && (
               <div className="bg-green-50 border border-green-100 rounded-xl p-4">
                 <p className="text-xs font-semibold text-green-800 uppercase tracking-wide mb-3">Your Performance</p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {analytics.spotlightClicks > 0 && (
+                  {(analytics.spotlightImpressions > 0 || analytics.spotlightClicks > 0) && (
                     <div className="bg-white rounded-lg p-3 border border-green-100 text-center">
-                      <p className="text-2xl font-bold text-green-700">{analytics.spotlightClicks}</p>
-                      <p className="text-xs text-gray-500 mt-0.5">Spotlight clicks</p>
+                      <p className="text-2xl font-bold text-green-700">{analytics.spotlightImpressions.toLocaleString()}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">Spotlight impressions</p>
+                      {analytics.spotlightClicks > 0 && (
+                        <p className="text-xs text-green-600 font-medium mt-1">
+                          {analytics.spotlightClicks} clicks
+                          {analytics.spotlightImpressions > 0 && ` · ${((analytics.spotlightClicks / analytics.spotlightImpressions) * 100).toFixed(1)}% CTR`}
+                        </p>
+                      )}
                     </div>
                   )}
-                  {analytics.adClicks > 0 && (
+                  {(analytics.adImpressions > 0 || analytics.adClicks > 0) && (
                     <div className="bg-white rounded-lg p-3 border border-green-100 text-center">
-                      <p className="text-2xl font-bold text-green-700">{analytics.adClicks}</p>
-                      <p className="text-xs text-gray-500 mt-0.5">Ad clicks</p>
+                      <p className="text-2xl font-bold text-green-700">{analytics.adImpressions.toLocaleString()}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">Ad impressions</p>
+                      {analytics.adClicks > 0 && (
+                        <p className="text-xs text-green-600 font-medium mt-1">
+                          {analytics.adClicks} clicks
+                          {analytics.adImpressions > 0 && ` · ${((analytics.adClicks / analytics.adImpressions) * 100).toFixed(1)}% CTR`}
+                        </p>
+                      )}
                     </div>
                   )}
                 </div>
@@ -446,6 +461,11 @@ function PortalContent() {
                       </div>
                       <div className="flex flex-col items-end gap-1.5 shrink-0">
                         <StatusBadge status={s.status} />
+                        {analytics && analytics.spotlightImpressions > 0 && (
+                          <span className="text-xs text-green-700 font-medium">
+                            {analytics.spotlightImpressions.toLocaleString()} impressions
+                          </span>
+                        )}
                         {analytics && analytics.spotlightClicks > 0 && (
                           <span className="text-xs text-green-700 font-medium">
                             {analytics.spotlightClicks} click{analytics.spotlightClicks !== 1 ? "s" : ""}
@@ -465,6 +485,7 @@ function PortalContent() {
                 <div className="space-y-2">
                   {profile.bookings.map((b) => {
                     const clicks = analytics?.bookingClicks?.[b.id] ?? 0;
+                    const impressions = analytics?.bookingImpressions?.[b.id] ?? 0;
                     return (
                       <div key={b.id} className="bg-white rounded-xl border border-gray-200 p-4 flex items-center gap-4">
                         <div className="flex-1 min-w-0">
@@ -476,6 +497,11 @@ function PortalContent() {
                         </div>
                         <div className="flex flex-col items-end gap-1 shrink-0">
                           <StatusBadge status={b.status} />
+                          {impressions > 0 && (
+                            <span className="text-xs text-green-700 font-medium">
+                              {impressions.toLocaleString()} impressions
+                            </span>
+                          )}
                           {clicks > 0 && (
                             <span className="text-xs text-green-700 font-medium">
                               {clicks} click{clicks !== 1 ? "s" : ""}

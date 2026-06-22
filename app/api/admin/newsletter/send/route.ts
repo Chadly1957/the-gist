@@ -170,15 +170,20 @@ export async function POST(req: NextRequest) {
     ]);
   }
 
-  // Update spotlight rotation counters
-  await Promise.all(
-    rawSpotlights.map((s) =>
+  // Record spotlight appearances and update rotation counters
+  await Promise.all([
+    ...rawSpotlights.map((s) =>
       prisma.spotlightListing.update({
         where: { id: s.id },
         data: { lastShownAt: new Date(), shownCount: { increment: 1 } },
       })
-    )
-  );
+    ),
+    ...rawSpotlights.map((s) =>
+      prisma.newsletterSendSpotlight.create({
+        data: { newsletterSendId: newsletterSend.id, spotlightId: s.id },
+      })
+    ),
+  ]);
 
   if (status === "draft") {
     return NextResponse.json({

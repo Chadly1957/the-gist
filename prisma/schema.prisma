@@ -59,14 +59,26 @@ model Setting {
 }
 
 model NewsletterSend {
-  id             String                 @id @default(cuid())
-  subject        String
-  htmlBody       String
-  htmlSnapshot   String?
-  sentAt         DateTime               @default(now())
-  recipientCount Int                    @default(0)
-  status         String                 @default("sent")
-  recipients     NewsletterRecipient[]
+  id                   String                    @id @default(cuid())
+  subject              String
+  htmlBody             String
+  htmlSnapshot         String?
+  sentAt               DateTime                  @default(now())
+  recipientCount       Int                       @default(0)
+  status               String                    @default("sent")
+  recipients           NewsletterRecipient[]
+  spotlightAppearances NewsletterSendSpotlight[]
+}
+
+model NewsletterSendSpotlight {
+  id               String           @id @default(cuid())
+  newsletterSendId String
+  newsletterSend   NewsletterSend   @relation(fields: [newsletterSendId], references: [id], onDelete: Cascade)
+  spotlightId      String
+  spotlight        SpotlightListing @relation(fields: [spotlightId], references: [id], onDelete: Cascade)
+
+  @@index([newsletterSendId])
+  @@index([spotlightId])
 }
 
 model NewsletterRecipient {
@@ -115,19 +127,20 @@ model SponsorProfile {
 }
 
 model SpotlightListing {
-  id           String         @id @default(cuid())
-  sponsorId    String
-  sponsor      SponsorProfile @relation(fields: [sponsorId], references: [id], onDelete: Cascade)
-  businessName String
-  logoUrl      String?
-  description  String
-  ctaLabel     String         @default("Visit Website")
-  ctaUrl       String
-  status       String         @default("pending")
-  lastShownAt  DateTime?
-  shownCount   Int            @default(0)
-  createdAt    DateTime       @default(now())
-  approvedAt   DateTime?
+  id              String                    @id @default(cuid())
+  sponsorId       String
+  sponsor         SponsorProfile            @relation(fields: [sponsorId], references: [id], onDelete: Cascade)
+  businessName    String
+  logoUrl         String?
+  description     String
+  ctaLabel        String                    @default("Visit Website")
+  ctaUrl          String
+  status          String                    @default("pending")
+  lastShownAt     DateTime?
+  shownCount      Int                       @default(0)
+  createdAt       DateTime                  @default(now())
+  approvedAt      DateTime?
+  sendAppearances NewsletterSendSpotlight[]
 }
 
 model AdBooking {
