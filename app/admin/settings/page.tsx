@@ -143,11 +143,17 @@ export default function SettingsPage() {
 
             {/* Brevo credentials hint */}
             {settings.smtp_host === "smtp-relay.brevo.com" && (
-              <div className="mt-3 p-3 bg-blue-50 border border-blue-100 rounded-lg text-xs text-blue-700 leading-relaxed">
-                <strong>Brevo credentials:</strong> Username = your Brevo account login email.
-                Password = the <em>SMTP key</em> found under{" "}
-                <strong>SMTP &amp; API → SMTP tab → Generate a new SMTP key</strong> in your Brevo dashboard
-                (not your account password).
+              <div className="mt-3 p-3 bg-blue-50 border border-blue-100 rounded-lg text-xs text-blue-700 space-y-2">
+                <p className="font-semibold">Brevo setup — follow these steps exactly:</p>
+                <ol className="list-decimal list-inside space-y-1 leading-relaxed">
+                  <li>In Brevo, go to <strong>SMTP &amp; API</strong> in the left sidebar</li>
+                  <li>Click the <strong>SMTP</strong> tab (not the API Keys tab)</li>
+                  <li>If you see a &quot;Request access&quot; button, click it — free accounts need SMTP activated separately</li>
+                  <li>Once activated, click <strong>Generate a new SMTP key</strong> and copy the key shown (it starts with <code className="bg-blue-100 px-0.5 rounded">xkeysib-</code>)</li>
+                  <li><strong>Username</strong> = your Brevo login email address</li>
+                  <li><strong>Password</strong> = that SMTP key (not your Brevo account password)</li>
+                </ol>
+                <p className="text-blue-600">If you still get &quot;Authentication failed&quot; after these steps, check that your Brevo account has a verified sender email address under <strong>Senders &amp; Domains</strong>.</p>
               </div>
             )}
 
