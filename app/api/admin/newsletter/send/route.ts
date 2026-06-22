@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getAdminSession } from "@/lib/auth";
-import { getResendClient } from "@/lib/resend";
 import { renderTemplate, Block, SpotlightItem, PresentingSponsorItem, InArticleAdItem } from "@/lib/template-renderer";
+import { getEmailClient } from "@/lib/email";
 import { signTrackingUrl } from "@/lib/tracking";
 
 export async function POST(req: NextRequest) {
@@ -96,12 +96,11 @@ export async function POST(req: NextRequest) {
       imageUrl: b.imageUrl,
     }));
 
-  // Send via Resend
-  const resend = await getResendClient(allSettings);
-  const activeSubscribers = resend
+  const emailClient = getEmailClient(allSettings);
+  const activeSubscribers = emailClient
     ? await prisma.subscriber.findMany({ where: { active: true }, select: { id: true, email: true } })
     : [];
-  const willSend = !!resend && activeSubscribers.length > 0;
+  const willSend = !!emailClient && activeSubscribers.length > 0;
 
   // Render HTML once. Open/click tracking links embed a recipient-id
   // placeholder that gets swapped in per-recipient below, so the template
@@ -127,7 +126,7 @@ export async function POST(req: NextRequest) {
   ).replace(/\{\{UNSUBSCRIBE_URL\}\}/g, `${appUrl}/unsubscribe`);
 
   let recipientCount = 0;
-  const status = resend ? "sent" : "draft";
+  const status = emailClient ? "sent" : "draft";
 
   const newsletterSend = await prisma.newsletterSend.create({
     data: { subject, htmlBody, htmlSnapshot, recipientCount: 0, status },
@@ -150,11 +149,11 @@ export async function POST(req: NextRequest) {
         .replaceAll("EMAILPLACEHOLDER", encodeURIComponent(r.email)),
     }));
 
-    const result = await resend.sendBatch(personalized);
+    const result = await emailClient!.sendBatch(personalized);
     if (!result.success) {
       await prisma.newsletterSend.update({ where: { id: newsletterSend.id }, data: { status: "failed" } });
       return NextResponse.json(
-        { error: `Resend error: ${result.error}` },
+        { error: `Send failed: ${result.error}` },
         { status: 502 }
       );
     }

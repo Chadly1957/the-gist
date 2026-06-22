@@ -3,9 +3,12 @@ import { prisma } from "@/lib/db";
 import { getAdminSession } from "@/lib/auth";
 
 const ALLOWED_KEYS = [
-  "resend_api_key",
-  "resend_from_email",
-  "resend_from_name",
+  "smtp_host",
+  "smtp_port",
+  "smtp_user",
+  "smtp_pass",
+  "smtp_from",
+  "smtp_from_name",
   "sponsorship_price_spotlight",
   "sponsorship_price_in_article",
   "sponsorship_price_presenting",
@@ -23,19 +26,21 @@ export async function GET() {
 
   const settings: Record<string, string> = {};
   for (const row of rows) {
-    // Mask API key for display
-    if (row.key === "resend_api_key" && row.value) {
+    if (row.key === "smtp_pass" && row.value) {
       settings[row.key] = "••••••••" + row.value.slice(-4);
     } else {
       settings[row.key] = row.value;
     }
   }
 
-  const hasApiKey = Boolean(
-    rows.find((r) => r.key === "resend_api_key")?.value || process.env.RESEND_API_KEY
+  const smtpRow = rows.reduce<Record<string, string>>((acc, r) => { acc[r.key] = r.value; return acc; }, {});
+  const hasSmtp = Boolean(
+    (smtpRow["smtp_host"] || process.env.SMTP_HOST) &&
+    (smtpRow["smtp_user"] || process.env.SMTP_USER) &&
+    (smtpRow["smtp_pass"] || process.env.SMTP_PASS)
   );
 
-  return NextResponse.json({ settings, hasApiKey });
+  return NextResponse.json({ settings, hasSmtp });
 }
 
 export async function POST(req: NextRequest) {
@@ -46,8 +51,7 @@ export async function POST(req: NextRequest) {
 
   for (const [key, value] of Object.entries(settings)) {
     if (!ALLOWED_KEYS.includes(key)) continue;
-    // Don't overwrite API key if it's the masked version
-    if (key === "resend_api_key" && String(value).startsWith("••••")) continue;
+    if (key === "smtp_pass" && String(value).startsWith("••••")) continue;
 
     await prisma.setting.upsert({
       where: { key },

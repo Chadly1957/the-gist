@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getAdminSession } from "@/lib/auth";
-import { getResendClient } from "@/lib/resend";
+import { getEmailClient } from "@/lib/email";
 import { renderTemplate, Block, SpotlightItem, PresentingSponsorItem, InArticleAdItem } from "@/lib/template-renderer";
 
 export async function POST(req: NextRequest) {
@@ -96,15 +96,15 @@ export async function POST(req: NextRequest) {
     { spotlights, presentingSponsor, inArticleAds }
   ).replace(/\{\{UNSUBSCRIBE_URL\}\}/g, `${appUrl}/unsubscribe`);
 
-  const resend = await getResendClient(allSettings);
-  if (!resend) {
+  const emailClient = getEmailClient(allSettings);
+  if (!emailClient) {
     return NextResponse.json(
-      { error: "Resend is not configured. Add your API key in Settings." },
+      { error: "SMTP is not configured. Add your credentials in Settings." },
       { status: 503 }
     );
   }
 
-  const result = await resend.sendEmail({ to: testEmail, subject: `[TEST] ${subject}`, htmlBody });
+  const result = await emailClient.sendEmail({ to: testEmail, subject: `[TEST] ${subject}`, htmlBody });
   if (!result.success) {
     return NextResponse.json({ error: `Send failed: ${result.error}` }, { status: 502 });
   }

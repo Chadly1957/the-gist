@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { getResendClient } from "@/lib/resend";
+import { getEmailClient } from "@/lib/email";
 
 function portalEmailHtml(contactName: string, portalUrl: string): string {
   return `
@@ -26,7 +26,7 @@ export async function sendSponsorPortalEmail(
   try {
     const rows = await prisma.setting.findMany();
     const settings = Object.fromEntries(rows.map((r) => [r.key, r.value]));
-    const client = await getResendClient(settings);
+    const client = getEmailClient(settings);
     if (!client) return;
 
     await client.sendEmail({

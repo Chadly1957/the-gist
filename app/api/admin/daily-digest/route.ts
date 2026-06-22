@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { getResendClient } from "@/lib/resend";
+import { getEmailClient } from "@/lib/email";
 
 export const dynamic = "force-dynamic";
 
@@ -146,9 +146,9 @@ export async function GET(req: NextRequest) {
     (await prisma.setting.findMany()).map((r) => [r.key, r.value])
   );
 
-  const resend = await getResendClient(settings);
+  const resend = getEmailClient(settings);
   if (!resend) {
-    return NextResponse.json({ error: "Resend not configured." }, { status: 503 });
+    return NextResponse.json({ error: "SMTP not configured." }, { status: 503 });
   }
 
   const adminUser = await prisma.adminUser.findFirst();

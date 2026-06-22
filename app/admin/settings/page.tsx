@@ -3,98 +3,69 @@
 import { useEffect, useState } from "react";
 
 interface Settings {
-  resend_api_key: string;
-  resend_from_email: string;
-  resend_from_name: string;
+  smtp_host: string;
+  smtp_port: string;
+  smtp_user: string;
+  smtp_pass: string;
+  smtp_from: string;
+  smtp_from_name: string;
   spotlight_count: string;
   in_article_count: string;
 }
 
-interface DnsRecord {
-  type: string;
-  name: string;
-  value: string;
-  status?: string;
-  record?: string;
-}
-
-interface Domain {
-  id: string;
-  name: string;
-  status?: string;
-  records?: DnsRecord[];
-}
+const PROVIDERS = [
+  {
+    label: "Brevo",
+    description: "300 emails/day free",
+    host: "smtp-relay.brevo.com",
+    port: "587",
+  },
+  {
+    label: "AWS SES",
+    description: "$0.10 per 1,000 emails",
+    host: "email-smtp.us-east-1.amazonaws.com",
+    port: "587",
+  },
+  {
+    label: "Gmail",
+    description: "Use an App Password",
+    host: "smtp.gmail.com",
+    port: "587",
+  },
+];
 
 export default function SettingsPage() {
   const [settings, setSettings] = useState<Settings>({
-    resend_api_key: "",
-    resend_from_email: "newsletter@thegistdecatur.com",
-    resend_from_name: "The Gist Decatur",
+    smtp_host: "",
+    smtp_port: "587",
+    smtp_user: "",
+    smtp_pass: "",
+    smtp_from: "newsletter@thegistdecatur.com",
+    smtp_from_name: "The Gist Decatur",
     spotlight_count: "5",
     in_article_count: "2",
   });
-  const [hasApiKey, setHasApiKey] = useState(false);
+  const [hasSmtp, setHasSmtp] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null);
 
-  const [domain, setDomain] = useState<Domain | null>(null);
-  const [domainLoading, setDomainLoading] = useState(true);
-  const [domainInput, setDomainInput] = useState("");
-  const [connecting, setConnecting] = useState(false);
-  const [verifying, setVerifying] = useState(false);
-  const [domainError, setDomainError] = useState("");
-
   async function loadSettings() {
     const res = await fetch("/api/admin/settings");
     const data = await res.json();
     setSettings((prev) => ({ ...prev, ...data.settings }));
-    setHasApiKey(Boolean(data.hasApiKey));
+    setHasSmtp(Boolean(data.hasSmtp));
   }
 
   useEffect(() => {
     loadSettings().then(() => setLoading(false));
-
-    fetch("/api/admin/settings/domain")
-      .then((r) => r.json())
-      .then((data) => {
-        setDomain(data.domain || null);
-        setDomainLoading(false);
-      });
   }, []);
 
-  async function handleConnectDomain() {
-    if (!domainInput.trim()) return;
-    setConnecting(true);
-    setDomainError("");
-    const res = await fetch("/api/admin/settings/domain", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ domain: domainInput }),
-    });
-    const data = await res.json();
-    if (res.ok) {
-      setDomain(data.domain);
-      setDomainInput("");
-    } else {
-      setDomainError(data.error || "Failed to connect domain.");
-    }
-    setConnecting(false);
-  }
-
-  async function handleVerifyDomain() {
-    setVerifying(true);
-    setDomainError("");
-    const res = await fetch("/api/admin/settings/domain/verify", { method: "POST" });
-    const data = await res.json();
-    if (res.ok) {
-      setDomain(data.domain);
-    } else {
-      setDomainError(data.error || "Verification check failed.");
-    }
-    setVerifying(false);
+  function applyPreset(preset: (typeof PROVIDERS)[number]) {
+    setSettings((s) => ({ ...s, smtp_host: preset.host, smtp_port: preset.port }));
+    setTestResult(null);
   }
 
   async function handleSave(e: React.FormEvent) {
@@ -122,9 +93,7 @@ export default function SettingsPage() {
   }
 
   if (loading) {
-    return (
-      <div className="p-8 text-gray-400 text-sm">Loading settings…</div>
-    );
+    return <div className="p-8 text-gray-400 text-sm">Loading settings…</div>;
   }
 
   return (
@@ -132,12 +101,12 @@ export default function SettingsPage() {
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
         <p className="text-gray-500 text-sm mt-1">
-          Configure your Resend API integration and sending domain.
+          Configure SMTP email delivery and newsletter limits.
         </p>
       </div>
 
       <form onSubmit={handleSave} className="space-y-6">
-        {/* Resend */}
+        {/* SMTP Email */}
         <div className="bg-white rounded-xl border border-gray-200 p-6">
           <div className="flex items-center gap-3 mb-5">
             <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center">
@@ -146,51 +115,98 @@ export default function SettingsPage() {
               </svg>
             </div>
             <div>
-              <h2 className="text-sm font-semibold text-gray-800">Resend</h2>
-              <p className="text-xs text-gray-400">Email delivery API key</p>
+              <h2 className="text-sm font-semibold text-gray-800">SMTP Email</h2>
+              <p className="text-xs text-gray-400">Works with Brevo (free), AWS SES, Gmail, or any SMTP provider</p>
+            </div>
+          </div>
+
+          {/* Provider presets */}
+          <div className="mb-5">
+            <p className="text-xs font-medium text-gray-500 mb-2">Quick setup</p>
+            <div className="flex flex-wrap gap-2">
+              {PROVIDERS.map((p) => (
+                <button
+                  key={p.label}
+                  type="button"
+                  onClick={() => applyPreset(p)}
+                  className={`px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors ${
+                    settings.smtp_host === p.host
+                      ? "border-green-600 bg-green-50 text-green-700"
+                      : "border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50"
+                  }`}
+                >
+                  {p.label}
+                  <span className="ml-1.5 text-gray-400 font-normal">{p.description}</span>
+                </button>
+              ))}
             </div>
           </div>
 
           <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                API Key
-              </label>
-              <input
-                type="password"
-                value={settings.resend_api_key}
-                onChange={(e) =>
-                  setSettings((s) => ({ ...s, resend_api_key: e.target.value }))
-                }
-                placeholder="re_…"
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-[1fr_100px] gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                  From Email
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">SMTP Host</label>
                 <input
-                  type="email"
-                  value={settings.resend_from_email}
-                  onChange={(e) =>
-                    setSettings((s) => ({ ...s, resend_from_email: e.target.value }))
-                  }
+                  type="text"
+                  value={settings.smtp_host}
+                  onChange={(e) => setSettings((s) => ({ ...s, smtp_host: e.target.value }))}
+                  placeholder="smtp-relay.brevo.com"
                   className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                  From Name
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Port</label>
+                <input
+                  type="number"
+                  value={settings.smtp_port}
+                  onChange={(e) => setSettings((s) => ({ ...s, smtp_port: e.target.value }))}
+                  placeholder="587"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Username / Login</label>
                 <input
                   type="text"
-                  value={settings.resend_from_name}
-                  onChange={(e) =>
-                    setSettings((s) => ({ ...s, resend_from_name: e.target.value }))
-                  }
+                  value={settings.smtp_user}
+                  onChange={(e) => setSettings((s) => ({ ...s, smtp_user: e.target.value }))}
+                  placeholder="your@email.com"
+                  autoComplete="off"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Password / API Key</label>
+                <input
+                  type="password"
+                  value={settings.smtp_pass}
+                  onChange={(e) => setSettings((s) => ({ ...s, smtp_pass: e.target.value }))}
+                  placeholder={hasSmtp ? "••••••••" : "SMTP password or API key"}
+                  autoComplete="new-password"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">From Email</label>
+                <input
+                  type="email"
+                  value={settings.smtp_from}
+                  onChange={(e) => setSettings((s) => ({ ...s, smtp_from: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">From Name</label>
+                <input
+                  type="text"
+                  value={settings.smtp_from_name}
+                  onChange={(e) => setSettings((s) => ({ ...s, smtp_from_name: e.target.value }))}
                   className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
                 />
               </div>
@@ -201,15 +217,16 @@ export default function SettingsPage() {
               <button
                 type="button"
                 onClick={handleTestConnection}
-                disabled={testing || !hasApiKey}
+                disabled={testing || !hasSmtp}
                 className="px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
               >
                 {testing ? "Testing…" : "Test Connection"}
               </button>
+              {!hasSmtp && (
+                <span className="text-xs text-gray-400">Save your SMTP credentials first to test</span>
+              )}
               {testResult && (
-                <span
-                  className={`text-sm font-medium ${testResult.ok ? "text-green-600" : "text-red-500"}`}
-                >
+                <span className={`text-sm font-medium ${testResult.ok ? "text-green-600" : "text-red-500"}`}>
                   {testResult.message}
                 </span>
               )}
@@ -217,127 +234,14 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        {/* Sending Domain */}
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <div className="flex items-center gap-3 mb-5">
-            <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center">
-              <svg className="w-4 h-4 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            <div>
-              <h2 className="text-sm font-semibold text-gray-800">Sending Domain</h2>
-              <p className="text-xs text-gray-400">Verify your own domain so newsletters send from your address</p>
-            </div>
-          </div>
-
-          {domainLoading ? (
-            <p className="text-sm text-gray-400">Loading domain status…</p>
-          ) : !domain ? (
-            <div className="space-y-3">
-              <div className="flex gap-3">
-                <input
-                  type="text"
-                  value={domainInput}
-                  onChange={(e) => setDomainInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      handleConnectDomain();
-                    }
-                  }}
-                  placeholder="thegistdecatur.com"
-                  className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-                />
-                <button
-                  type="button"
-                  onClick={handleConnectDomain}
-                  disabled={connecting || !hasApiKey}
-                  className="px-4 py-2 bg-green-700 hover:bg-green-800 disabled:opacity-50 text-white text-sm font-semibold rounded-lg transition-colors whitespace-nowrap"
-                >
-                  {connecting ? "Connecting…" : "Connect Domain"}
-                </button>
-              </div>
-              {!hasApiKey && !loading && (
-                <p className="text-xs text-red-500">
-                  No Resend API key detected (Settings field or RESEND_API_KEY env var). Add one above to connect a domain.
-                </p>
-              )}
-              <p className="text-xs text-gray-400">
-                Enter the domain you want to send newsletters from. We&apos;ll give you DNS records to add at your registrar to verify it.
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-semibold text-gray-800">{domain.name}</p>
-                  <span
-                    className={`inline-block mt-1 text-xs font-medium px-2 py-0.5 rounded-full ${
-                      domain.status === "verified" || domain.status === "active"
-                        ? "bg-green-100 text-green-700"
-                        : "bg-amber-100 text-amber-700"
-                    }`}
-                  >
-                    {domain.status || "pending"}
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleVerifyDomain}
-                  disabled={verifying}
-                  className="px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
-                >
-                  {verifying ? "Checking…" : "Check Verification"}
-                </button>
-              </div>
-
-              {domain.records && domain.records.length > 0 && (
-                <div className="border border-gray-200 rounded-lg overflow-hidden">
-                  <table className="w-full text-xs">
-                    <thead className="bg-gray-50 text-gray-500">
-                      <tr>
-                        <th className="text-left px-3 py-2 font-medium">Purpose</th>
-                        <th className="text-left px-3 py-2 font-medium">Type</th>
-                        <th className="text-left px-3 py-2 font-medium">Name</th>
-                        <th className="text-left px-3 py-2 font-medium">Value</th>
-                        <th className="text-left px-3 py-2 font-medium">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {domain.records.map((rec, i) => (
-                        <tr key={i}>
-                          <td className="px-3 py-2 font-medium uppercase">{rec.record}</td>
-                          <td className="px-3 py-2 font-mono">{rec.type}</td>
-                          <td className="px-3 py-2 font-mono break-all">{rec.name}</td>
-                          <td className="px-3 py-2 font-mono break-all">{rec.value}</td>
-                          <td className="px-3 py-2">{rec.status || "pending"}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-
-              {(!domain.records || domain.records.length === 0) && (
-                <p className="text-sm text-amber-600">
-                  Resend didn&apos;t return any DNS records for this domain. See the raw response below.
-                </p>
-              )}
-
-              <details className="text-xs text-gray-400">
-                <summary className="cursor-pointer hover:text-gray-600">View raw API response</summary>
-                <pre className="mt-2 p-3 bg-gray-50 rounded-lg overflow-x-auto whitespace-pre-wrap break-all">
-                  {JSON.stringify(domain, null, 2)}
-                </pre>
-              </details>
-              <p className="text-xs text-gray-400">
-                Add these records at your domain registrar, then click Check Verification.
-              </p>
-            </div>
-          )}
-
-          {domainError && <p className="text-sm text-red-600 mt-3">{domainError}</p>}
+        {/* SPF / DKIM guidance */}
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-5">
+          <p className="text-xs font-semibold text-amber-800 mb-2">Improve deliverability with SPF &amp; DKIM</p>
+          <p className="text-xs text-amber-700 leading-relaxed">
+            Add an SPF record to your DNS so receiving servers know your provider is authorized to send on your behalf.
+            Your provider&apos;s dashboard will have the exact record to add — usually a <code className="bg-amber-100 px-1 rounded">TXT</code> record
+            on your root domain. Brevo and AWS SES both offer one-click DKIM signing as well.
+          </p>
         </div>
 
         {/* Newsletter Limits */}
