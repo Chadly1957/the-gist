@@ -13,7 +13,12 @@ interface SendResult {
 }
 
 export class SmtpEmailClient {
-  private transporter: nodemailer.Transporter;
+  private transportOpts: {
+    host: string;
+    port: number;
+    secure: boolean;
+    auth: { user: string; pass: string };
+  };
   private from: string;
 
   constructor(opts: {
@@ -24,22 +29,28 @@ export class SmtpEmailClient {
     fromEmail: string;
     fromName: string;
   }) {
-    this.transporter = nodemailer.createTransport({
+    this.transportOpts = {
       host: opts.host,
       port: opts.port,
       secure: opts.port === 465,
       auth: { user: opts.user, pass: opts.pass },
-      pool: true,
-      maxConnections: 5,
-    });
+    };
     this.from = opts.fromName
       ? `${opts.fromName} <${opts.fromEmail}>`
       : opts.fromEmail;
   }
 
+  private createTransport(pool = false) {
+    return nodemailer.createTransport({
+      ...this.transportOpts,
+      ...(pool ? { pool: true, maxConnections: 5 } : {}),
+    });
+  }
+
   async sendEmail(payload: EmailPayload): Promise<{ success: boolean; error?: string }> {
+    const t = this.createTransport();
     try {
-      await this.transporter.sendMail({
+      await t.sendMail({
         from: this.from,
         to: payload.to,
         subject: payload.subject,
@@ -49,16 +60,16 @@ export class SmtpEmailClient {
     } catch (err) {
       return { success: false, error: String(err) };
     } finally {
-      this.transporter.close();
+      t.close();
     }
   }
 
-  // Sends all emails in parallel; nodemailer pool caps concurrency at maxConnections
   async sendBatch(emails: EmailPayload[]): Promise<SendResult> {
+    const t = this.createTransport(true);
     try {
       const results = await Promise.all(
         emails.map(({ to, subject, htmlBody }) =>
-          this.transporter
+          t
             .sendMail({ from: this.from, to, subject, html: htmlBody })
             .then((info) => ({ id: info.messageId as string | undefined }))
             .catch(() => ({ id: undefined as string | undefined }))
@@ -68,18 +79,20 @@ export class SmtpEmailClient {
     } catch (err) {
       return { success: false, error: String(err) };
     } finally {
-      this.transporter.close();
+      t.close();
     }
   }
 
   async testConnection(): Promise<{ success: boolean; error?: string }> {
+    // Non-pooled transporter — verify() hangs on pool transporters in serverless
+    const t = this.createTransport(false);
     try {
-      await this.transporter.verify();
+      await t.verify();
       return { success: true };
     } catch (err) {
       return { success: false, error: String(err) };
     } finally {
-      this.transporter.close();
+      t.close();
     }
   }
 }

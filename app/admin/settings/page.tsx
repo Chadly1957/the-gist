@@ -140,6 +140,25 @@ export default function SettingsPage() {
                 </button>
               ))}
             </div>
+
+            {/* Brevo credentials hint */}
+            {settings.smtp_host === "smtp-relay.brevo.com" && (
+              <div className="mt-3 p-3 bg-blue-50 border border-blue-100 rounded-lg text-xs text-blue-700 leading-relaxed">
+                <strong>Brevo credentials:</strong> Username = your Brevo account login email.
+                Password = the <em>SMTP key</em> found under{" "}
+                <strong>SMTP &amp; API → SMTP tab → Generate a new SMTP key</strong> in your Brevo dashboard
+                (not your account password).
+              </div>
+            )}
+
+            {/* AWS SES credentials hint */}
+            {settings.smtp_host === "email-smtp.us-east-1.amazonaws.com" && (
+              <div className="mt-3 p-3 bg-orange-50 border border-orange-100 rounded-lg text-xs text-orange-700 leading-relaxed">
+                <strong>AWS SES credentials:</strong> Use SMTP credentials created under{" "}
+                <strong>SES → SMTP Settings → Create SMTP credentials</strong> — these are separate from
+                your IAM access keys. Make sure your sending identity is verified in SES first.
+              </div>
+            )}
           </div>
 
           <div className="space-y-4">
@@ -233,6 +252,50 @@ export default function SettingsPage() {
             </div>
           </div>
         </div>
+
+        {/* Vercel env vars */}
+        <details className="bg-white rounded-xl border border-gray-200 p-5 group">
+          <summary className="cursor-pointer text-sm font-semibold text-gray-800 flex items-center justify-between list-none">
+            <span>Configure via Vercel environment variables</span>
+            <svg className="w-4 h-4 text-gray-400 group-open:rotate-180 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+            </svg>
+          </summary>
+          <p className="mt-3 text-xs text-gray-500 leading-relaxed">
+            Set these in your Vercel project under <strong>Settings → Environment Variables</strong>.
+            Env vars take effect on next deployment. Database settings (above) override env vars when both are set.
+          </p>
+          <div className="mt-3 border border-gray-100 rounded-lg overflow-hidden text-xs">
+            <table className="w-full">
+              <thead className="bg-gray-50 text-gray-500">
+                <tr>
+                  <th className="text-left px-3 py-2 font-medium">Variable</th>
+                  <th className="text-left px-3 py-2 font-medium">Brevo example</th>
+                  <th className="text-left px-3 py-2 font-medium">AWS SES example</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100 font-mono">
+                {[
+                  ["SMTP_HOST", "smtp-relay.brevo.com", "email-smtp.us-east-1.amazonaws.com"],
+                  ["SMTP_PORT", "587", "587"],
+                  ["SMTP_USER", "you@youremail.com", "AKIA…(SES SMTP user)"],
+                  ["SMTP_PASS", "xsmtp-key-from-brevo", "SMTP secret key from SES"],
+                  ["SMTP_FROM", "newsletter@yourdomain.com", "newsletter@yourdomain.com"],
+                  ["SMTP_FROM_NAME", "The Gist Decatur", "The Gist Decatur"],
+                ].map(([key, brevo, ses]) => (
+                  <tr key={key} className="text-gray-600">
+                    <td className="px-3 py-2 font-semibold text-gray-800">{key}</td>
+                    <td className="px-3 py-2 text-gray-500">{brevo}</td>
+                    <td className="px-3 py-2 text-gray-500">{ses}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="mt-3 text-xs text-gray-400">
+            After adding env vars in Vercel, redeploy (or trigger a redeploy) for them to take effect. The Test Connection button will use them automatically.
+          </p>
+        </details>
 
         {/* SPF / DKIM guidance */}
         <div className="bg-amber-50 border border-amber-200 rounded-xl p-5">
