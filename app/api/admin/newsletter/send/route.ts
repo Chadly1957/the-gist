@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getAdminSession } from "@/lib/auth";
 import { renderTemplate, Block, SpotlightItem, PresentingSponsorItem, InArticleAdItem } from "@/lib/template-renderer";
-import { getEmailClient } from "@/lib/email";
+import { getEmailClient, htmlToText } from "@/lib/email";
 import { signTrackingUrl } from "@/lib/tracking";
 
 export async function POST(req: NextRequest) {
@@ -141,13 +141,22 @@ export async function POST(req: NextRequest) {
       )
     );
 
-    const personalized = recipients.map((r) => ({
-      to: r.email,
-      subject,
-      htmlBody: htmlBody
+    const personalized = recipients.map((r) => {
+      const personalizedHtml = htmlBody
         .replaceAll("RIDPLACEHOLDER", r.id)
-        .replaceAll("EMAILPLACEHOLDER", encodeURIComponent(r.email)),
-    }));
+        .replaceAll("EMAILPLACEHOLDER", encodeURIComponent(r.email));
+      const unsubUrl = `${appUrl}/unsubscribe?r=${r.id}&email=${encodeURIComponent(r.email)}`;
+      return {
+        to: r.email,
+        subject,
+        htmlBody: personalizedHtml,
+        textBody: htmlToText(personalizedHtml),
+        headers: {
+          "List-Unsubscribe": `<${unsubUrl}>`,
+          "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+        },
+      };
+    });
 
     const result = await emailClient!.sendBatch(personalized);
     if (!result.success) {
@@ -187,7 +196,7 @@ export async function POST(req: NextRequest) {
   if (status === "draft") {
     return NextResponse.json({
       message:
-        "Newsletter saved as draft. Configure Resend API in Settings to send to your list.",
+        "Newsletter saved as draft. Configure SMTP in Settings to send to your list.",
     });
   }
 

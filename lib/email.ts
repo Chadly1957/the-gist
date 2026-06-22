@@ -4,6 +4,8 @@ interface EmailPayload {
   to: string;
   subject: string;
   htmlBody: string;
+  textBody?: string;
+  headers?: Record<string, string>;
 }
 
 interface SendResult {
@@ -55,6 +57,8 @@ export class SmtpEmailClient {
         to: payload.to,
         subject: payload.subject,
         html: payload.htmlBody,
+        text: payload.textBody,
+        headers: payload.headers,
       });
       return { success: true };
     } catch (err) {
@@ -68,9 +72,9 @@ export class SmtpEmailClient {
     const t = this.createTransport(true);
     try {
       const results = await Promise.all(
-        emails.map(({ to, subject, htmlBody }) =>
+        emails.map(({ to, subject, htmlBody, textBody, headers }) =>
           t
-            .sendMail({ from: this.from, to, subject, html: htmlBody })
+            .sendMail({ from: this.from, to, subject, html: htmlBody, text: textBody, headers })
             .then((info) => ({ id: info.messageId as string | undefined }))
             .catch(() => ({ id: undefined as string | undefined }))
         )
@@ -116,4 +120,28 @@ export function getEmailClient(
   if (!host || !user || !pass) return null;
 
   return new SmtpEmailClient({ host, port, user, pass, fromEmail, fromName });
+}
+
+// Strips HTML to produce a plain-text fallback. Gives Gmail's classifier
+// a multipart/alternative signal that reduces Promotions tab placement.
+export function htmlToText(html: string): string {
+  return html
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p>/gi, "\n\n")
+    .replace(/<\/h[1-6]>/gi, "\n\n")
+    .replace(/<\/tr>/gi, "\n")
+    .replace(/<\/td>/gi, "  ")
+    .replace(/<\/li>/gi, "\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\n[ \t]+/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }

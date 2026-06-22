@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getAdminSession } from "@/lib/auth";
-import { getEmailClient } from "@/lib/email";
+import { getEmailClient, htmlToText } from "@/lib/email";
 import { renderTemplate, Block, SpotlightItem, PresentingSponsorItem, InArticleAdItem } from "@/lib/template-renderer";
 
 export async function POST(req: NextRequest) {
@@ -104,7 +104,17 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const result = await emailClient.sendEmail({ to: testEmail, subject: `[TEST] ${subject}`, htmlBody });
+  const unsubUrl = `${appUrl}/unsubscribe`;
+  const result = await emailClient.sendEmail({
+    to: testEmail,
+    subject: `[TEST] ${subject}`,
+    htmlBody,
+    textBody: htmlToText(htmlBody),
+    headers: {
+      "List-Unsubscribe": `<${unsubUrl}>`,
+      "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+    },
+  });
   if (!result.success) {
     return NextResponse.json({ error: `Send failed: ${result.error}` }, { status: 502 });
   }
