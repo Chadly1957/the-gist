@@ -230,7 +230,7 @@ export default function LandingPage() {
               <div className="space-y-3">
                 {[
                   {
-                    name: "Small Business Spotlight",
+                    name: "Community Partners",
                     price: "Free",
                     desc: "Rotating listing with logo, description, and CTA in every issue.",
                     accent: "bg-green-800 border-green-700",

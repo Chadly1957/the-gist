@@ -390,7 +390,7 @@ function PortalContent() {
                   {(analytics.spotlightImpressions > 0 || analytics.spotlightClicks > 0) && (
                     <div className="bg-white rounded-lg p-3 border border-green-100 text-center">
                       <p className="text-2xl font-bold text-green-700">{analytics.spotlightImpressions.toLocaleString()}</p>
-                      <p className="text-xs text-gray-500 mt-0.5">Spotlight impressions</p>
+                      <p className="text-xs text-gray-500 mt-0.5">Community Partner impressions</p>
                       {analytics.spotlightClicks > 0 && (
                         <p className="text-xs text-green-600 font-medium mt-1">
                           {analytics.spotlightClicks} clicks
@@ -427,7 +427,7 @@ function PortalContent() {
                   </svg>
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-gray-800">Spotlight Listing</p>
+                  <p className="text-sm font-semibold text-gray-800">Community Partner Listing</p>
                   <p className="text-xs text-gray-400">Submit or view your free listing</p>
                 </div>
               </button>
@@ -450,7 +450,7 @@ function PortalContent() {
             {/* Spotlights */}
             {profile.spotlights.length > 0 && (
               <div>
-                <h2 className="text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide">Spotlight Listings</h2>
+                <h2 className="text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide">Community Partner Listings</h2>
                 <div className="space-y-2">
                   {profile.spotlights.map((s) => (
                     <div key={s.id} className="bg-white rounded-xl border border-gray-200 p-4 flex items-center gap-4">
@@ -523,7 +523,7 @@ function PortalContent() {
         {/* SPOTLIGHT FORM */}
         {view === "spotlight" && (
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-1">Small Business Spotlight</h1>
+            <h1 className="text-2xl font-bold text-gray-900 mb-1">Community Partners</h1>
             <p className="text-sm text-gray-500 mb-6">Free rotating placement in every newsletter. Submit your listing and we&apos;ll review it within 1-2 business days.</p>
 
             {sSuccess ? (

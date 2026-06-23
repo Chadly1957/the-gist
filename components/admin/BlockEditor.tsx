@@ -22,7 +22,7 @@ const BLOCK_TYPES: { type: Block["type"]; label: string; icon: string }[] = [
   { type: "image", label: "Image", icon: "IMG" },
   { type: "button", label: "Button / CTA", icon: "BTN" },
   { type: "divider", label: "Divider", icon: "─" },
-  { type: "spotlight", label: "Business Spotlight", icon: "★" },
+  { type: "spotlight", label: "Community Partners", icon: "★" },
   { type: "presenting_sponsor", label: "Presenting Sponsor", icon: "✦" },
 ];
 
@@ -221,7 +221,7 @@ function BlockPreview({ block }: { block: Block }) {
             <span className="text-yellow-600 text-sm">★</span>
           </div>
           <div>
-            <p className="text-sm font-semibold text-gray-800">Small Business Spotlight</p>
+            <p className="text-sm font-semibold text-gray-800">Community Partners</p>
             <p className="text-xs text-gray-400">Auto-filled with 5 rotating approved listings</p>
           </div>
         </div>
@@ -449,7 +449,7 @@ function BlockFields({
     case "image":
       return <ImageBlockFields block={block} onChange={onChange} />;
     case "spotlight":
-      return <p className="text-xs text-gray-400">No configuration needed. This block auto-populates with the 5 most-eligible approved spotlight listings at send time.</p>;
+      return <p className="text-xs text-gray-400">No configuration needed. This block auto-populates with the most-eligible approved community partner listings at send time.</p>;
     case "presenting_sponsor":
       return <p className="text-xs text-gray-400">No configuration needed. This block auto-populates with the approved presenting sponsor for the selected newsletter date. Hidden if no sponsor is booked.</p>;
     case "articles":

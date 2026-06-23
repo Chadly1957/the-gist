@@ -499,7 +499,7 @@ export default function AdminSponsorsPage() {
 
               <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
                 {[
-                  { key: "sponsorship_price_spotlight", label: "Small Business Spotlight", hint: 'e.g. "Free"' },
+                  { key: "sponsorship_price_spotlight", label: "Community Partners", hint: 'e.g. "Free"' },
                   { key: "sponsorship_price_in_article", label: "In-Article Sponsorship", hint: 'e.g. "$15/day"' },
                   { key: "sponsorship_price_presenting", label: "Presenting Sponsor", hint: 'e.g. "$25/day"' },
                 ].map(({ key, label, hint }) => (

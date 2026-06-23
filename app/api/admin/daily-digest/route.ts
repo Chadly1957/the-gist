@@ -20,7 +20,7 @@ function digestHtml(data: {
   } | null;
 }): string {
   const SPONSOR_TYPE_LABELS: Record<string, string> = {
-    spotlight: "Spotlight",
+    spotlight: "Community Partner",
     presenting_sponsor: "Presenting",
     in_article_ad: "In-Article Ad",
   };

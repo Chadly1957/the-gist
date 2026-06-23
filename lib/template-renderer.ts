@@ -199,7 +199,7 @@ function renderSpotlight(items: SpotlightItem[], tracking?: TrackingConfig): str
   return `
     <div style="padding:20px 40px;">
       <div style="font-family:sans-serif;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#6b7280;margin-bottom:14px;padding-bottom:8px;border-bottom:2px solid #e5e7eb;">
-        Local Business Spotlight
+        Community Partners
       </div>
       ${cards}
     </div>`;

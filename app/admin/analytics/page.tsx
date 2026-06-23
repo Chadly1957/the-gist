@@ -37,7 +37,7 @@ interface Summary {
 }
 
 const SPONSOR_TYPE_LABELS: Record<string, string> = {
-  spotlight: "Spotlight",
+  spotlight: "Community Partner",
   presenting_sponsor: "Presenting Sponsor",
   in_article_ad: "In-Article Ad",
 };

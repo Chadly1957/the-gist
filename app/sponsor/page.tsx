@@ -33,7 +33,7 @@ export default async function SponsorPage() {
   const TIERS = [
     {
       key: "spotlight",
-      name: "Small Business Spotlight",
+      name: "Community Partners",
       price: prices.spotlight,
       description:
         "Get your business in front of Decatur readers every week. Your listing rotates in a group of up to 5 local businesses and appears in every newsletter we send.",
