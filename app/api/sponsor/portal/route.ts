@@ -96,3 +96,22 @@ export async function GET(req: NextRequest) {
     },
   });
 }
+
+export async function PATCH(req: NextRequest) {
+  const { token, businessName, contactName } = await req.json();
+  if (!token) return NextResponse.json({ error: "Token required." }, { status: 401 });
+
+  const profile = await prisma.sponsorProfile.findUnique({ where: { magicToken: token } });
+  if (!profile) return NextResponse.json({ error: "Invalid token." }, { status: 404 });
+
+  const data: Record<string, string> = {};
+  if (businessName?.trim()) data.businessName = businessName.trim();
+  if (contactName?.trim()) data.contactName = contactName.trim();
+
+  if (Object.keys(data).length === 0) {
+    return NextResponse.json({ error: "Nothing to update." }, { status: 400 });
+  }
+
+  const updated = await prisma.sponsorProfile.update({ where: { id: profile.id }, data });
+  return NextResponse.json({ profile: updated });
+}

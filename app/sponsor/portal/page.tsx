@@ -47,7 +47,7 @@ interface Analytics {
   bookingImpressions: Record<string, number>;
 }
 
-type View = "overview" | "spotlight" | "booking";
+type View = "overview" | "spotlight" | "booking" | "profile";
 
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
   pending: { label: "Pending Review", color: "bg-yellow-50 text-yellow-700" },
@@ -227,12 +227,19 @@ function PortalContent() {
   const [view, setView] = useState<View>("overview");
 
   // Spotlight form
+  const [editingSpotlight, setEditingSpotlight] = useState<Spotlight | null>(null);
   const [sForm, setSForm] = useState({ businessName: "", logoUrl: "", description: "", ctaLabel: "Visit Website", ctaUrl: "" });
   const [sUploading, setSUploading] = useState(false);
   const [sSubmitting, setSSubmitting] = useState(false);
   const [sError, setSError] = useState("");
   const [sSuccess, setSSuccess] = useState(false);
   const sFileRef = useRef<HTMLInputElement>(null);
+
+  // Profile edit form
+  const [pForm, setPForm] = useState({ businessName: "", contactName: "" });
+  const [pSaving, setPSaving] = useState(false);
+  const [pSaved, setPSaved] = useState(false);
+  const [pError, setPError] = useState("");
 
   // Booking form
   const [bType, setBType] = useState<"in_article" | "presenting">("in_article");
@@ -288,16 +295,49 @@ function PortalContent() {
     e.preventDefault();
     setSSubmitting(true); setSError("");
     try {
-      const res = await fetch("/api/sponsor/spotlight", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, ...sForm }),
-      });
-      const data = await res.json();
-      if (res.ok) { setSSuccess(true); setProfile((p) => p ? { ...p, spotlights: [data.listing, ...p.spotlights] } : p); }
-      else setSError(data.error || "Submission failed.");
+      if (editingSpotlight) {
+        const res = await fetch("/api/sponsor/spotlight", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token, id: editingSpotlight.id, ...sForm }),
+        });
+        const data = await res.json();
+        if (res.ok) {
+          setProfile((p) => p ? { ...p, spotlights: p.spotlights.map((s) => s.id === editingSpotlight.id ? data.listing : s) } : p);
+          setEditingSpotlight(null);
+          setView("overview");
+        } else setSError(data.error || "Update failed.");
+      } else {
+        const res = await fetch("/api/sponsor/spotlight", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token, ...sForm }),
+        });
+        const data = await res.json();
+        if (res.ok) { setSSuccess(true); setProfile((p) => p ? { ...p, spotlights: [data.listing, ...p.spotlights] } : p); }
+        else setSError(data.error || "Submission failed.");
+      }
     } catch (_e) { setSError("Connection error."); }
     finally { setSSubmitting(false); }
+  }
+
+  async function saveProfile(e: React.FormEvent) {
+    e.preventDefault();
+    setPSaving(true); setPError(""); setPSaved(false);
+    try {
+      const res = await fetch("/api/sponsor/portal", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token, ...pForm }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setProfile((p) => p ? { ...p, businessName: data.profile.businessName, contactName: data.profile.contactName } : p);
+        setPSaved(true);
+        setTimeout(() => { setPSaved(false); setView("overview"); }, 1500);
+      } else setPError(data.error || "Update failed.");
+    } catch (_e) { setPError("Connection error."); }
+    finally { setPSaving(false); }
   }
 
   async function submitBooking(e: React.FormEvent) {
@@ -369,7 +409,7 @@ function PortalContent() {
       <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         {/* Navigation */}
         {view !== "overview" && (
-          <button onClick={() => { setView("overview"); setSSuccess(false); setBSuccess(false); }} className="text-sm text-green-700 hover:underline mb-6 inline-block">
+          <button onClick={() => { setView("overview"); setSSuccess(false); setBSuccess(false); setEditingSpotlight(null); }} className="text-sm text-green-700 hover:underline mb-6 inline-block">
             ← Back to overview
           </button>
         )}
@@ -377,9 +417,20 @@ function PortalContent() {
         {/* OVERVIEW */}
         {view === "overview" && (
           <div className="space-y-6">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">Sponsor Portal</h1>
-              <p className="text-gray-500 text-sm mt-1">Welcome back, {profile.contactName}.</p>
+            <div className="flex items-start justify-between">
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900">Sponsor Portal</h1>
+                <p className="text-gray-500 text-sm mt-1">Welcome back, {profile.contactName}.</p>
+              </div>
+              <button
+                onClick={() => { setPForm({ businessName: profile.businessName, contactName: profile.contactName }); setPError(""); setPSaved(false); setView("profile"); }}
+                className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-700 mt-1"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                </svg>
+                Edit Profile
+              </button>
             </div>
 
             {/* Analytics summary — only shown once there's data */}
@@ -461,6 +512,12 @@ function PortalContent() {
                       </div>
                       <div className="flex flex-col items-end gap-1.5 shrink-0">
                         <StatusBadge status={s.status} />
+                        <button
+                          onClick={() => { setEditingSpotlight(s); setSForm({ businessName: s.businessName, logoUrl: s.logoUrl || "", description: s.description, ctaLabel: s.ctaLabel, ctaUrl: s.ctaUrl }); setSError(""); setSSuccess(false); setView("spotlight"); }}
+                          className="text-xs text-green-700 hover:underline"
+                        >
+                          Edit
+                        </button>
                         {analytics && analytics.spotlightImpressions > 0 && (
                           <span className="text-xs text-green-700 font-medium">
                             {analytics.spotlightImpressions.toLocaleString()} impressions
@@ -523,8 +580,8 @@ function PortalContent() {
         {/* SPOTLIGHT FORM */}
         {view === "spotlight" && (
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-1">Community Partners</h1>
-            <p className="text-sm text-gray-500 mb-6">Free rotating placement in every newsletter. Submit your listing and we&apos;ll review it within 1-2 business days.</p>
+            <h1 className="text-2xl font-bold text-gray-900 mb-1">{editingSpotlight ? "Edit Listing" : "Community Partners"}</h1>
+            <p className="text-sm text-gray-500 mb-6">{editingSpotlight ? "Update your listing details below." : "Free rotating placement in every newsletter. Submit your listing and we’ll review it within 1-2 business days."}</p>
 
             {sSuccess ? (
               <div className="bg-green-50 border border-green-100 rounded-xl p-6 text-center">
@@ -580,7 +637,7 @@ function PortalContent() {
 
                 <button type="submit" disabled={sSubmitting}
                   className="w-full bg-green-700 hover:bg-green-800 disabled:opacity-50 text-white font-semibold py-2.5 rounded-xl text-sm transition-colors">
-                  {sSubmitting ? "Submitting…" : "Submit Listing for Review"}
+                  {sSubmitting ? (editingSpotlight ? "Saving…" : "Submitting…") : (editingSpotlight ? "Save Changes" : "Submit Listing for Review")}
                 </button>
               </form>
             )}
@@ -695,6 +752,46 @@ function PortalContent() {
                 </button>
               </form>
             )}
+          </div>
+        )}
+        {/* PROFILE EDIT */}
+        {view === "profile" && (
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900 mb-1">Edit Profile</h1>
+            <p className="text-sm text-gray-500 mb-6">Update your business name and contact information.</p>
+            <form onSubmit={saveProfile} className="space-y-4 bg-white rounded-xl border border-gray-200 p-6">
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">Business Name *</label>
+                <input
+                  type="text"
+                  value={pForm.businessName}
+                  onChange={(e) => setPForm((f) => ({ ...f, businessName: e.target.value }))}
+                  required
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">Contact Name *</label>
+                <input
+                  type="text"
+                  value={pForm.contactName}
+                  onChange={(e) => setPForm((f) => ({ ...f, contactName: e.target.value }))}
+                  required
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                />
+              </div>
+              {pError && <p className="text-sm text-red-600">{pError}</p>}
+              <div className="flex items-center gap-3">
+                <button
+                  type="submit"
+                  disabled={pSaving}
+                  className="bg-green-700 hover:bg-green-800 disabled:opacity-50 text-white font-semibold px-6 py-2.5 rounded-xl text-sm transition-colors"
+                >
+                  {pSaving ? "Saving…" : "Save Changes"}
+                </button>
+                {pSaved && <span className="text-sm text-green-600 font-medium">Saved!</span>}
+              </div>
+            </form>
           </div>
         )}
       </div>
