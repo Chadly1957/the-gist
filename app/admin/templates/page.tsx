@@ -23,6 +23,7 @@ export default function TemplatesPage() {
   const [newName, setNewName] = useState("");
   const [createError, setCreateError] = useState("");
   const [showNewForm, setShowNewForm] = useState(false);
+  const [mobileTab, setMobileTab] = useState<"list" | "editor">("list");
 
   async function fetchTemplates(selectAfter?: string) {
     setLoadError(false);
@@ -148,9 +149,26 @@ export default function TemplatesPage() {
   }
 
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="flex flex-col h-screen overflow-hidden">
+      {/* Mobile tab bar */}
+      <div className="flex border-b border-gray-200 bg-white shrink-0 md:hidden">
+        <button
+          onClick={() => setMobileTab("list")}
+          className={`flex-1 py-2.5 text-sm font-medium transition-colors ${mobileTab === "list" ? "text-green-700 border-b-2 border-green-700" : "text-gray-500"}`}
+        >
+          Templates
+        </button>
+        <button
+          onClick={() => setMobileTab("editor")}
+          className={`flex-1 py-2.5 text-sm font-medium transition-colors ${mobileTab === "editor" ? "text-green-700 border-b-2 border-green-700" : "text-gray-500"}`}
+        >
+          Editor
+        </button>
+      </div>
+
+      <div className="flex flex-1 overflow-hidden">
       {/* Sidebar */}
-      <div className="w-52 border-r border-gray-200 bg-white flex flex-col shrink-0">
+      <div className={`${mobileTab === "list" ? "flex" : "hidden"} md:flex w-full md:w-52 border-r border-gray-200 bg-white flex-col md:shrink-0`}>
         <div className="px-4 py-4 border-b border-gray-100">
           <h2 className="text-sm font-bold text-gray-800">Templates</h2>
         </div>
@@ -220,6 +238,7 @@ export default function TemplatesPage() {
       </div>
 
       {/* Main area */}
+      <div className={`${mobileTab === "editor" ? "flex" : "hidden"} md:flex flex-1 flex-col overflow-hidden`}>
       {!selected && (
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center">
@@ -306,6 +325,8 @@ export default function TemplatesPage() {
           </div>
         </div>
       )}
+      </div>
+      </div>
     </div>
   );
 }

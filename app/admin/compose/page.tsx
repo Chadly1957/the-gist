@@ -42,6 +42,7 @@ export default function ComposePage() {
   const [activeKeyword, setActiveKeyword] = useState("");
   const [newKeyword, setNewKeyword] = useState("");
   const [clearingPool, setClearingPool] = useState(false);
+  const [mobileTab, setMobileTab] = useState<"articles" | "compose">("articles");
 
   useEffect(() => {
     const saved = localStorage.getItem("gist_keyword_filters");
@@ -214,9 +215,26 @@ export default function ComposePage() {
   const previewHtml = preview ? buildPreviewHtml() : "";
 
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="flex flex-col h-screen overflow-hidden">
+      {/* Mobile tab bar */}
+      <div className="flex border-b border-gray-200 bg-white shrink-0 md:hidden">
+        <button
+          onClick={() => setMobileTab("articles")}
+          className={`flex-1 py-2.5 text-sm font-medium transition-colors ${mobileTab === "articles" ? "text-green-700 border-b-2 border-green-700" : "text-gray-500"}`}
+        >
+          Articles
+        </button>
+        <button
+          onClick={() => setMobileTab("compose")}
+          className={`flex-1 py-2.5 text-sm font-medium transition-colors ${mobileTab === "compose" ? "text-green-700 border-b-2 border-green-700" : "text-gray-500"}`}
+        >
+          Compose
+        </button>
+      </div>
+
+      <div className="flex flex-1 overflow-hidden">
       {/* Left panel: Article selection */}
-      <div className="w-[420px] flex flex-col border-r border-gray-200 bg-white shrink-0 overflow-hidden">
+      <div className={`${mobileTab === "articles" ? "flex" : "hidden"} md:flex w-full md:w-[420px] flex-col border-r border-gray-200 bg-white md:shrink-0 overflow-hidden`}>
         <div className="px-5 py-4 border-b border-gray-100 flex items-start justify-between gap-3">
           <div>
             <h2 className="text-base font-bold text-gray-900">Article Pool</h2>
@@ -411,7 +429,7 @@ export default function ComposePage() {
       </div>
 
       {/* Right panel: Compose & preview */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className={`${mobileTab === "compose" ? "flex" : "hidden"} md:flex flex-1 flex-col overflow-hidden`}>
         {/* Toolbar */}
         <div className="border-b border-gray-200 bg-white shrink-0">
           <div className="flex items-center justify-between px-6 py-3 gap-4">
@@ -596,6 +614,7 @@ export default function ComposePage() {
             </div>
           )}
         </div>
+      </div>
       </div>
     </div>
   );

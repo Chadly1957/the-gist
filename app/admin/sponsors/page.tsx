@@ -182,7 +182,7 @@ export default function AdminSponsorsPage() {
   const pendingCount = spotlights.filter((s) => s.status === "pending").length + bookings.filter((b) => b.status === "pending_review").length;
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-8">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Sponsors</h1>
         {pendingCount > 0 && (

@@ -65,7 +65,7 @@ export default function SourcesPage() {
   }
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-8">
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-gray-900">Sources</h1>
         <p className="text-gray-500 text-sm mt-1">
@@ -128,6 +128,7 @@ export default function SourcesPage() {
             No sources yet. Add one above to get started.
           </div>
         ) : (
+          <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-100">
@@ -183,6 +184,7 @@ export default function SourcesPage() {
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </div>
     </div>

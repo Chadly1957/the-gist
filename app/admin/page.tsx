@@ -32,8 +32,8 @@ export default async function AdminDashboard() {
     : null;
 
   return (
-    <div className="p-8">
-      <div className="mb-8">
+    <div className="p-4 sm:p-8">
+      <div className="mb-6 sm:mb-8">
         <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
         <p className="text-gray-500 text-sm mt-1">
           {new Date().toLocaleDateString("en-US", {
@@ -163,6 +163,7 @@ async function RecentSends() {
         Recent Sends
       </h2>
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-gray-50 border-b border-gray-200">
@@ -207,6 +208,7 @@ async function RecentSends() {
             ))}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );

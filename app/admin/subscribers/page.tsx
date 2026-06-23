@@ -149,7 +149,7 @@ export default function SubscribersPage() {
   const totalPages = Math.ceil(total / 50);
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-8">
       <div className="mb-6 flex items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Subscribers</h1>
@@ -230,6 +230,7 @@ export default function SubscribersPage() {
             {search ? "No subscribers match your search." : "No subscribers yet. Import a CSV or share your signup page."}
           </div>
         ) : (
+          <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
@@ -271,6 +272,7 @@ export default function SubscribersPage() {
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </div>
 
