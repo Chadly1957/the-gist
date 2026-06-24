@@ -518,7 +518,7 @@ function PortalContent() {
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-gray-800">Book Ad Date</p>
-                  <p className="text-xs text-gray-400">In-article or presenting sponsor</p>
+                  <p className="text-xs text-gray-400">Standard or presenting sponsor</p>
                 </div>
               </button>
               <button
@@ -587,7 +587,7 @@ function PortalContent() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-0.5">
                             <p className="text-sm font-semibold text-gray-800">{b.date}</p>
-                            <span className="text-xs text-gray-400 capitalize">{b.type === "in_article" ? "In-Article" : "Presenting"}</span>
+                            <span className="text-xs text-gray-400 capitalize">{b.type === "in_article" ? "Standard" : "Presenting"}</span>
                           </div>
                           <p className="text-xs text-gray-400 truncate">{b.headline}</p>
                         </div>
@@ -731,8 +731,8 @@ function PortalContent() {
                     {(["in_article", "presenting"] as const).map((t) => (
                       <button key={t} type="button" onClick={() => { setBType(t); setBDates([]); }}
                         className={`p-3 rounded-xl border text-left transition-colors ${bType === t ? "border-green-500 bg-green-50" : "border-gray-200 hover:border-gray-300"}`}>
-                        <p className="text-sm font-semibold text-gray-800">{t === "in_article" ? "In-Article: $15/day" : "Presenting Sponsor: $25/day"}</p>
-                        <p className="text-xs text-gray-400 mt-0.5">{t === "in_article" ? "Mixed in with news articles" : "Opening mention + in-article ad"}</p>
+                        <p className="text-sm font-semibold text-gray-800">{t === "in_article" ? "Standard: $15/day" : "Presenting Sponsor: $25/day"}</p>
+                        <p className="text-xs text-gray-400 mt-0.5">{t === "in_article" ? "Mixed in with the newsletter" : "Opening mention + standard ad"}</p>
                       </button>
                     ))}
                   </div>
@@ -743,7 +743,7 @@ function PortalContent() {
                   <BookingDatePicker selectedDates={bDates} onToggleDate={toggleBookingDate} adType={bType} />
                   <p className="text-xs text-gray-400 mt-1">
                     Click to select one or more dates. Grayed-out days are already fully booked.{" "}
-                    {bType === "in_article" ? "Up to 2 in-article slots per day." : "Only 1 presenting sponsor per day."}
+                    {bType === "in_article" ? "Up to 2 standard ad slots per day." : "Only 1 presenting sponsor per day."}
                   </p>
                 </div>
 

@@ -344,7 +344,7 @@ export default function SettingsPage() {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                In-article ads per issue
+                Standard ads per issue
               </label>
               <input
                 type="number"
@@ -354,7 +354,7 @@ export default function SettingsPage() {
                 onChange={(e) => setSettings((s) => ({ ...s, in_article_count: e.target.value }))}
                 className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
               />
-              <p className="text-xs text-gray-400 mt-1">Max in-article ads woven into the newsletter (default: 2)</p>
+              <p className="text-xs text-gray-400 mt-1">Max standard ads woven into the newsletter (default: 2)</p>
             </div>
           </div>
         </div>

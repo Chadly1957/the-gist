@@ -22,7 +22,7 @@ function digestHtml(data: {
   const SPONSOR_TYPE_LABELS: Record<string, string> = {
     spotlight: "Community Partner",
     presenting_sponsor: "Presenting",
-    in_article_ad: "In-Article Ad",
+    in_article_ad: "Standard Ad",
   };
 
   const sendSection = data.send

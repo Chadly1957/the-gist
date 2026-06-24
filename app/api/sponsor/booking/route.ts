@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
   const presentingCount = existing.filter((b) => b.type === "presenting").length;
 
   if (type === "in_article" && inArticleCount >= 2) {
-    return NextResponse.json({ error: "This date is fully booked for in-article sponsorships." }, { status: 409 });
+    return NextResponse.json({ error: "This date is fully booked for standard ad sponsorships." }, { status: 409 });
   }
   if (type === "presenting" && presentingCount >= 1) {
     return NextResponse.json({ error: "This date already has a presenting sponsor." }, { status: 409 });

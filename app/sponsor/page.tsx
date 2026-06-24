@@ -47,14 +47,14 @@ export default async function SponsorPage() {
     },
     {
       key: "in_article",
-      name: "In-Article Sponsorship",
+      name: "Standard Sponsorship",
       price: prices.in_article,
       description:
         "Your message appears inline with the day's news, labeled as a sponsored post. Choose any available dates on the calendar.",
       includes: [
         "Custom image, headline, and up to 250 characters of body copy",
         "A call-to-action link",
-        "Up to 2 in-article slots per day",
+        "Up to 2 standard ad slots per day",
       ],
       cta: "Reserve Dates",
       highlight: false,
@@ -64,10 +64,10 @@ export default async function SponsorPage() {
       name: "Presenting Sponsor",
       price: prices.presenting,
       description:
-        "The top sponsorship slot. You're featured as the day's presenting sponsor with a mention in the opening, plus a full in-article placement, outside the 2-slot limit.",
+        "The top sponsorship slot. You're featured as the day's presenting sponsor with a mention in the opening, plus a full standard ad placement, outside the 2-slot limit.",
       includes: [
         "\"Today's Gist is brought to you by [Your Business]\" opening mention",
-        "Full in-article ad placement (does not count against the 2-slot cap)",
+        "Full standard ad placement (does not count against the 2-slot cap)",
         "Exclusive: only 1 presenting sponsor per day",
       ],
       cta: "Reserve Dates",

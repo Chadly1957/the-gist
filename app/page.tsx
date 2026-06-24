@@ -236,7 +236,7 @@ export default function LandingPage() {
                     accent: "bg-green-800 border-green-700",
                   },
                   {
-                    name: "In-Article Sponsorship",
+                    name: "Standard Sponsorship",
                     price: "$15 / day",
                     desc: "Sponsored post mixed in with the day's news. Up to 2 slots per day.",
                     accent: "bg-green-800 border-green-700",
@@ -244,7 +244,7 @@ export default function LandingPage() {
                   {
                     name: "Presenting Sponsor",
                     price: "$25 / day",
-                    desc: "Opening mention + full in-article ad. Exclusive: one per day.",
+                    desc: "Opening mention + full standard ad placement. Exclusive: one per day.",
                     accent: "bg-green-800 border-green-600",
                   },
                 ].map((tier) => (

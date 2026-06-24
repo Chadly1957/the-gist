@@ -347,7 +347,7 @@ export default function AdminSponsorsPage() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap mb-0.5">
                         <p className="text-sm font-semibold text-gray-800">{b.date}</p>
-                        <span className="text-xs text-gray-500 capitalize">{b.type === "in_article" ? "In-Article" : "Presenting"}</span>
+                        <span className="text-xs text-gray-500 capitalize">{b.type === "in_article" ? "Standard" : "Presenting"}</span>
                         <StatusBadge status={b.status} />
                         {b.isPaid ? (
                           <span className="text-xs bg-green-50 text-green-700 px-1.5 py-0.5 rounded-full font-medium">Paid</span>
@@ -372,7 +372,7 @@ export default function AdminSponsorsPage() {
                               <select value={bookingForm.type}
                                 onChange={(e) => setBookingForm((f) => ({ ...f, type: e.target.value }))}
                                 className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500">
-                                <option value="in_article">In-Article</option>
+                                <option value="in_article">Standard</option>
                                 <option value="presenting">Presenting</option>
                               </select>
                             </div>
@@ -520,7 +520,7 @@ export default function AdminSponsorsPage() {
               <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
                 {[
                   { key: "sponsorship_price_spotlight", label: "Community Partners", hint: 'e.g. "Free"' },
-                  { key: "sponsorship_price_in_article", label: "In-Article Sponsorship", hint: 'e.g. "$15/day"' },
+                  { key: "sponsorship_price_in_article", label: "Standard Sponsorship", hint: 'e.g. "$15/day"' },
                   { key: "sponsorship_price_presenting", label: "Presenting Sponsor", hint: 'e.g. "$25/day"' },
                 ].map(({ key, label, hint }) => (
                   <div key={key}>
