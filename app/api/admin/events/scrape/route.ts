@@ -116,6 +116,10 @@ export async function POST(req: NextRequest) {
     parsedUrl.hostname === "fb.com" ||
     parsedUrl.hostname === "www.fb.com";
 
+  const isTicketTailor =
+    parsedUrl.hostname === "tickettailor.com" ||
+    parsedUrl.hostname === "www.tickettailor.com";
+
   let html: string;
   try {
     const res = await fetch(url, {
@@ -134,15 +138,24 @@ export async function POST(req: NextRequest) {
       signal: AbortSignal.timeout(12000),
     });
     if (!res.ok) {
-      return NextResponse.json(
-        { error: `Could not fetch the page (HTTP ${res.status}). Check the URL and try again.` },
-        { status: 400 }
-      );
+      // Return a partial result so the URL at least gets pre-filled
+      const siteWarning = isTicketTailor
+        ? "Tickettailor uses Cloudflare bot protection that blocks server-side requests — fill in the event details manually. The link has been saved."
+        : `Could not fetch the page (HTTP ${res.status}). The link has been saved — fill in the other details manually.`;
+      return NextResponse.json({
+        event: { url, found: { url: true }, warnings: [siteWarning] },
+      });
     }
     html = await res.text();
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: `Failed to fetch URL: ${msg}` }, { status: 400 });
+    return NextResponse.json({
+      event: {
+        url,
+        found: { url: true },
+        warnings: [`Could not reach the page (${msg}). The link has been saved — fill in the other details manually.`],
+      },
+    });
   }
 
   const result: ScrapedEvent = { found: {}, warnings: [] };
