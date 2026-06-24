@@ -193,15 +193,15 @@ function renderSpotlight(items: SpotlightItem[], tracking?: TrackingConfig): str
     return `
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid #e5e7eb;border-radius:8px;margin-bottom:12px;">
       <tr>
-        <td width="60" valign="middle" style="padding:12px 0 12px 12px;">
-          ${s.logoUrl ? `<img src="${s.logoUrl}" alt="${s.businessName}" width="48" height="48" style="display:block;width:48px;height:48px;border-radius:6px;object-fit:contain;border:1px solid #f3f4f6;" />` : ""}
+        <td width="88" valign="top" style="padding:14px 0 14px 14px;">
+          ${s.logoUrl
+            ? `<img src="${s.logoUrl}" alt="${s.businessName}" width="72" height="72" style="display:block;width:72px;height:72px;border-radius:6px;object-fit:contain;border:1px solid #f3f4f6;" />`
+            : `<div style="width:72px;height:72px;border-radius:6px;background:#f3f4f6;border:1px solid #e5e7eb;"></div>`}
         </td>
-        <td valign="middle" style="padding:12px;">
-          <div style="font-size:14px;font-weight:700;color:#111827;font-family:sans-serif;margin-bottom:3px;">${s.businessName}</div>
-          <div style="font-size:13px;color:#4b5563;line-height:1.5;font-family:sans-serif;">${s.description}</div>
-        </td>
-        <td width="140" valign="middle" align="center" style="padding:12px 12px 12px 0;">
-          <a href="${ctaUrl}" style="display:inline-block;background:#166534;color:#ffffff;padding:8px 16px;border-radius:4px;text-decoration:none;font-size:12px;font-family:sans-serif;font-weight:600;white-space:nowrap;">${s.ctaLabel}</a>
+        <td valign="middle" style="padding:14px;">
+          <div style="font-size:14px;font-weight:700;color:#111827;font-family:sans-serif;margin-bottom:4px;">${s.businessName}</div>
+          <div style="font-size:13px;color:#4b5563;line-height:1.5;font-family:sans-serif;margin-bottom:10px;">${s.description}</div>
+          <a href="${ctaUrl}" style="display:inline-block;background:#166534;color:#ffffff;padding:7px 14px;border-radius:4px;text-decoration:none;font-size:12px;font-family:sans-serif;font-weight:600;white-space:nowrap;">${s.ctaLabel}</a>
         </td>
       </tr>
     </table>`;

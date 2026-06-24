@@ -41,23 +41,21 @@ function SpotlightCard({ data }: { data: SpotlightPreviewData }) {
       <table role="presentation" width="100%" cellPadding={0} cellSpacing={0} style={{ border: "1px solid #e5e7eb", borderRadius: 8, marginBottom: 12, borderCollapse: "separate" }}>
         <tbody>
           <tr>
-            <td width={60} valign="middle" style={{ padding: "12px 0 12px 12px" }}>
+            <td width={88} valign="top" style={{ padding: "14px 0 14px 14px" }}>
               {data.logoUrl ? (
-                <img src={data.logoUrl} alt={data.businessName} width={48} height={48} style={{ display: "block", width: 48, height: 48, borderRadius: 6, objectFit: "contain", border: "1px solid #f3f4f6" }} />
+                <img src={data.logoUrl} alt={data.businessName} width={72} height={72} style={{ display: "block", width: 72, height: 72, borderRadius: 6, objectFit: "contain", border: "1px solid #f3f4f6" }} />
               ) : (
-                <div style={{ width: 48, height: 48, borderRadius: 6, background: "#f3f4f6", border: "1px solid #e5e7eb", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, color: "#9ca3af", textAlign: "center", lineHeight: 1.2 }}>No logo</div>
+                <div style={{ width: 72, height: 72, borderRadius: 6, background: "#f3f4f6", border: "1px solid #e5e7eb", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, color: "#9ca3af", textAlign: "center", lineHeight: 1.2 }}>No logo</div>
               )}
             </td>
-            <td valign="middle" style={{ padding: 12 }}>
-              <div style={{ fontSize: 14, fontWeight: 700, color: "#111827", fontFamily: "sans-serif", marginBottom: 3 }}>
+            <td valign="middle" style={{ padding: 14 }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: "#111827", fontFamily: "sans-serif", marginBottom: 4 }}>
                 {data.businessName || <span style={{ color: "#9ca3af" }}>Business name</span>}
               </div>
-              <div style={{ fontSize: 13, color: "#4b5563", lineHeight: 1.5, fontFamily: "sans-serif" }}>
+              <div style={{ fontSize: 13, color: "#4b5563", lineHeight: 1.5, fontFamily: "sans-serif", marginBottom: 10 }}>
                 {data.description || <span style={{ color: "#9ca3af" }}>Description will appear here.</span>}
               </div>
-            </td>
-            <td width={140} valign="middle" align="center" style={{ padding: "12px 12px 12px 0" }}>
-              <span style={{ display: "inline-block", background: "#166534", color: "#ffffff", padding: "8px 16px", borderRadius: 4, fontSize: 12, fontFamily: "sans-serif", fontWeight: 600, whiteSpace: "nowrap" }}>
+              <span style={{ display: "inline-block", background: "#166534", color: "#ffffff", padding: "7px 14px", borderRadius: 4, fontSize: 12, fontFamily: "sans-serif", fontWeight: 600, whiteSpace: "nowrap" }}>
                 {data.ctaLabel || "Visit Website"}
               </span>
             </td>
