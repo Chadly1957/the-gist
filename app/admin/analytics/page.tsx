@@ -36,10 +36,31 @@ interface Summary {
   avgClickRate: number;
 }
 
+interface TypeStat { impressions: number; clicks: number; }
+
+interface SponsorEntry {
+  type: string;
+  label: string;
+  impressions: number;
+  clicks: number;
+}
+
+interface SponsorBreakdown {
+  byType: Record<string, TypeStat>;
+  topSponsors: SponsorEntry[];
+}
+
 const SPONSOR_TYPE_LABELS: Record<string, string> = {
   spotlight: "Community Partner",
   presenting_sponsor: "Presenting Sponsor",
   in_article_ad: "Standard Ad",
+};
+
+const SPONSOR_TYPE_ORDER = ["presenting_sponsor", "in_article_ad", "spotlight"] as const;
+const SPONSOR_TYPE_COLORS: Record<string, { bg: string; text: string; badge: string; bar: string }> = {
+  presenting_sponsor: { bg: "bg-purple-50", text: "text-purple-700", badge: "bg-purple-100 text-purple-700", bar: "bg-purple-500" },
+  in_article_ad:      { bg: "bg-blue-50",   text: "text-blue-700",   badge: "bg-blue-100 text-blue-700",     bar: "bg-blue-500"   },
+  spotlight:          { bg: "bg-green-50",  text: "text-green-700",  badge: "bg-green-100 text-green-700",   bar: "bg-green-500"  },
 };
 
 function pct(n: number): string {
@@ -49,6 +70,7 @@ function pct(n: number): string {
 export default function AnalyticsPage() {
   const [sends, setSends] = useState<SendStats[]>([]);
   const [summary, setSummary] = useState<Summary | null>(null);
+  const [sponsorBreakdown, setSponsorBreakdown] = useState<SponsorBreakdown | null>(null);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<string | null>(null);
 
@@ -58,6 +80,7 @@ export default function AnalyticsPage() {
       .then((data) => {
         setSends(data.sends || []);
         setSummary(data.summary || null);
+        setSponsorBreakdown(data.sponsorBreakdown || null);
       })
       .finally(() => setLoading(false));
   }, []);
@@ -108,6 +131,102 @@ export default function AnalyticsPage() {
         ))}
       </div>
 
+      {/* ── Sponsored Content Breakdown ─────────────────────────────────── */}
+      <div className="mb-8">
+        <h2 className="text-base font-bold text-gray-900 mb-4">Sponsored Content Performance</h2>
+
+        {/* Per-type summary cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+          {SPONSOR_TYPE_ORDER.map((typeKey) => {
+            const stat = sponsorBreakdown?.byType[typeKey];
+            const label = SPONSOR_TYPE_LABELS[typeKey];
+            const colors = SPONSOR_TYPE_COLORS[typeKey];
+            const ctr = stat && stat.impressions > 0 ? stat.clicks / stat.impressions : 0;
+            return (
+              <div key={typeKey} className={`rounded-xl border border-gray-200 p-5 ${colors.bg}`}>
+                <p className={`text-xs font-semibold uppercase tracking-wide mb-3 ${colors.text}`}>{label}</p>
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  <div>
+                    <p className="text-xl font-bold text-gray-900">{stat?.impressions.toLocaleString() ?? "—"}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">Impressions</p>
+                  </div>
+                  <div>
+                    <p className="text-xl font-bold text-gray-900">{stat?.clicks.toLocaleString() ?? "—"}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">Clicks</p>
+                  </div>
+                  <div>
+                    <p className={`text-xl font-bold ${colors.text}`}>{stat ? pct(ctr) : "—"}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">CTR</p>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Top performers table */}
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          <div className="px-5 py-4 border-b border-gray-100">
+            <p className="text-sm font-semibold text-gray-800">Top Performing Sponsors</p>
+            <p className="text-xs text-gray-400 mt-0.5">All-time, ranked by clicks</p>
+          </div>
+          {loading || !sponsorBreakdown ? (
+            <div className="py-10 text-center">
+              <div className="w-5 h-5 border-2 border-green-600 border-t-transparent rounded-full animate-spin mx-auto" />
+            </div>
+          ) : sponsorBreakdown.topSponsors.length === 0 ? (
+            <p className="px-5 py-8 text-sm text-gray-400 text-center">No sponsor click data yet.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-gray-100">
+                    <th className="text-left px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wide">Sponsor</th>
+                    <th className="text-left px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wide">Type</th>
+                    <th className="text-right px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wide">Impressions</th>
+                    <th className="text-right px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wide">Clicks</th>
+                    <th className="text-right px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wide">CTR</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sponsorBreakdown.topSponsors.map((s, i) => {
+                    const ctr = s.impressions > 0 ? s.clicks / s.impressions : 0;
+                    const colors = SPONSOR_TYPE_COLORS[s.type] ?? SPONSOR_TYPE_COLORS.spotlight;
+                    const maxClicks = sponsorBreakdown.topSponsors[0]?.clicks ?? 1;
+                    const barWidth = maxClicks > 0 ? (s.clicks / maxClicks) * 100 : 0;
+                    return (
+                      <tr key={i} className="border-b border-gray-50 last:border-0 hover:bg-gray-50/50">
+                        <td className="px-5 py-3">
+                          <div className="flex items-center gap-3">
+                            <div className="w-28 sm:w-40 h-1.5 bg-gray-100 rounded-full shrink-0">
+                              <div
+                                className={`h-1.5 rounded-full ${colors.bar}`}
+                                style={{ width: `${barWidth}%` }}
+                              />
+                            </div>
+                            <span className="font-medium text-gray-800">{s.label}</span>
+                          </div>
+                        </td>
+                        <td className="px-5 py-3">
+                          <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${colors.badge}`}>
+                            {SPONSOR_TYPE_LABELS[s.type] ?? s.type}
+                          </span>
+                        </td>
+                        <td className="px-5 py-3 text-right text-gray-500">{s.impressions.toLocaleString()}</td>
+                        <td className="px-5 py-3 text-right font-semibold text-gray-900">{s.clicks.toLocaleString()}</td>
+                        <td className="px-5 py-3 text-right font-semibold text-green-700">{pct(ctr)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── Per-send table ───────────────────────────────────────────────── */}
+      <h2 className="text-base font-bold text-gray-900 mb-4">Send History</h2>
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         <div className="overflow-x-auto">
         <table className="w-full text-sm">

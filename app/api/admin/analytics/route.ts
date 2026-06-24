@@ -104,6 +104,32 @@ export async function GET() {
     { recipientCount: 0, uniqueOpens: 0, uniqueClicks: 0, unsubscribes: 0, sponsoredClicks: 0, sponsoredImpressions: 0 }
   );
 
+  // Aggregate sponsor performance across all tracked sends
+  const byType = new Map<string, { impressions: number; clicks: number }>();
+  const bySponsor = new Map<string, { type: string; label: string; impressions: number; clicks: number }>();
+
+  for (const send of trackedStats) {
+    for (const sc of send.sponsoredClicks) {
+      const te = byType.get(sc.type) ?? { impressions: 0, clicks: 0 };
+      te.impressions += sc.impressions;
+      te.clicks += sc.clicks;
+      byType.set(sc.type, te);
+
+      const key = `${sc.type}::${sc.label}`;
+      const se = bySponsor.get(key) ?? { type: sc.type, label: sc.label, impressions: 0, clicks: 0 };
+      se.impressions += sc.impressions;
+      se.clicks += sc.clicks;
+      bySponsor.set(key, se);
+    }
+  }
+
+  const sponsorBreakdown = {
+    byType: Object.fromEntries(byType),
+    topSponsors: Array.from(bySponsor.values())
+      .sort((a, b) => b.clicks - a.clicks || b.impressions - a.impressions)
+      .slice(0, 25),
+  };
+
   return NextResponse.json({
     sends: stats,
     summary: {
@@ -111,5 +137,6 @@ export async function GET() {
       avgOpenRate: totals.recipientCount > 0 ? totals.uniqueOpens / totals.recipientCount : 0,
       avgClickRate: totals.recipientCount > 0 ? totals.uniqueClicks / totals.recipientCount : 0,
     },
+    sponsorBreakdown,
   });
 }
