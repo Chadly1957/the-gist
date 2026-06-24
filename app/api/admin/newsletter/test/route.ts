@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getAdminSession } from "@/lib/auth";
 import { getEmailClient, htmlToText } from "@/lib/email";
-import { renderTemplate, Block, SpotlightItem, PresentingSponsorItem, InArticleAdItem } from "@/lib/template-renderer";
+import { renderTemplate, Block, SpotlightItem, PresentingSponsorItem, InArticleAdItem, EventItem } from "@/lib/template-renderer";
 
 export async function POST(req: NextRequest) {
   const session = await getAdminSession();
@@ -44,6 +44,10 @@ export async function POST(req: NextRequest) {
   const spotlightCount = Math.max(1, parseInt(allSettings.spotlight_count || "5") || 5);
   const inArticleCount = Math.max(1, parseInt(allSettings.in_article_count || "2") || 2);
 
+  const dateEnd = new Date(date + "T00:00:00");
+  dateEnd.setDate(dateEnd.getDate() + 30);
+  const dateEndStr = dateEnd.toISOString().split("T")[0];
+
   const [rawSpotlights, dateBookings] = await Promise.all([
     prisma.spotlightListing.findMany({
       where: { status: "approved" },
@@ -55,6 +59,12 @@ export async function POST(req: NextRequest) {
       include: { sponsor: { select: { businessName: true } } },
     }),
   ]);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const events: EventItem[] = await (prisma as any).event.findMany({
+    where: { status: "approved", eventDate: { gte: date, lte: dateEndStr } },
+    orderBy: { eventDate: "asc" },
+  });
 
   const spotlights: SpotlightItem[] = rawSpotlights.map((s) => ({
     businessName: s.businessName,
@@ -93,7 +103,9 @@ export async function POST(req: NextRequest) {
   const htmlBody = renderTemplate(
     blocks,
     articles.map((a) => ({ ...a, publishedAt: a.publishedAt })),
-    { spotlights, presentingSponsor, inArticleAds }
+    { spotlights, presentingSponsor, inArticleAds },
+    undefined,
+    events
   ).replace(/\{\{UNSUBSCRIBE_URL\}\}/g, `${appUrl}/unsubscribe`);
 
   const emailClient = getEmailClient(allSettings);

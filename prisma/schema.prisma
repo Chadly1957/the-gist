@@ -124,6 +124,7 @@ model SponsorProfile {
   createdAt    DateTime           @default(now())
   spotlights   SpotlightListing[]
   bookings     AdBooking[]
+  events       Event[]
 }
 
 model SpotlightListing {
@@ -160,4 +161,23 @@ model AdBooking {
   adminNotes      String?
   createdAt       DateTime       @default(now())
   approvedAt      DateTime?
+}
+
+model Event {
+  id          String          @id @default(cuid())
+  title       String
+  description String?
+  eventDate   String
+  startTime   String?
+  endTime     String?
+  location    String?
+  url         String?
+  cost        String?
+  status      String          @default("pending")
+  sponsorId   String?
+  sponsor     SponsorProfile? @relation(fields: [sponsorId], references: [id], onDelete: SetNull)
+  createdAt   DateTime        @default(now())
+  approvedAt  DateTime?
+
+  @@index([sponsorId])
 }

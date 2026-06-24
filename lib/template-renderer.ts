@@ -2,8 +2,19 @@
 
 export interface Block {
   id: string;
-  type: "header" | "text" | "image" | "articles" | "divider" | "footer" | "button" | "spotlight" | "presenting_sponsor";
+  type: "header" | "text" | "image" | "articles" | "divider" | "footer" | "button" | "spotlight" | "presenting_sponsor" | "events";
   content: Record<string, unknown>;
+}
+
+export interface EventItem {
+  title: string;
+  description?: string | null;
+  eventDate: string; // YYYY-MM-DD
+  startTime?: string | null;
+  endTime?: string | null;
+  location?: string | null;
+  url?: string | null;
+  cost?: string | null;
 }
 
 export interface SpotlightItem {
@@ -238,6 +249,36 @@ function renderInArticleAd(ad: InArticleAdItem, tracking?: TrackingConfig): stri
     </div>`;
 }
 
+function renderEvents(events: EventItem[]): string {
+  if (events.length === 0) return "";
+  const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const DAYS = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+  function fmtDate(d: string): string {
+    const [y, m, day] = d.split("-").map(Number);
+    const dt = new Date(y, m - 1, day);
+    return `${DAYS[dt.getDay()]}, ${MONTHS[m - 1]} ${day}`;
+  }
+  const items = events.map((e) => {
+    const timeParts = [e.startTime, e.endTime].filter(Boolean).join(" – ");
+    const meta = [timeParts, e.location, e.cost].filter(Boolean).join(" · ");
+    return `
+      <div style="margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid #f3f4f6;">
+        <div style="font-size:11px;font-weight:700;color:#166534;font-family:sans-serif;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:3px;">${fmtDate(e.eventDate)}</div>
+        <div style="font-size:15px;font-weight:700;color:#111827;font-family:sans-serif;line-height:1.3;margin-bottom:4px;">${e.title}</div>
+        ${meta ? `<div style="font-size:12px;color:#6b7280;font-family:sans-serif;margin-bottom:4px;">${meta}</div>` : ""}
+        ${e.description ? `<div style="font-size:13px;color:#4b5563;line-height:1.5;font-family:sans-serif;margin-bottom:4px;">${e.description}</div>` : ""}
+        ${e.url ? `<a href="${e.url}" style="font-size:12px;color:#166534;font-family:sans-serif;font-weight:600;text-decoration:none;">More info →</a>` : ""}
+      </div>`;
+  }).join("");
+  return `
+    <div style="padding:20px 40px;">
+      <div style="font-family:sans-serif;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#6b7280;margin-bottom:14px;padding-bottom:8px;border-bottom:2px solid #e5e7eb;">
+        Upcoming Events
+      </div>
+      ${items}
+    </div>`;
+}
+
 function renderDivider(): string {
   return `<div class="block" style="padding:8px 40px;"><hr class="divider" style="border:none;border-top:1px solid #e5e7eb;margin:0;" /></div>`;
 }
@@ -267,7 +308,8 @@ export function renderTemplate(
     presentingSponsor?: PresentingSponsorItem | null;
     inArticleAds?: InArticleAdItem[];
   } = {},
-  tracking?: TrackingConfig
+  tracking?: TrackingConfig,
+  events: EventItem[] = []
 ): string {
   const { spotlights = [], presentingSponsor = null, inArticleAds = [] } = sponsors;
 
@@ -292,6 +334,8 @@ export function renderTemplate(
           return renderSpotlight(spotlights, tracking);
         case "presenting_sponsor":
           return presentingSponsor ? renderPresentingSponsor(presentingSponsor, tracking) : "";
+        case "events":
+          return renderEvents(events);
         default:
           return "";
       }

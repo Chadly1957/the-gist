@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getAdminSession } from "@/lib/auth";
-import { renderTemplate, Block, SpotlightItem, PresentingSponsorItem, InArticleAdItem } from "@/lib/template-renderer";
+import { renderTemplate, Block, SpotlightItem, PresentingSponsorItem, InArticleAdItem, EventItem } from "@/lib/template-renderer";
 import { getEmailClient, htmlToText } from "@/lib/email";
 import { signTrackingUrl } from "@/lib/tracking";
 
@@ -51,6 +51,10 @@ export async function POST(req: NextRequest) {
   const spotlightCount = Math.max(1, parseInt(allSettings.spotlight_count || "5") || 5);
   const inArticleCount = Math.max(1, parseInt(allSettings.in_article_count || "2") || 2);
 
+  const dateEnd = new Date(date + "T00:00:00");
+  dateEnd.setDate(dateEnd.getDate() + 30);
+  const dateEndStr = dateEnd.toISOString().split("T")[0];
+
   const [rawSpotlights, dateBookings] = await Promise.all([
     prisma.spotlightListing.findMany({
       where: { status: "approved" },
@@ -62,6 +66,13 @@ export async function POST(req: NextRequest) {
       include: { sponsor: { select: { businessName: true } } },
     }),
   ]);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const rawEvents: EventItem[] = await (prisma as any).event.findMany({
+    where: { status: "approved", eventDate: { gte: date, lte: dateEndStr } },
+    orderBy: { eventDate: "asc" },
+  });
+  const events: EventItem[] = rawEvents;
 
   const spotlights: SpotlightItem[] = rawSpotlights.map((s) => ({
     businessName: s.businessName,
@@ -110,7 +121,8 @@ export async function POST(req: NextRequest) {
     blocks,
     articles.map((a) => ({ ...a, publishedAt: a.publishedAt })),
     { spotlights, presentingSponsor, inArticleAds },
-    willSend ? { baseUrl: appUrl, sign: signTrackingUrl } : undefined
+    willSend ? { baseUrl: appUrl, sign: signTrackingUrl } : undefined,
+    events
   ).replace(
     /\{\{UNSUBSCRIBE_URL\}\}/g,
     willSend
@@ -122,7 +134,9 @@ export async function POST(req: NextRequest) {
   const htmlSnapshot = renderTemplate(
     blocks,
     articles.map((a) => ({ ...a, publishedAt: a.publishedAt })),
-    { spotlights, presentingSponsor, inArticleAds }
+    { spotlights, presentingSponsor, inArticleAds },
+    undefined,
+    events
   ).replace(/\{\{UNSUBSCRIBE_URL\}\}/g, `${appUrl}/unsubscribe`);
 
   let recipientCount = 0;

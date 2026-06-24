@@ -4,7 +4,7 @@ import { useState, useRef } from "react";
 
 export interface Block {
   id: string;
-  type: "header" | "text" | "image" | "articles" | "divider" | "button" | "footer" | "spotlight" | "presenting_sponsor";
+  type: "header" | "text" | "image" | "articles" | "divider" | "button" | "footer" | "spotlight" | "presenting_sponsor" | "events";
   content: Record<string, string>;
 }
 
@@ -22,6 +22,7 @@ const BLOCK_TYPES: { type: Block["type"]; label: string; icon: string }[] = [
   { type: "image", label: "Image", icon: "IMG" },
   { type: "button", label: "Button / CTA", icon: "BTN" },
   { type: "divider", label: "Divider", icon: "─" },
+  { type: "events", label: "Upcoming Events", icon: "📅" },
   { type: "spotlight", label: "Community Partners", icon: "★" },
   { type: "presenting_sponsor", label: "Presenting Sponsor", icon: "✦" },
 ];
@@ -44,6 +45,7 @@ export default function BlockEditor({ blocks, onChange }: BlockEditorProps) {
       },
       spotlight: {},
       presenting_sponsor: {},
+      events: {},
     };
     const newBlock: Block = { id: generateId(), type, content: defaults[type] };
     onChange([...blocks, newBlock]);
@@ -235,6 +237,20 @@ function BlockPreview({ block }: { block: Block }) {
           <div>
             <p className="text-sm font-semibold text-gray-800">Presenting Sponsor</p>
             <p className="text-xs text-gray-400">Auto-filled with approved presenting sponsor for the newsletter date</p>
+          </div>
+        </div>
+      );
+    case "events":
+      return (
+        <div className="flex items-center gap-3 py-2">
+          <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center">
+            <svg className="w-4 h-4 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-gray-800">Upcoming Events</p>
+            <p className="text-xs text-gray-400">Auto-filled with approved events in the next 30 days when the newsletter is sent</p>
           </div>
         </div>
       );
