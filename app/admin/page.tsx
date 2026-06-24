@@ -6,15 +6,24 @@ export const dynamic = "force-dynamic";
 
 async function getDashboardStats() {
   try {
-    const [subscribers, sources, articles, lastSend] = await Promise.all([
+    const today = new Date().toISOString().split("T")[0];
+    const thirtyDaysOut = new Date();
+    thirtyDaysOut.setDate(thirtyDaysOut.getDate() + 30);
+    const thirtyDaysOutStr = thirtyDaysOut.toISOString().split("T")[0];
+
+    const [subscribers, sources, articles, lastSend, sponsorProfiles, activeSpotlights, pendingBookings, upcomingBookings] = await Promise.all([
       prisma.subscriber.count({ where: { active: true } }),
       prisma.source.count({ where: { active: true } }),
       prisma.article.count(),
       prisma.newsletterSend.findFirst({ orderBy: { sentAt: "desc" } }),
+      prisma.sponsorProfile.count(),
+      prisma.spotlightListing.count({ where: { status: "approved" } }),
+      prisma.adBooking.count({ where: { status: "pending" } }),
+      prisma.adBooking.count({ where: { status: "approved", date: { gte: today, lte: thirtyDaysOutStr } } }),
     ]);
-    return { subscribers, sources, articles, lastSend };
+    return { subscribers, sources, articles, lastSend, sponsorProfiles, activeSpotlights, pendingBookings, upcomingBookings };
   } catch {
-    return { subscribers: 0, sources: 0, articles: 0, lastSend: null };
+    return { subscribers: 0, sources: 0, articles: 0, lastSend: null, sponsorProfiles: 0, activeSpotlights: 0, pendingBookings: 0, upcomingBookings: 0 };
   }
 }
 
@@ -140,6 +149,73 @@ export default async function AdminDashboard() {
               <p className="text-gray-400 text-xs mt-0.5">Design your newsletter layout</p>
             </div>
           </Link>
+        </div>
+      </div>
+
+      {/* Sponsors at a Glance */}
+      <div className="mb-8">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-base font-semibold text-gray-700">Sponsors</h2>
+          <Link href="/admin/sponsors" className="text-xs text-green-700 hover:underline font-medium">
+            Manage →
+          </Link>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          {[
+            {
+              label: "Profiles Created",
+              value: stats.sponsorProfiles.toLocaleString(),
+              sub: "total community partners",
+              color: "text-amber-600",
+              icon: (
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+              ),
+            },
+            {
+              label: "Active Spotlights",
+              value: stats.activeSpotlights.toLocaleString(),
+              sub: "approved free listings",
+              color: "text-green-600",
+              icon: (
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                </svg>
+              ),
+            },
+            {
+              label: "Pending Review",
+              value: stats.pendingBookings.toLocaleString(),
+              sub: "ad bookings awaiting approval",
+              color: stats.pendingBookings > 0 ? "text-orange-500" : "text-gray-400",
+              icon: (
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              ),
+            },
+            {
+              label: "Upcoming Ads",
+              value: stats.upcomingBookings.toLocaleString(),
+              sub: "approved in next 30 days",
+              color: "text-blue-600",
+              icon: (
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+              ),
+            },
+          ].map((stat) => (
+            <div key={stat.label} className="bg-white rounded-xl border border-gray-200 p-4 flex items-start gap-3">
+              <div className={`mt-0.5 shrink-0 ${stat.color}`}>{stat.icon}</div>
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide leading-tight mb-1">{stat.label}</p>
+                <p className={`text-2xl font-bold ${stat.color}`}>{stat.value}</p>
+                <p className="text-xs text-gray-400 mt-0.5 leading-tight">{stat.sub}</p>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
 
