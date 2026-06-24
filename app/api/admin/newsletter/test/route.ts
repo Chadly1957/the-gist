@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { getAdminSession } from "@/lib/auth";
 import { getEmailClient, htmlToText } from "@/lib/email";
 import { renderTemplate, Block, SpotlightItem, PresentingSponsorItem, InArticleAdItem, EventItem } from "@/lib/template-renderer";
+import { blurbToHtml } from "@/lib/url";
 
 export async function POST(req: NextRequest) {
   const session = await getAdminSession();
@@ -31,7 +32,7 @@ export async function POST(req: NextRequest) {
   if (blurb) {
     blocks = blocks.map((b, i) =>
       b.type === "text" && i === blocks.findIndex((x) => x.type === "text")
-        ? { ...b, content: { ...b.content, html: `${b.content.html}<p>${blurb}</p>` } }
+        ? { ...b, content: { ...b.content, html: `${b.content.html}${blurbToHtml(blurb)}` } }
         : b
     ) as Block[];
   }

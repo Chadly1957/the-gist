@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { renderTemplate } from "@/lib/template-renderer";
+import { blurbToHtml } from "@/lib/url";
 
 interface Article {
   id: string;
@@ -143,7 +144,7 @@ export default function ComposePage() {
     if (blurb) {
       blocks = blocks.map((b: { type: string; content: Record<string, string> }) =>
         b.type === "text" && blocks.indexOf(b) === blocks.findIndex((x: { type: string }) => x.type === "text")
-          ? { ...b, content: { ...b.content, html: `${b.content.html}<p>${blurb}</p>` } }
+          ? { ...b, content: { ...b.content, html: `${b.content.html}${blurbToHtml(blurb)}` } }
           : b
       );
     }
@@ -567,9 +568,9 @@ export default function ComposePage() {
                 <textarea
                   value={blurb}
                   onChange={(e) => setBlurb(e.target.value)}
-                  rows={3}
-                  placeholder="Add a personal note for today's issue… (optional, appended to the first text block)"
-                  className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none"
+                  rows={5}
+                  placeholder={"Add a personal note for today's issue…\n\nUse blank lines to create new paragraphs."}
+                  className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-y"
                 />
               </div>
 
