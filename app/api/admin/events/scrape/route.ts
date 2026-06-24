@@ -38,11 +38,24 @@ function extractJsonLd(html: string): Record<string, unknown>[] {
   return results;
 }
 
+const EVENT_TYPES = new Set([
+  "Event", "BusinessEvent", "ChildrensEvent", "ComedyEvent", "DanceEvent",
+  "EducationEvent", "ExhibitionEvent", "Festival", "FoodEvent", "Hackathon",
+  "LiteraryEvent", "MusicEvent", "PublicationEvent", "SaleEvent",
+  "ScreeningEvent", "SocialEvent", "SportsEvent", "TheaterEvent", "VisualArtsEvent",
+]);
+
+function isEventType(t: unknown): boolean {
+  if (typeof t === "string") return EVENT_TYPES.has(t);
+  if (Array.isArray(t)) return t.some((v) => typeof v === "string" && EVENT_TYPES.has(v));
+  return false;
+}
+
 function findEventJsonLd(items: Record<string, unknown>[]): Record<string, unknown> | undefined {
   for (const item of items) {
-    if (item["@type"] === "Event") return item;
+    if (isEventType(item["@type"])) return item;
     if (item["@graph"] && Array.isArray(item["@graph"])) {
-      const found = (item["@graph"] as Record<string, unknown>[]).find((n) => n["@type"] === "Event");
+      const found = (item["@graph"] as Record<string, unknown>[]).find((n) => isEventType(n["@type"]));
       if (found) return found;
     }
   }
@@ -108,12 +121,17 @@ export async function POST(req: NextRequest) {
     const res = await fetch(url, {
       headers: {
         "User-Agent":
-          "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
-        Accept: "text/html,application/xhtml+xml",
+          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         "Accept-Language": "en-US,en;q=0.9",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Cache-Control": "no-cache",
+        "Sec-Fetch-Dest": "document",
+        "Sec-Fetch-Mode": "navigate",
+        "Sec-Fetch-Site": "none",
       },
       redirect: "follow",
-      signal: AbortSignal.timeout(10000),
+      signal: AbortSignal.timeout(12000),
     });
     if (!res.ok) {
       return NextResponse.json(
@@ -180,6 +198,8 @@ export async function POST(req: NextRequest) {
       result.title = ogTitle
         .replace(/\s*[\|–—-]\s*Facebook\s*$/i, "")
         .replace(/\s*[\|–—-]\s*Eventbrite\s*$/i, "")
+        .replace(/\s*[\|–—-]\s*Ticket Tailor\s*$/i, "")
+        .replace(/\s*[\|–—-]\s*TicketTailor\s*$/i, "")
         .trim();
       result.found.title = true;
     }
