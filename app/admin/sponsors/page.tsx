@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import SponsorPreview from "@/components/SponsorPreview";
 
 interface Spotlight {
   id: string;
@@ -67,6 +68,7 @@ export default function AdminSponsorsPage() {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [previewId, setPreviewId] = useState<string | null>(null);
 
   // Edit forms
   const [editingSpotlightId, setEditingSpotlightId] = useState<string | null>(null);
@@ -304,6 +306,10 @@ export default function AdminSponsorsPage() {
                               className="px-3 py-1.5 border border-gray-200 text-gray-600 rounded-lg text-xs font-semibold hover:bg-gray-100">
                               Edit
                             </button>
+                            <button onClick={() => setPreviewId(previewId === s.id ? null : s.id)}
+                              className="px-3 py-1.5 border border-gray-200 text-gray-600 rounded-lg text-xs font-semibold hover:bg-gray-100">
+                              {previewId === s.id ? "Hide Preview" : "Preview"}
+                            </button>
                             <a href={s.ctaUrl} target="_blank" rel="noopener noreferrer"
                               className="px-3 py-1.5 border border-gray-200 text-gray-600 rounded-lg text-xs font-semibold hover:bg-gray-100">
                               Visit Site ↗
@@ -316,6 +322,11 @@ export default function AdminSponsorsPage() {
                             className="text-xs text-green-700 underline">
                             Open sponsor portal ↗
                           </a>
+                          {previewId === s.id && (
+                            <div className="mt-3">
+                              <SponsorPreview data={{ type: "spotlight", businessName: s.businessName, logoUrl: s.logoUrl ?? undefined, description: s.description, ctaLabel: s.ctaLabel, ctaUrl: s.ctaUrl }} />
+                            </div>
+                          )}
                         </>
                       )}
                     </div>
@@ -457,10 +468,19 @@ export default function AdminSponsorsPage() {
                               className="px-3 py-1.5 border border-gray-200 text-gray-600 rounded-lg text-xs font-semibold hover:bg-gray-100">
                               Edit
                             </button>
+                            <button onClick={() => setPreviewId(previewId === b.id ? null : b.id)}
+                              className="px-3 py-1.5 border border-gray-200 text-gray-600 rounded-lg text-xs font-semibold hover:bg-gray-100">
+                              {previewId === b.id ? "Hide Preview" : "Preview"}
+                            </button>
                             <button onClick={() => deleteBooking(b.id)} className="px-3 py-1.5 text-red-500 hover:text-red-700 text-xs font-semibold">
                               Delete
                             </button>
                           </div>
+                          {previewId === b.id && (
+                            <div className="mt-3">
+                              <SponsorPreview data={b.type === "presenting" ? { type: "presenting", businessName: b.sponsor.businessName, imageUrl: b.imageUrl ?? undefined, headline: b.headline, body: b.body, ctaLabel: b.ctaLabel, ctaUrl: b.ctaUrl, presentingBlurb: b.presentingBlurb ?? undefined } : { type: "in_article", businessName: b.sponsor.businessName, imageUrl: b.imageUrl ?? undefined, headline: b.headline, body: b.body, ctaLabel: b.ctaLabel, ctaUrl: b.ctaUrl }} />
+                            </div>
+                          )}
                         </>
                       )}
                     </div>

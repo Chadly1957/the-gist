@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Logo from "@/components/Logo";
+import SponsorPreview from "@/components/SponsorPreview";
 
 interface Spotlight {
   id: string;
@@ -233,6 +234,7 @@ function PortalContent() {
   const [sSubmitting, setSSubmitting] = useState(false);
   const [sError, setSError] = useState("");
   const [sSuccess, setSSuccess] = useState(false);
+  const [sShowPreview, setSShowPreview] = useState(false);
   const sFileRef = useRef<HTMLInputElement>(null);
 
   // Profile edit form
@@ -250,6 +252,7 @@ function PortalContent() {
   const [bError, setBError] = useState("");
   const [bSuccess, setBSuccess] = useState(false);
   const [bPartialErrors, setBPartialErrors] = useState<{ date: string; error: string }[]>([]);
+  const [bShowPreview, setBShowPreview] = useState(false);
   const bFileRef = useRef<HTMLInputElement>(null);
 
   function toggleBookingDate(date: string) {
@@ -635,6 +638,21 @@ function PortalContent() {
 
                 {sError && <p className="text-sm text-red-600">{sError}</p>}
 
+                <div className="border-t border-gray-100 pt-4">
+                  <button type="button" onClick={() => setSShowPreview((v) => !v)}
+                    className="flex items-center gap-1.5 text-sm font-medium text-green-700 hover:text-green-800 mb-3">
+                    <svg className={`w-4 h-4 transition-transform ${sShowPreview ? "rotate-90" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                    </svg>
+                    {sShowPreview ? "Hide preview" : "Preview how it looks in the newsletter"}
+                  </button>
+                  {sShowPreview && (
+                    <div className="mb-4">
+                      <SponsorPreview data={{ type: "spotlight", businessName: sForm.businessName, logoUrl: sForm.logoUrl || undefined, description: sForm.description, ctaLabel: sForm.ctaLabel, ctaUrl: sForm.ctaUrl }} />
+                    </div>
+                  )}
+                </div>
+
                 <button type="submit" disabled={sSubmitting}
                   className="w-full bg-green-700 hover:bg-green-800 disabled:opacity-50 text-white font-semibold py-2.5 rounded-xl text-sm transition-colors">
                   {sSubmitting ? (editingSpotlight ? "Saving…" : "Submitting…") : (editingSpotlight ? "Save Changes" : "Submit Listing for Review")}
@@ -745,6 +763,24 @@ function PortalContent() {
                 )}
 
                 {bError && <p className="text-sm text-red-600">{bError}</p>}
+
+                <div className="border-t border-gray-100 pt-4">
+                  <button type="button" onClick={() => setBShowPreview((v) => !v)}
+                    className="flex items-center gap-1.5 text-sm font-medium text-green-700 hover:text-green-800 mb-3">
+                    <svg className={`w-4 h-4 transition-transform ${bShowPreview ? "rotate-90" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                    </svg>
+                    {bShowPreview ? "Hide preview" : "Preview how it looks in the newsletter"}
+                  </button>
+                  {bShowPreview && (
+                    <div className="mb-4">
+                      <SponsorPreview data={bType === "presenting"
+                        ? { type: "presenting", businessName: profile?.businessName, imageUrl: bForm.imageUrl || undefined, headline: bForm.headline, body: bForm.body, ctaLabel: bForm.ctaLabel, ctaUrl: bForm.ctaUrl, presentingBlurb: bForm.presentingBlurb || undefined }
+                        : { type: "in_article", imageUrl: bForm.imageUrl || undefined, headline: bForm.headline, body: bForm.body, ctaLabel: bForm.ctaLabel, ctaUrl: bForm.ctaUrl }
+                      } />
+                    </div>
+                  )}
+                </div>
 
                 <button type="submit" disabled={bSubmitting}
                   className="w-full bg-green-700 hover:bg-green-800 disabled:opacity-50 text-white font-semibold py-2.5 rounded-xl text-sm transition-colors">
