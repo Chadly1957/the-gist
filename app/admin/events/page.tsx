@@ -52,6 +52,11 @@ export default function AdminEventsPage() {
   const [addForm, setAddForm] = useState(EMPTY_FORM);
   const [addSaving, setAddSaving] = useState(false);
   const [addError, setAddError] = useState("");
+  const [scrapeUrl, setScrapeUrl] = useState("");
+  const [scraping, setScraping] = useState(false);
+  const [scrapeError, setScrapeError] = useState("");
+  const [scrapeWarnings, setScrapeWarnings] = useState<string[]>([]);
+  const [scrapeFound, setScrapeFound] = useState<Record<string, boolean>>({});
 
   async function load() {
     const res = await fetch("/api/admin/events");
@@ -83,6 +88,35 @@ export default function AdminEventsPage() {
     setEditingId(null);
   }
 
+  async function scrapeEvent() {
+    if (!scrapeUrl.trim()) return;
+    setScraping(true);
+    setScrapeError("");
+    setScrapeWarnings([]);
+    setScrapeFound({});
+    const res = await fetch("/api/admin/events/scrape", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url: scrapeUrl.trim() }),
+    });
+    const data = await res.json();
+    setScraping(false);
+    if (!res.ok) { setScrapeError(data.error || "Failed to fetch event details."); return; }
+    const ev = data.event;
+    setAddForm((f) => ({
+      ...f,
+      title: ev.title ?? f.title,
+      description: ev.description ?? f.description,
+      eventDate: ev.eventDate ?? f.eventDate,
+      startTime: ev.startTime ?? f.startTime,
+      endTime: ev.endTime ?? f.endTime,
+      location: ev.location ?? f.location,
+      url: ev.url ?? f.url,
+    }));
+    setScrapeFound(ev.found ?? {});
+    setScrapeWarnings(ev.warnings ?? []);
+  }
+
   async function addEvent(e: React.FormEvent) {
     e.preventDefault();
     setAddSaving(true);
@@ -95,6 +129,9 @@ export default function AdminEventsPage() {
     const data = await res.json();
     if (!res.ok) { setAddError(data.error || "Failed to add event."); setAddSaving(false); return; }
     setAddForm(EMPTY_FORM);
+    setScrapeUrl("");
+    setScrapeFound({});
+    setScrapeWarnings([]);
     setShowAddForm(false);
     setAddSaving(false);
     await load();
@@ -127,6 +164,52 @@ export default function AdminEventsPage() {
       {showAddForm && (
         <form onSubmit={addEvent} className="bg-white rounded-xl border border-gray-200 p-6 mb-6 space-y-4">
           <h2 className="text-sm font-bold text-gray-800">New Event</h2>
+
+          {/* URL Import */}
+          <div className="bg-blue-50 border border-blue-100 rounded-lg p-4 space-y-3">
+            <p className="text-xs font-semibold text-blue-800">Import from URL (optional)</p>
+            <div className="flex gap-2">
+              <input
+                type="url"
+                placeholder="https://www.eventbrite.com/e/... or Facebook event link"
+                value={scrapeUrl}
+                onChange={(e) => { setScrapeUrl(e.target.value); setScrapeError(""); setScrapeWarnings([]); setScrapeFound({}); }}
+                className="flex-1 px-3 py-2 border border-blue-200 bg-white rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+              />
+              <button
+                type="button"
+                onClick={scrapeEvent}
+                disabled={scraping || !scrapeUrl.trim()}
+                className="px-3 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg text-xs font-semibold transition-colors shrink-0"
+              >
+                {scraping ? (
+                  <span className="flex items-center gap-1.5">
+                    <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48 2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48 2.83-2.83" />
+                    </svg>
+                    Fetching…
+                  </span>
+                ) : "Fetch Details"}
+              </button>
+            </div>
+            {scrapeError && <p className="text-xs text-red-600">{scrapeError}</p>}
+            {Object.keys(scrapeFound).length > 0 && (
+              <div className="space-y-1">
+                <p className="text-xs font-semibold text-blue-700">Fields filled in:</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {(["title", "eventDate", "startTime", "endTime", "location", "description", "url"] as const).map((field) => (
+                    <span key={field}
+                      className={`text-xs px-2 py-0.5 rounded-full font-medium ${scrapeFound[field] ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-400"}`}>
+                      {scrapeFound[field] ? "✓ " : "✗ "}{field === "eventDate" ? "date" : field === "startTime" ? "start time" : field === "endTime" ? "end time" : field}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+            {scrapeWarnings.map((w, i) => (
+              <p key={i} className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded px-2 py-1">{w}</p>
+            ))}
+          </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="sm:col-span-2">
               <label className="block text-xs font-semibold text-gray-600 mb-1">Title *</label>
@@ -177,7 +260,7 @@ export default function AdminEventsPage() {
               className="px-4 py-2 bg-green-700 text-white rounded-lg text-sm font-semibold hover:bg-green-800 disabled:opacity-50">
               {addSaving ? "Adding…" : "Add Event"}
             </button>
-            <button type="button" onClick={() => { setShowAddForm(false); setAddForm(EMPTY_FORM); setAddError(""); }}
+            <button type="button" onClick={() => { setShowAddForm(false); setAddForm(EMPTY_FORM); setAddError(""); setScrapeUrl(""); setScrapeFound({}); setScrapeWarnings([]); }}
               className="px-4 py-2 border border-gray-200 text-gray-600 rounded-lg text-sm font-semibold hover:bg-gray-50">
               Cancel
             </button>
