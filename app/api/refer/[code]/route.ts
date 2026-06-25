@@ -18,6 +18,17 @@ async function getActiveSprint() {
 }
 
 export async function GET(_req: NextRequest, { params }: { params: { code: string } }) {
+  // Test emails use "preview" as a placeholder — return demo data so the page renders
+  if (params.code === "preview") {
+    const previewEndDate = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+    return NextResponse.json({
+      valid: true,
+      referrerFirstName: "Jane",
+      sprint: { goal: 5, endDate: previewEndDate, prizeDescription: "$25 gift card (preview)" },
+      signupCount: 2,
+    });
+  }
+
   const ref = await db.referralCode.findUnique({
     where: { code: params.code },
     include: { subscriber: { select: { firstName: true, active: true } } },
