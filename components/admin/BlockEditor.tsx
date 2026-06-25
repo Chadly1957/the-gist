@@ -4,7 +4,7 @@ import { useState, useRef } from "react";
 
 export interface Block {
   id: string;
-  type: "header" | "text" | "image" | "articles" | "divider" | "button" | "footer" | "spotlight" | "presenting_sponsor" | "events";
+  type: "header" | "text" | "image" | "articles" | "divider" | "button" | "footer" | "spotlight" | "presenting_sponsor" | "events" | "referral";
   content: Record<string, string>;
 }
 
@@ -25,6 +25,7 @@ const BLOCK_TYPES: { type: Block["type"]; label: string; icon: string }[] = [
   { type: "events", label: "Upcoming Events", icon: "📅" },
   { type: "spotlight", label: "Community Partners", icon: "★" },
   { type: "presenting_sponsor", label: "Presenting Sponsor", icon: "✦" },
+  { type: "referral", label: "Refer a Friend", icon: "🔗" },
 ];
 
 export default function BlockEditor({ blocks, onChange }: BlockEditorProps) {
@@ -46,6 +47,11 @@ export default function BlockEditor({ blocks, onChange }: BlockEditorProps) {
       spotlight: {},
       presenting_sponsor: {},
       events: {},
+      referral: {
+        title: "Refer a Friend, Earn Rewards",
+        text: "Know someone who'd love The Gist Decatur? Share your unique link and earn a chance to win a prize!",
+        buttonLabel: "Share Your Referral Link →",
+      },
     };
     const newBlock: Block = { id: generateId(), type, content: defaults[type] };
     onChange([...blocks, newBlock]);
@@ -271,6 +277,17 @@ function BlockPreview({ block }: { block: Block }) {
           <p className="text-xs text-blue-400 underline mt-0.5">{block.content.unsubscribeText}</p>
         </div>
       );
+    case "referral":
+      return (
+        <div className="bg-green-50 border border-green-200 rounded-xl p-4">
+          <div className="text-xs font-semibold text-green-700 uppercase tracking-wide mb-1">Refer a Friend</div>
+          <p className="text-sm font-bold text-gray-900 mb-1">{block.content.title || "Refer a Friend, Earn Rewards"}</p>
+          <p className="text-xs text-gray-500 mb-2">{block.content.text || "Share your unique link…"}</p>
+          <span className="inline-block bg-green-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg">
+            {block.content.buttonLabel || "Share Your Referral Link →"}
+          </span>
+        </div>
+      );
     default:
       return null;
   }
@@ -468,6 +485,15 @@ function BlockFields({
       return <p className="text-xs text-gray-400">No configuration needed. This block auto-populates with the most-eligible approved community partner listings at send time.</p>;
     case "presenting_sponsor":
       return <p className="text-xs text-gray-400">No configuration needed. This block auto-populates with the approved presenting sponsor for the selected newsletter date. Hidden if no sponsor is booked.</p>;
+    case "referral":
+      return (
+        <div className="space-y-3">
+          {field("title", "Heading", { placeholder: "Refer a Friend, Earn Rewards" })}
+          {field("text", "Body Text", { rows: 2, placeholder: "Know someone who'd love The Gist Decatur? Share your unique link and earn a chance to win a prize!" })}
+          {field("buttonLabel", "Button Label", { placeholder: "Share Your Referral Link →" })}
+          <p className="text-xs text-gray-400">Each subscriber automatically gets a unique referral link. The button links to their personal referral portal at thegistdecatur.com/refer/[code].</p>
+        </div>
+      );
     case "articles":
       return (
         <div className="space-y-3">

@@ -107,7 +107,10 @@ export async function POST(req: NextRequest) {
     { spotlights, presentingSponsor, inArticleAds },
     undefined,
     events
-  ).replace(/\{\{UNSUBSCRIBE_URL\}\}/g, `${appUrl}/unsubscribe`);
+  )
+    .replace(/\{\{UNSUBSCRIBE_URL\}\}/g, `${appUrl}/unsubscribe`)
+    .replace(/\{\{APP_URL\}\}/g, appUrl)
+    .replace(/REFCODEPLACEHOLDER/g, "preview");
 
   const emailClient = getEmailClient(allSettings);
   if (!emailClient) {

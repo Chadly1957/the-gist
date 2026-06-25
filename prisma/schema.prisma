@@ -181,3 +181,40 @@ model Event {
 
   @@index([sponsorId])
 }
+
+model ReferralSprint {
+  id               String           @id @default(cuid())
+  name             String
+  startDate        String
+  endDate          String
+  goal             Int              @default(5)
+  prizeDescription String?
+  status           String           @default("active")
+  winnerEmail      String?
+  drawnAt          DateTime?
+  createdAt        DateTime         @default(now())
+  signups          ReferralSignup[]
+}
+
+model ReferralCode {
+  id           String           @id @default(cuid())
+  subscriberId String           @unique
+  code         String           @unique
+  createdAt    DateTime         @default(now())
+  signups      ReferralSignup[]
+
+  @@index([code])
+}
+
+model ReferralSignup {
+  id              String          @id @default(cuid())
+  referralCodeId  String
+  referralCode    ReferralCode    @relation(fields: [referralCodeId], references: [id], onDelete: Cascade)
+  newSubscriberId String?
+  sprintId        String?
+  sprint          ReferralSprint? @relation(fields: [sprintId], references: [id], onDelete: SetNull)
+  createdAt       DateTime        @default(now())
+
+  @@index([referralCodeId])
+  @@index([sprintId])
+}

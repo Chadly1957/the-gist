@@ -2,7 +2,7 @@
 
 export interface Block {
   id: string;
-  type: "header" | "text" | "image" | "articles" | "divider" | "footer" | "button" | "spotlight" | "presenting_sponsor" | "events";
+  type: "header" | "text" | "image" | "articles" | "divider" | "footer" | "button" | "spotlight" | "presenting_sponsor" | "events" | "referral";
   content: Record<string, unknown>;
 }
 
@@ -279,6 +279,24 @@ function renderEvents(events: EventItem[]): string {
     </div>`;
 }
 
+// REFCODEPLACEHOLDER is substituted per-recipient in the send route
+// {{APP_URL}} is substituted by the send/test route with the actual app URL
+function renderReferral(content: Record<string, unknown>): string {
+  const title = String(content.title || "Refer a Friend, Earn Rewards");
+  const text = String(content.text || "Know someone who'd love The Gist Decatur? Share your unique link and earn a chance to win a prize!");
+  const label = String(content.buttonLabel || "Share Your Referral Link →");
+  const referUrl = "{{APP_URL}}/refer/REFCODEPLACEHOLDER";
+  return `
+    <div style="padding:20px 40px;">
+      <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:24px;text-align:center;">
+        <div style="font-family:sans-serif;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#166534;margin-bottom:10px;">Refer a Friend</div>
+        <div style="font-size:18px;font-weight:700;color:#111827;font-family:Georgia,serif;line-height:1.3;margin-bottom:10px;">${title}</div>
+        <div style="font-size:14px;color:#4b5563;line-height:1.6;font-family:sans-serif;margin-bottom:20px;">${text}</div>
+        <a href="${referUrl}" style="display:inline-block;background:#166534;color:#ffffff;padding:12px 28px;border-radius:6px;text-decoration:none;font-size:14px;font-family:sans-serif;font-weight:700;">${label}</a>
+      </div>
+    </div>`;
+}
+
 function renderDivider(): string {
   return `<div class="block" style="padding:8px 40px;"><hr class="divider" style="border:none;border-top:1px solid #e5e7eb;margin:0;" /></div>`;
 }
@@ -336,6 +354,8 @@ export function renderTemplate(
           return presentingSponsor ? renderPresentingSponsor(presentingSponsor, tracking) : "";
         case "events":
           return renderEvents(events);
+        case "referral":
+          return renderReferral(block.content);
         default:
           return "";
       }

@@ -6,6 +6,13 @@ import { getEmailClient, htmlToText } from "@/lib/email";
 import { signTrackingUrl } from "@/lib/tracking";
 import { blurbToHtml } from "@/lib/url";
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const db = prisma as any;
+
+function generateRefCode(): string {
+  return Math.random().toString(36).slice(2, 10).toUpperCase();
+}
+
 export async function POST(req: NextRequest) {
   const session = await getAdminSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -124,12 +131,40 @@ export async function POST(req: NextRequest) {
     { spotlights, presentingSponsor, inArticleAds },
     willSend ? { baseUrl: appUrl, sign: signTrackingUrl } : undefined,
     events
-  ).replace(
-    /\{\{UNSUBSCRIBE_URL\}\}/g,
-    willSend
-      ? `${appUrl}/unsubscribe?r=RIDPLACEHOLDER&email=EMAILPLACEHOLDER`
-      : `${appUrl}/unsubscribe`
-  );
+  )
+    .replace(
+      /\{\{UNSUBSCRIBE_URL\}\}/g,
+      willSend
+        ? `${appUrl}/unsubscribe?r=RIDPLACEHOLDER&email=EMAILPLACEHOLDER`
+        : `${appUrl}/unsubscribe`
+    )
+    .replace(/\{\{APP_URL\}\}/g, appUrl);
+
+  // Build per-subscriber referral code map if the template has a referral block
+  const hasReferral = htmlBody.includes("REFCODEPLACEHOLDER");
+  const refCodeMap = new Map<string, string>(); // subscriberId -> code
+  if (hasReferral && activeSubscribers.length > 0) {
+    const subscriberIds = activeSubscribers.map((s) => s.id);
+    const existingCodes = await db.referralCode.findMany({
+      where: { subscriberId: { in: subscriberIds } },
+    });
+    for (const rc of existingCodes) {
+      refCodeMap.set(rc.subscriberId, rc.code);
+    }
+    const missingSubscribers = activeSubscribers.filter((s) => !refCodeMap.has(s.id));
+    for (const sub of missingSubscribers) {
+      for (let attempt = 0; attempt < 5; attempt++) {
+        try {
+          const code = generateRefCode();
+          await db.referralCode.create({ data: { subscriberId: sub.id, code } });
+          refCodeMap.set(sub.id, code);
+          break;
+        } catch {
+          // unique constraint violation — retry with new code
+        }
+      }
+    }
+  }
 
   // Clean snapshot for public archive: no tracking tokens, no personalization
   const htmlSnapshot = renderTemplate(
@@ -157,9 +192,12 @@ export async function POST(req: NextRequest) {
     );
 
     const personalized = recipients.map((r) => {
+      const sub = activeSubscribers.find((s) => s.email === r.email);
+      const refCode = (sub && refCodeMap.get(sub.id)) || "nocode";
       const personalizedHtml = htmlBody
         .replaceAll("RIDPLACEHOLDER", r.id)
-        .replaceAll("EMAILPLACEHOLDER", encodeURIComponent(r.email));
+        .replaceAll("EMAILPLACEHOLDER", encodeURIComponent(r.email))
+        .replaceAll("REFCODEPLACEHOLDER", refCode);
       const unsubUrl = `${appUrl}/unsubscribe?r=${r.id}&email=${encodeURIComponent(r.email)}`;
       return {
         to: r.email,
