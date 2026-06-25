@@ -9,46 +9,94 @@ export async function GET() {
   const session = await getAdminSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const sprints = await db.referralSprint.findMany({
-    orderBy: { createdAt: "desc" },
-  });
+  const sprints = await db.referralSprint.findMany({ orderBy: { createdAt: "desc" } });
 
-  // For each sprint, get signup counts grouped by referralCodeId
-  const sprintIds = sprints.map((s: { id: string }) => s.id);
-  const allSignups = sprintIds.length
-    ? await db.referralSignup.findMany({
-        where: { sprintId: { in: sprintIds } },
-        select: { sprintId: true, referralCodeId: true },
+  // Fetch all signups (all time) with full detail
+  const allSignups: { sprintId: string | null; referralCodeId: string; newSubscriberId: string | null; createdAt: string }[] =
+    await db.referralSignup.findMany({
+      select: { sprintId: true, referralCodeId: true, newSubscriberId: true, createdAt: true },
+      orderBy: { createdAt: "desc" },
+    });
+
+  // Fetch all referral codes to map code → subscriber
+  const involvedCodeIds = Array.from(new Set(allSignups.map((s) => s.referralCodeId)));
+  const codes: { id: string; subscriberId: string }[] = involvedCodeIds.length
+    ? await db.referralCode.findMany({
+        where: { id: { in: involvedCodeIds } },
+        select: { id: true, subscriberId: true },
       })
     : [];
+  const codeToSubId = new Map(codes.map((c) => [c.id, c.subscriberId]));
 
-  // Build counts per sprint
-  const countsBySprintAndCode = new Map<string, Map<string, number>>();
-  for (const su of allSignups) {
-    if (!countsBySprintAndCode.has(su.sprintId)) {
-      countsBySprintAndCode.set(su.sprintId, new Map());
-    }
-    const codeMap = countsBySprintAndCode.get(su.sprintId)!;
-    codeMap.set(su.referralCodeId, (codeMap.get(su.referralCodeId) ?? 0) + 1);
-  }
+  // Fetch all subscriber info (referrers + referred people)
+  const referrerSubIds = codes.map((c) => c.subscriberId);
+  const referredSubIds = allSignups.map((s) => s.newSubscriberId).filter(Boolean) as string[];
+  const allSubIds = Array.from(new Set([...referrerSubIds, ...referredSubIds]));
+  const subscribers = allSubIds.length
+    ? await prisma.subscriber.findMany({
+        where: { id: { in: allSubIds } },
+        select: { id: true, email: true, firstName: true },
+      })
+    : [];
+  const subMap = new Map(subscribers.map((s) => [s.id, s]));
 
-  // Also get total signup counts (all-time, no sprint filter)
-  const allTimeSignups = await db.referralSignup.findMany({
-    select: { referralCodeId: true },
-  });
-  const allTimeCounts = new Map<string, number>();
-  for (const su of allTimeSignups) {
-    allTimeCounts.set(su.referralCodeId, (allTimeCounts.get(su.referralCodeId) ?? 0) + 1);
-  }
-
+  // Build sprint leaderboards
+  const sprintIds = sprints.map((s: { id: string }) => s.id);
   const sprintsWithStats = sprints.map((sprint: { id: string; goal: number }) => {
-    const codeMap = countsBySprintAndCode.get(sprint.id) ?? new Map();
-    const totalSignups = Array.from(codeMap.values()).reduce((a, b) => a + b, 0);
-    const qualifiedReferrers = Array.from(codeMap.values()).filter((c) => c >= sprint.goal).length;
-    return { ...sprint, totalSignups, qualifiedReferrers };
+    const sprintSignups = allSignups.filter((s) => s.sprintId === sprint.id);
+
+    // Group by referrer
+    const byReferrer = new Map<string, { signupCount: number; referrals: { email: string; firstName: string | null; joinedAt: string }[] }>();
+    for (const su of sprintSignups) {
+      const refSubId = codeToSubId.get(su.referralCodeId);
+      if (!refSubId) continue;
+      if (!byReferrer.has(refSubId)) byReferrer.set(refSubId, { signupCount: 0, referrals: [] });
+      const entry = byReferrer.get(refSubId)!;
+      entry.signupCount++;
+      if (su.newSubscriberId) {
+        const referredSub = subMap.get(su.newSubscriberId);
+        if (referredSub) entry.referrals.push({ email: referredSub.email, firstName: referredSub.firstName, joinedAt: su.createdAt });
+      }
+    }
+
+    const leaderboard = Array.from(byReferrer.entries())
+      .map(([subId, data]) => {
+        const sub = subMap.get(subId);
+        return { subscriberId: subId, email: sub?.email ?? "", firstName: sub?.firstName ?? null, ...data };
+      })
+      .sort((a, b) => b.signupCount - a.signupCount);
+
+    const totalSignups = leaderboard.reduce((a, b) => a + b.signupCount, 0);
+    const qualifiedReferrers = leaderboard.filter((e) => e.signupCount >= sprint.goal).length;
+
+    return { ...sprint, totalSignups, qualifiedReferrers, leaderboard };
   });
 
-  return NextResponse.json({ sprints: sprintsWithStats });
+  // All-time leaderboard (across all signups, any sprint or none)
+  const allTimeByReferrer = new Map<string, { signupCount: number; referrals: { email: string; firstName: string | null; joinedAt: string }[] }>();
+  for (const su of allSignups) {
+    const refSubId = codeToSubId.get(su.referralCodeId);
+    if (!refSubId) continue;
+    if (!allTimeByReferrer.has(refSubId)) allTimeByReferrer.set(refSubId, { signupCount: 0, referrals: [] });
+    const entry = allTimeByReferrer.get(refSubId)!;
+    entry.signupCount++;
+    if (su.newSubscriberId) {
+      const referredSub = subMap.get(su.newSubscriberId);
+      if (referredSub) entry.referrals.push({ email: referredSub.email, firstName: referredSub.firstName, joinedAt: su.createdAt });
+    }
+  }
+  const allTimeLeaderboard = Array.from(allTimeByReferrer.entries())
+    .map(([subId, data]) => {
+      const sub = subMap.get(subId);
+      return { subscriberId: subId, email: sub?.email ?? "", firstName: sub?.firstName ?? null, ...data };
+    })
+    .sort((a, b) => b.signupCount - a.signupCount);
+
+  return NextResponse.json({
+    sprints: sprintsWithStats,
+    allTimeLeaderboard,
+    sprintIds, // included so client doesn't need to derive it
+  });
 }
 
 export async function POST(req: NextRequest) {

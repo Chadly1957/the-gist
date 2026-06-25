@@ -2,6 +2,20 @@
 
 import { useState, useEffect, useCallback } from "react";
 
+interface ReferredPerson {
+  email: string;
+  firstName: string | null;
+  joinedAt: string;
+}
+
+interface LeaderboardEntry {
+  subscriberId: string;
+  email: string;
+  firstName: string | null;
+  signupCount: number;
+  referrals: ReferredPerson[];
+}
+
 interface Sprint {
   id: string;
   name: string;
@@ -15,12 +29,16 @@ interface Sprint {
   createdAt: string;
   totalSignups: number;
   qualifiedReferrers: number;
+  leaderboard: LeaderboardEntry[];
 }
 
 function formatDate(dateStr: string): string {
   const [y, m, d] = dateStr.split("-").map(Number);
-  const dt = new Date(y, m - 1, d);
-  return dt.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  return new Date(y, m - 1, d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
+function formatDateTime(iso: string): string {
+  return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
 const STATUS_STYLES: Record<string, string> = {
@@ -29,31 +47,234 @@ const STATUS_STYLES: Record<string, string> = {
   cancelled: "bg-red-100 text-red-600",
 };
 
+function ReferrerRow({ entry, goal, rank }: { entry: LeaderboardEntry; goal: number; rank: number }) {
+  const [open, setOpen] = useState(false);
+  const qualified = entry.signupCount >= goal;
+  const displayName = entry.firstName || entry.email.split("@")[0];
+
+  return (
+    <>
+      <tr
+        className={`border-t border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors ${open ? "bg-gray-50" : ""}`}
+        onClick={() => setOpen(!open)}
+      >
+        <td className="px-4 py-3 text-sm text-gray-500 w-8">{rank}</td>
+        <td className="px-4 py-3">
+          <div className="text-sm font-medium text-gray-900">{displayName}</div>
+          <div className="text-xs text-gray-400">{entry.email}</div>
+        </td>
+        <td className="px-4 py-3 text-center">
+          <span className={`inline-flex items-center gap-1 text-sm font-bold ${qualified ? "text-green-700" : "text-gray-700"}`}>
+            {entry.signupCount}
+            {qualified && (
+              <svg className="w-3.5 h-3.5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.286 3.953a1 1 0 00.95.69h4.159c.969 0 1.371 1.24.588 1.81l-3.365 2.444a1 1 0 00-.364 1.118l1.286 3.953c.3.922-.755 1.688-1.538 1.118l-3.365-2.444a1 1 0 00-1.175 0L6.049 17.013c-.783.57-1.838-.196-1.538-1.118l1.286-3.953a1 1 0 00-.364-1.118L2.068 9.38c-.783-.57-.381-1.81.588-1.81h4.159a1 1 0 00.95-.69L9.049 2.927z" />
+              </svg>
+            )}
+          </span>
+        </td>
+        <td className="px-4 py-3 text-right pr-4">
+          <svg
+            className={`w-4 h-4 text-gray-400 ml-auto transition-transform ${open ? "rotate-180" : ""}`}
+            fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+          </svg>
+        </td>
+      </tr>
+      {open && (
+        <tr className="bg-gray-50">
+          <td colSpan={4} className="px-4 pb-3 pt-1">
+            {entry.referrals.length === 0 ? (
+              <p className="text-xs text-gray-400 italic">No referred subscribers recorded.</p>
+            ) : (
+              <div className="space-y-1">
+                {entry.referrals.map((r, i) => (
+                  <div key={i} className="flex items-center gap-2 text-xs text-gray-600">
+                    <svg className="w-3 h-3 text-green-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span className="font-medium">{r.firstName || r.email.split("@")[0]}</span>
+                    <span className="text-gray-400">{r.email}</span>
+                    <span className="text-gray-300">·</span>
+                    <span className="text-gray-400">{formatDateTime(r.joinedAt)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </td>
+        </tr>
+      )}
+    </>
+  );
+}
+
+function LeaderboardTable({ entries, goal, emptyMsg }: { entries: LeaderboardEntry[]; goal: number; emptyMsg: string }) {
+  if (entries.length === 0) {
+    return <p className="text-xs text-gray-400 py-3 text-center">{emptyMsg}</p>;
+  }
+  return (
+    <table className="w-full text-left">
+      <thead>
+        <tr className="text-xs text-gray-400 uppercase tracking-wide">
+          <th className="px-4 pb-2 w-8">#</th>
+          <th className="px-4 pb-2">Subscriber</th>
+          <th className="px-4 pb-2 text-center">Referrals</th>
+          <th className="w-8" />
+        </tr>
+      </thead>
+      <tbody>
+        {entries.map((entry, i) => (
+          <ReferrerRow key={entry.subscriberId} entry={entry} goal={goal} rank={i + 1} />
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+function SprintCard({
+  sprint,
+  onStatusChange,
+  onDelete,
+  onDraw,
+  drawing,
+}: {
+  sprint: Sprint;
+  onStatusChange: (id: string, status: string) => void;
+  onDelete: (id: string) => void;
+  onDraw: (sprint: Sprint) => void;
+  drawing: boolean;
+}) {
+  const [showLeaderboard, setShowLeaderboard] = useState(false);
+  const today = new Date().toISOString().split("T")[0];
+  const isEnded = sprint.endDate < today;
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
+      <div className="p-5">
+        <div className="flex items-start justify-between gap-3 mb-3">
+          <div>
+            <div className="flex items-center gap-2">
+              <h3 className="font-semibold text-gray-900">{sprint.name}</h3>
+              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_STYLES[sprint.status] ?? "bg-gray-100 text-gray-600"}`}>
+                {sprint.status}
+              </span>
+            </div>
+            <p className="text-xs text-gray-500 mt-0.5">
+              {formatDate(sprint.startDate)} – {formatDate(sprint.endDate)}
+              {isEnded && sprint.status === "active" && (
+                <span className="ml-2 text-amber-600 font-medium">Ended — draw winner or close</span>
+              )}
+            </p>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            {sprint.status === "active" && sprint.qualifiedReferrers > 0 && (
+              <button
+                onClick={() => onDraw(sprint)}
+                disabled={drawing}
+                className="flex items-center gap-1.5 bg-green-700 hover:bg-green-800 disabled:opacity-50 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors"
+              >
+                {drawing ? "Drawing…" : (
+                  <>
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                    </svg>
+                    Draw Winner
+                  </>
+                )}
+              </button>
+            )}
+            {sprint.status === "active" && (
+              <button onClick={() => onStatusChange(sprint.id, "cancelled")} className="text-xs text-gray-400 hover:text-red-500 px-2 py-1.5 transition-colors">
+                Cancel
+              </button>
+            )}
+            <button onClick={() => onDelete(sprint.id)} className="text-xs text-gray-400 hover:text-red-500 px-2 py-1.5 transition-colors">
+              Delete
+            </button>
+          </div>
+        </div>
+
+        {/* Stats row */}
+        <div className="grid grid-cols-3 gap-3 mb-3">
+          <div className="bg-gray-50 rounded-xl p-3 text-center">
+            <div className="text-xl font-bold text-gray-900">{sprint.totalSignups}</div>
+            <div className="text-xs text-gray-500">Total signups</div>
+          </div>
+          <div className="bg-gray-50 rounded-xl p-3 text-center">
+            <div className="text-xl font-bold text-gray-900">{sprint.qualifiedReferrers}</div>
+            <div className="text-xs text-gray-500">Met goal ({sprint.goal})</div>
+          </div>
+          <div className="bg-gray-50 rounded-xl p-3 text-center">
+            <div className="text-xl font-bold text-gray-900">{sprint.leaderboard.length}</div>
+            <div className="text-xs text-gray-500">Active referrers</div>
+          </div>
+        </div>
+
+        {sprint.prizeDescription && (
+          <p className="text-xs text-gray-500 mb-3">
+            <span className="font-semibold">Prize:</span> {sprint.prizeDescription}
+          </p>
+        )}
+
+        {sprint.winnerEmail && (
+          <div className="mb-3 bg-green-50 border border-green-200 rounded-xl px-4 py-3 flex items-center gap-2">
+            <svg className="w-4 h-4 text-green-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+            </svg>
+            <div>
+              <p className="text-xs font-semibold text-green-900">Winner: {sprint.winnerEmail}</p>
+              {sprint.drawnAt && <p className="text-xs text-green-700">Drawn {new Date(sprint.drawnAt).toLocaleDateString()}</p>}
+            </div>
+          </div>
+        )}
+
+        {/* Leaderboard toggle */}
+        {sprint.leaderboard.length > 0 && (
+          <button
+            onClick={() => setShowLeaderboard(!showLeaderboard)}
+            className="flex items-center gap-1.5 text-xs font-medium text-gray-500 hover:text-gray-800 transition-colors"
+          >
+            <svg className={`w-3.5 h-3.5 transition-transform ${showLeaderboard ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+            </svg>
+            {showLeaderboard ? "Hide" : "Show"} referrer breakdown ({sprint.leaderboard.length})
+          </button>
+        )}
+      </div>
+
+      {showLeaderboard && (
+        <div className="border-t border-gray-100">
+          <LeaderboardTable entries={sprint.leaderboard} goal={sprint.goal} emptyMsg="No referrals yet." />
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function ReferralsPage() {
   const [sprints, setSprints] = useState<Sprint[]>([]);
+  const [allTimeLeaderboard, setAllTimeLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [drawingId, setDrawingId] = useState<string | null>(null);
   const [drawResult, setDrawResult] = useState<{ sprintId: string; winner: { email: string; firstName?: string | null; signupCount: number }; totalEligible: number } | null>(null);
   const [error, setError] = useState("");
+  const [showAllTime, setShowAllTime] = useState(false);
 
   const today = new Date().toISOString().split("T")[0];
-
-  const [form, setForm] = useState({
-    name: "",
-    startDate: today,
-    endDate: "",
-    goal: "10",
-    prizeDescription: "",
-  });
+  const [form, setForm] = useState({ name: "", startDate: today, endDate: "", goal: "10", prizeDescription: "" });
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const res = await fetch("/api/admin/referrals");
       const data = await res.json();
-      if (res.ok) setSprints(data.sprints);
+      if (res.ok) {
+        setSprints(data.sprints);
+        setAllTimeLeaderboard(data.allTimeLeaderboard ?? []);
+      }
     } finally {
       setLoading(false);
     }
@@ -139,71 +360,36 @@ export default function ReferralsPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="sm:col-span-2">
                 <label className="block text-xs font-semibold text-gray-600 mb-1">Sprint Name</label>
-                <input
-                  type="text"
-                  value={form.name}
-                  onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  required
-                  placeholder="Summer Referral Challenge"
-                  className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-                />
+                <input type="text" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required placeholder="Summer Referral Challenge"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
               </div>
               <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-1">Start Date</label>
-                <input
-                  type="date"
-                  value={form.startDate}
-                  onChange={(e) => setForm({ ...form, startDate: e.target.value })}
-                  required
-                  className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-                />
+                <input type="date" value={form.startDate} onChange={(e) => setForm({ ...form, startDate: e.target.value })} required
+                  className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
               </div>
               <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-1">End Date</label>
-                <input
-                  type="date"
-                  value={form.endDate}
-                  onChange={(e) => setForm({ ...form, endDate: e.target.value })}
-                  required
-                  className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-                />
+                <input type="date" value={form.endDate} onChange={(e) => setForm({ ...form, endDate: e.target.value })} required
+                  className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
               </div>
               <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-1">Referral Goal (per subscriber)</label>
-                <input
-                  type="number"
-                  min="1"
-                  value={form.goal}
-                  onChange={(e) => setForm({ ...form, goal: e.target.value })}
-                  required
-                  className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-                />
+                <input type="number" min="1" value={form.goal} onChange={(e) => setForm({ ...form, goal: e.target.value })} required
+                  className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
               </div>
               <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-1">Prize Description</label>
-                <input
-                  type="text"
-                  value={form.prizeDescription}
-                  onChange={(e) => setForm({ ...form, prizeDescription: e.target.value })}
-                  placeholder="$25 gift card to a local restaurant"
-                  className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-                />
+                <input type="text" value={form.prizeDescription} onChange={(e) => setForm({ ...form, prizeDescription: e.target.value })} placeholder="$25 gift card to a local restaurant"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
               </div>
             </div>
             {error && <p className="text-sm text-red-600">{error}</p>}
             <div className="flex gap-3">
-              <button
-                type="submit"
-                disabled={creating}
-                className="bg-green-700 hover:bg-green-800 disabled:opacity-50 text-white px-5 py-2 rounded-xl text-sm font-semibold transition-colors"
-              >
+              <button type="submit" disabled={creating} className="bg-green-700 hover:bg-green-800 disabled:opacity-50 text-white px-5 py-2 rounded-xl text-sm font-semibold transition-colors">
                 {creating ? "Creating…" : "Create Sprint"}
               </button>
-              <button
-                type="button"
-                onClick={() => { setShowForm(false); setError(""); }}
-                className="px-5 py-2 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50 transition-colors"
-              >
+              <button type="button" onClick={() => { setShowForm(false); setError(""); }} className="px-5 py-2 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50 transition-colors">
                 Cancel
               </button>
             </div>
@@ -223,12 +409,7 @@ export default function ReferralsPage() {
               <strong>{drawResult.winner.firstName ? `${drawResult.winner.firstName} (${drawResult.winner.email})` : drawResult.winner.email}</strong> was randomly selected from {drawResult.totalEligible} qualified referrer{drawResult.totalEligible !== 1 ? "s" : ""}.
               They referred <strong>{drawResult.winner.signupCount}</strong> new subscribers.
             </p>
-            <button
-              onClick={() => setDrawResult(null)}
-              className="text-xs text-green-600 underline mt-1"
-            >
-              Dismiss
-            </button>
+            <button onClick={() => setDrawResult(null)} className="text-xs text-green-600 underline mt-1">Dismiss</button>
           </div>
         </div>
       )}
@@ -237,157 +418,64 @@ export default function ReferralsPage() {
         <div className="text-center py-12">
           <div className="w-6 h-6 border-2 border-green-600 border-t-transparent rounded-full animate-spin mx-auto" />
         </div>
-      ) : sprints.length === 0 ? (
-        <div className="text-center py-16 text-gray-400">
-          <svg className="w-10 h-10 mx-auto mb-3 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
-          </svg>
-          <p className="text-sm">No referral sprints yet. Create one to get started.</p>
-        </div>
       ) : (
         <>
-          {activeSprints.length > 0 && (
-            <div className="mb-6">
-              <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Active</h2>
-              <div className="space-y-4">
-                {activeSprints.map((sprint) => (
-                  <SprintCard
-                    key={sprint.id}
-                    sprint={sprint}
-                    onStatusChange={handleStatusChange}
-                    onDelete={handleDelete}
-                    onDraw={handleDraw}
-                    drawing={drawingId === sprint.id}
-                  />
-                ))}
-              </div>
+          {sprints.length === 0 && allTimeLeaderboard.length === 0 ? (
+            <div className="text-center py-16 text-gray-400">
+              <svg className="w-10 h-10 mx-auto mb-3 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+              <p className="text-sm">No referral sprints yet. Create one to get started.</p>
             </div>
-          )}
-          {pastSprints.length > 0 && (
-            <div>
-              <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Past Sprints</h2>
-              <div className="space-y-4">
-                {pastSprints.map((sprint) => (
-                  <SprintCard
-                    key={sprint.id}
-                    sprint={sprint}
-                    onStatusChange={handleStatusChange}
-                    onDelete={handleDelete}
-                    onDraw={handleDraw}
-                    drawing={drawingId === sprint.id}
-                  />
-                ))}
-              </div>
-            </div>
+          ) : (
+            <>
+              {activeSprints.length > 0 && (
+                <div className="mb-6">
+                  <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Active</h2>
+                  <div className="space-y-4">
+                    {activeSprints.map((sprint) => (
+                      <SprintCard key={sprint.id} sprint={sprint} onStatusChange={handleStatusChange} onDelete={handleDelete} onDraw={handleDraw} drawing={drawingId === sprint.id} />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {pastSprints.length > 0 && (
+                <div className="mb-6">
+                  <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Past Sprints</h2>
+                  <div className="space-y-4">
+                    {pastSprints.map((sprint) => (
+                      <SprintCard key={sprint.id} sprint={sprint} onStatusChange={handleStatusChange} onDelete={handleDelete} onDraw={handleDraw} drawing={drawingId === sprint.id} />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* All-time leaderboard */}
+              {allTimeLeaderboard.length > 0 && (
+                <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
+                  <button
+                    onClick={() => setShowAllTime(!showAllTime)}
+                    className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-50 transition-colors"
+                  >
+                    <div className="text-left">
+                      <div className="text-sm font-semibold text-gray-900">All-Time Leaderboard</div>
+                      <div className="text-xs text-gray-500">{allTimeLeaderboard.length} referrer{allTimeLeaderboard.length !== 1 ? "s" : ""} · {allTimeLeaderboard.reduce((a, b) => a + b.signupCount, 0)} total referrals</div>
+                    </div>
+                    <svg className={`w-4 h-4 text-gray-400 transition-transform ${showAllTime ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+                  {showAllTime && (
+                    <div className="border-t border-gray-100">
+                      <LeaderboardTable entries={allTimeLeaderboard} goal={Infinity} emptyMsg="No referrals yet." />
+                    </div>
+                  )}
+                </div>
+              )}
+            </>
           )}
         </>
-      )}
-    </div>
-  );
-}
-
-function SprintCard({
-  sprint,
-  onStatusChange,
-  onDelete,
-  onDraw,
-  drawing,
-}: {
-  sprint: Sprint;
-  onStatusChange: (id: string, status: string) => void;
-  onDelete: (id: string) => void;
-  onDraw: (sprint: Sprint) => void;
-  drawing: boolean;
-}) {
-  const today = new Date().toISOString().split("T")[0];
-  const isEnded = sprint.endDate < today;
-
-  return (
-    <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
-      <div className="flex items-start justify-between gap-3 mb-3">
-        <div>
-          <div className="flex items-center gap-2">
-            <h3 className="font-semibold text-gray-900">{sprint.name}</h3>
-            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_STYLES[sprint.status] ?? "bg-gray-100 text-gray-600"}`}>
-              {sprint.status}
-            </span>
-          </div>
-          <p className="text-xs text-gray-500 mt-0.5">
-            {formatDate(sprint.startDate)} – {formatDate(sprint.endDate)}
-            {isEnded && sprint.status === "active" && (
-              <span className="ml-2 text-amber-600 font-medium">Ended — draw winner or close</span>
-            )}
-          </p>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          {sprint.status === "active" && sprint.qualifiedReferrers > 0 && (
-            <button
-              onClick={() => onDraw(sprint)}
-              disabled={drawing}
-              className="flex items-center gap-1.5 bg-green-700 hover:bg-green-800 disabled:opacity-50 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors"
-            >
-              {drawing ? "Drawing…" : (
-                <>
-                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
-                  </svg>
-                  Draw Winner
-                </>
-              )}
-            </button>
-          )}
-          {sprint.status === "active" && (
-            <button
-              onClick={() => onStatusChange(sprint.id, "cancelled")}
-              className="text-xs text-gray-400 hover:text-red-500 px-2 py-1.5 transition-colors"
-            >
-              Cancel
-            </button>
-          )}
-          <button
-            onClick={() => onDelete(sprint.id)}
-            className="text-xs text-gray-400 hover:text-red-500 px-2 py-1.5 transition-colors"
-          >
-            Delete
-          </button>
-        </div>
-      </div>
-
-      {/* Stats row */}
-      <div className="grid grid-cols-3 gap-3 mb-3">
-        <div className="bg-gray-50 rounded-xl p-3 text-center">
-          <div className="text-xl font-bold text-gray-900">{sprint.totalSignups}</div>
-          <div className="text-xs text-gray-500">Total signups</div>
-        </div>
-        <div className="bg-gray-50 rounded-xl p-3 text-center">
-          <div className="text-xl font-bold text-gray-900">{sprint.qualifiedReferrers}</div>
-          <div className="text-xs text-gray-500">Met goal ({sprint.goal})</div>
-        </div>
-        <div className="bg-gray-50 rounded-xl p-3 text-center">
-          <div className="text-xl font-bold text-gray-900">{sprint.goal}</div>
-          <div className="text-xs text-gray-500">Goal / referrer</div>
-        </div>
-      </div>
-
-      {/* Prize */}
-      {sprint.prizeDescription && (
-        <p className="text-xs text-gray-500 mb-2">
-          <span className="font-semibold">Prize:</span> {sprint.prizeDescription}
-        </p>
-      )}
-      {/* Winner */}
-      {sprint.winnerEmail && (
-        <div className="mt-3 bg-green-50 border border-green-200 rounded-xl px-4 py-3 flex items-center gap-2">
-          <svg className="w-4 h-4 text-green-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
-          </svg>
-          <div>
-            <p className="text-xs font-semibold text-green-900">Winner: {sprint.winnerEmail}</p>
-            {sprint.drawnAt && (
-              <p className="text-xs text-green-700">Drawn {new Date(sprint.drawnAt).toLocaleDateString()}</p>
-            )}
-          </div>
-        </div>
       )}
     </div>
   );
