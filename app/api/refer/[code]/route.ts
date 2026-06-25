@@ -29,12 +29,11 @@ export async function GET(_req: NextRequest, { params }: { params: { code: strin
     });
   }
 
-  const ref = await db.referralCode.findUnique({
-    where: { code: params.code },
-    include: { subscriber: { select: { firstName: true, active: true } } },
-  });
-
+  const ref = await db.referralCode.findUnique({ where: { code: params.code } });
   if (!ref) return NextResponse.json({ valid: false });
+
+  const subscriber = await prisma.subscriber.findUnique({ where: { id: ref.subscriberId } });
+  if (!subscriber?.active) return NextResponse.json({ valid: false });
 
   const sprint = await getActiveSprint();
   const signupCount = sprint
@@ -43,7 +42,7 @@ export async function GET(_req: NextRequest, { params }: { params: { code: strin
 
   return NextResponse.json({
     valid: true,
-    referrerFirstName: ref.subscriber?.firstName || null,
+    referrerFirstName: subscriber.firstName || null,
     sprint: sprint
       ? { goal: sprint.goal, endDate: sprint.endDate, prizeDescription: sprint.prizeDescription }
       : null,
