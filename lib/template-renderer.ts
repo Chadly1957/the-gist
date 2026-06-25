@@ -314,7 +314,11 @@ function renderFooter(content: Record<string, unknown>): string {
   return `
     <div class="footer">
       <p>${content.text || "You are receiving this because you subscribed to The Gist Decatur."}</p>
-      <p><a href="{{UNSUBSCRIBE_URL}}">${content.unsubscribeText || "Unsubscribe"}</a></p>
+      <p>
+        <a href="{{UNSUBSCRIBE_URL}}">${content.unsubscribeText || "Unsubscribe"}</a>
+        &nbsp;·&nbsp;
+        <a href="{{PROFILE_URL}}" style="color:#6b7280;">Update your name</a>
+      </p>
     </div>`;
 }
 

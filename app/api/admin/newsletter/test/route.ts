@@ -109,6 +109,7 @@ export async function POST(req: NextRequest) {
     events
   )
     .replace(/\{\{UNSUBSCRIBE_URL\}\}/g, `${appUrl}/unsubscribe`)
+    .replace(/\{\{PROFILE_URL\}\}/g, `${appUrl}/profile?r=preview`)
     .replace(/\{\{APP_URL\}\}/g, appUrl)
     .replace(/REFCODEPLACEHOLDER/g, "preview");
 

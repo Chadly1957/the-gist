@@ -138,6 +138,7 @@ export async function POST(req: NextRequest) {
         ? `${appUrl}/unsubscribe?r=RIDPLACEHOLDER&email=EMAILPLACEHOLDER`
         : `${appUrl}/unsubscribe`
     )
+    .replace(/\{\{PROFILE_URL\}\}/g, willSend ? `${appUrl}/profile?r=RIDPLACEHOLDER` : `${appUrl}/profile`)
     .replace(/\{\{APP_URL\}\}/g, appUrl);
 
   // Build per-subscriber referral code map if the template has a referral block
@@ -173,7 +174,10 @@ export async function POST(req: NextRequest) {
     { spotlights, presentingSponsor, inArticleAds },
     undefined,
     events
-  ).replace(/\{\{UNSUBSCRIBE_URL\}\}/g, `${appUrl}/unsubscribe`);
+  )
+    .replace(/\{\{UNSUBSCRIBE_URL\}\}/g, `${appUrl}/unsubscribe`)
+    .replace(/\{\{PROFILE_URL\}\}/g, `${appUrl}/profile`)
+    .replace(/\{\{APP_URL\}\}/g, appUrl);
 
   let recipientCount = 0;
   const status = emailClient ? "sent" : "draft";
