@@ -31,11 +31,20 @@ export default function ReferralPage({ params }: { params: { code: string } }) {
   const [submitStatus, setSubmitStatus] = useState<"idle" | "success" | "already" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
   const [copied, setCopied] = useState(false);
+  const [displayName, setDisplayName] = useState<string | null | undefined>(undefined);
+  const [nameInput, setNameInput] = useState("");
+  const [nameExpanded, setNameExpanded] = useState(false);
+  const [nameSaving, setNameSaving] = useState(false);
+  const [nameSaved, setNameSaved] = useState(false);
 
   useEffect(() => {
     fetch(`/api/refer/${params.code}`)
       .then((r) => r.json())
-      .then(setData)
+      .then((d) => {
+        setData(d);
+        setDisplayName(d.referrerFirstName ?? null);
+        setNameInput(d.referrerFirstName ?? "");
+      })
       .catch(() => setData({ valid: false }))
       .finally(() => setLoading(false));
   }, [params.code]);
@@ -70,6 +79,26 @@ export default function ReferralPage({ params }: { params: { code: string } }) {
     }
   }
 
+  async function saveName(e: React.FormEvent) {
+    e.preventDefault();
+    setNameSaving(true);
+    try {
+      const res = await fetch(`/api/refer/${params.code}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ firstName: nameInput.trim() }),
+      });
+      if (res.ok) {
+        setDisplayName(nameInput.trim() || null);
+        setNameSaved(true);
+        setNameExpanded(false);
+        setTimeout(() => setNameSaved(false), 3000);
+      }
+    } finally {
+      setNameSaving(false);
+    }
+  }
+
   function copyLink() {
     navigator.clipboard.writeText(window.location.href).then(() => {
       setCopied(true);
@@ -97,7 +126,9 @@ export default function ReferralPage({ params }: { params: { code: string } }) {
     );
   }
 
-  const { referrerFirstName, sprint, signupCount = 0 } = data;
+  const { sprint, signupCount = 0 } = data;
+  const currentName = displayName !== undefined ? displayName : data.referrerFirstName;
+  const nameIsNumber = /^\d+$/.test(currentName || "");
   const progressPct = sprint ? Math.min(100, Math.round((signupCount / sprint.goal) * 100)) : 0;
   const remaining = sprint ? Math.max(0, sprint.goal - signupCount) : 0;
 
@@ -113,7 +144,7 @@ export default function ReferralPage({ params }: { params: { code: string } }) {
           <h2 className="text-xl font-bold text-gray-900 mb-2">You&apos;re subscribed!</h2>
           <p className="text-gray-500 text-sm">
             Welcome to The Gist Decatur.
-            {referrerFirstName ? ` ${referrerFirstName} referred you — thanks to you both!` : ""}
+            {data.referrerFirstName ? ` ${data.referrerFirstName} referred you — thanks to you both!` : ""}
           </p>
         </div>
       </div>
@@ -145,8 +176,8 @@ export default function ReferralPage({ params }: { params: { code: string } }) {
           {/* Referrer name */}
           <div className="text-center mb-6">
             <h1 className="text-2xl font-bold text-gray-900 mb-2">
-              {referrerFirstName
-                ? <>{referrerFirstName} invited you to The Gist Decatur</>
+              {currentName
+                ? <>{currentName} invited you to The Gist Decatur</>
                 : <>You&apos;ve been invited to The Gist Decatur</>}
             </h1>
             <p className="text-gray-500 text-sm">
@@ -162,7 +193,7 @@ export default function ReferralPage({ params }: { params: { code: string } }) {
                 <span className="text-xs text-green-700">Ends {formatDate(sprint.endDate)}</span>
               </div>
               <div className="text-sm text-green-900 font-medium mb-1">
-                {referrerFirstName ? `${referrerFirstName} has referred ` : ""}
+                {currentName ? `${currentName} has referred ` : ""}
                 <span className="font-bold">{signupCount}</span> of <span className="font-bold">{sprint.goal}</span> people
               </div>
               <div className="w-full bg-green-200 rounded-full h-2 mb-2">
@@ -241,6 +272,66 @@ export default function ReferralPage({ params }: { params: { code: string } }) {
               </svg>
               {copied ? "Copied!" : "Copy referral link"}
             </button>
+          </div>
+
+          {/* Name update */}
+          <div className="mt-4">
+            {nameIsNumber && !nameExpanded && (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-center justify-between gap-3">
+                <p className="text-xs text-amber-800">
+                  Your name is showing as <strong>&ldquo;{currentName}&rdquo;</strong> — want to fix that?
+                </p>
+                <button
+                  onClick={() => { setNameExpanded(true); setNameInput(""); }}
+                  className="text-xs font-semibold text-amber-700 underline whitespace-nowrap"
+                >
+                  Update name
+                </button>
+              </div>
+            )}
+
+            {!nameIsNumber && !nameExpanded && !nameSaved && (
+              <div className="text-center">
+                <button
+                  onClick={() => setNameExpanded(true)}
+                  className="text-xs text-gray-400 hover:text-gray-600 underline transition-colors"
+                >
+                  {currentName ? "Update your name" : "Add your name"}
+                </button>
+              </div>
+            )}
+
+            {nameSaved && !nameExpanded && (
+              <p className="text-center text-xs text-green-700 font-medium">Name updated!</p>
+            )}
+
+            {nameExpanded && (
+              <form onSubmit={saveName} className="flex gap-2 items-center">
+                <input
+                  type="text"
+                  value={nameInput}
+                  onChange={(e) => setNameInput(e.target.value)}
+                  placeholder="Your first name"
+                  maxLength={100}
+                  autoFocus
+                  className="flex-1 px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                />
+                <button
+                  type="submit"
+                  disabled={nameSaving}
+                  className="bg-green-700 hover:bg-green-800 disabled:opacity-50 text-white text-xs font-semibold px-4 py-2 rounded-xl transition-colors whitespace-nowrap"
+                >
+                  {nameSaving ? "Saving…" : "Save"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setNameExpanded(false); setNameInput(currentName || ""); }}
+                  className="text-gray-400 hover:text-gray-600 text-xs px-1"
+                >
+                  ✕
+                </button>
+              </form>
+            )}
           </div>
         </div>
       </div>

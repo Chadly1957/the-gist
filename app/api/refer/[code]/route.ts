@@ -50,6 +50,25 @@ export async function GET(_req: NextRequest, { params }: { params: { code: strin
   });
 }
 
+export async function PATCH(req: NextRequest, { params }: { params: { code: string } }) {
+  if (params.code === "preview") return NextResponse.json({ ok: true });
+
+  const { firstName } = await req.json();
+  if (typeof firstName !== "string") {
+    return NextResponse.json({ error: "Invalid name." }, { status: 400 });
+  }
+
+  const ref = await db.referralCode.findUnique({ where: { code: params.code } });
+  if (!ref) return NextResponse.json({ error: "Invalid referral code." }, { status: 404 });
+
+  await prisma.subscriber.update({
+    where: { id: ref.subscriberId },
+    data: { firstName: firstName.trim() || null },
+  });
+
+  return NextResponse.json({ ok: true });
+}
+
 export async function POST(req: NextRequest, { params }: { params: { code: string } }) {
   const { email, firstName } = await req.json();
   if (!email || typeof email !== "string" || !email.includes("@")) {
