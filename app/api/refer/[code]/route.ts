@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { sendWelcomeEmail } from "@/lib/welcome-email";
 
 export const dynamic = "force-dynamic";
 
@@ -108,6 +109,13 @@ export async function POST(req: NextRequest, { params }: { params: { code: strin
       sprintId: sprint?.id || null,
     },
   });
+
+  const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "").replace(/\/$/, "");
+  try {
+    await sendWelcomeEmail({ id: subscriber.id, email: subscriber.email }, appUrl);
+  } catch {
+    // Welcome email failure must not break the subscription itself
+  }
 
   return NextResponse.json({ message: "You're subscribed! Thanks for signing up." });
 }
