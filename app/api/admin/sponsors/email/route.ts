@@ -3,12 +3,34 @@ import { prisma } from "@/lib/db";
 import { getAdminSession } from "@/lib/auth";
 import { getEmailClient, htmlToText } from "@/lib/email";
 
+// If the body looks like plain text (no HTML tags), convert it to a
+// properly styled HTML email so paragraphs and line breaks are preserved.
+function ensureHtml(body: string): string {
+  if (/<[a-z][\s\S]*>/i.test(body)) return body;
+
+  const escaped = body
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+
+  const paragraphs = escaped
+    .split(/\n{2,}/)
+    .filter((p) => p.trim())
+    .map((p) => `<p style="margin:0 0 16px 0">${p.trim().replace(/\n/g, "<br>")}</p>`)
+    .join("\n");
+
+  return `<!DOCTYPE html>
+<html><body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;font-size:15px;line-height:1.6;color:#333333;max-width:600px;margin:0 auto;padding:24px 20px">
+${paragraphs}
+</body></html>`;
+}
+
 function personalizeBody(
-  html: string,
+  body: string,
   profile: { businessName: string; contactName: string; magicToken: string },
   appUrl: string
 ) {
-  return html
+  return body
     .replaceAll("{{BUSINESS_NAME}}", profile.businessName)
     .replaceAll("{{CONTACT_NAME}}", profile.contactName)
     .replaceAll("{{PORTAL_URL}}", `${appUrl}/sponsor/portal?token=${profile.magicToken}`);
@@ -39,12 +61,13 @@ export async function POST(req: NextRequest) {
   }
 
   const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "").replace(/\/$/, "");
+  const preparedBody = ensureHtml(htmlBody);
 
   if (profileId) {
     const profile = await prisma.sponsorProfile.findUnique({ where: { id: profileId } });
     if (!profile) return NextResponse.json({ error: "Sponsor not found." }, { status: 404 });
 
-    const body = personalizeBody(htmlBody, profile, appUrl);
+    const body = personalizeBody(preparedBody, profile, appUrl);
     const result = await emailClient.sendEmail({
       to: profile.email,
       subject,
@@ -64,8 +87,8 @@ export async function POST(req: NextRequest) {
   const emails = profiles.map((p) => ({
     to: p.email,
     subject,
-    htmlBody: personalizeBody(htmlBody, p, appUrl),
-    textBody: htmlToText(personalizeBody(htmlBody, p, appUrl)),
+    htmlBody: personalizeBody(preparedBody, p, appUrl),
+    textBody: htmlToText(personalizeBody(preparedBody, p, appUrl)),
   }));
 
   const result = await emailClient.sendBatch(emails);

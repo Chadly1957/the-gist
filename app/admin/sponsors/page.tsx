@@ -741,14 +741,15 @@ export default function AdminSponsorsPage() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-1">Body (HTML supported)</label>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Message</label>
                   <textarea
                     rows={10}
                     value={emailBody}
                     onChange={(e) => setEmailBody(e.target.value)}
-                    placeholder={"<p>Hi {{CONTACT_NAME}},</p>\n<p>…</p>"}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-green-500 resize-y"
+                    placeholder={"Hi {{CONTACT_NAME}},\n\nYour message here.\n\nThanks,\nChad"}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-y"
                   />
+                  <p className="text-xs text-gray-400 mt-1">Plain text — blank lines become paragraphs, single line breaks are preserved.</p>
                 </div>
 
                 {emailResult && (
