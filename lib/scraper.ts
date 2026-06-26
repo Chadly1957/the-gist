@@ -17,6 +17,10 @@ export interface ScrapedArticle {
   publishedAt: Date;
 }
 
+// Paths that are almost never real articles (nav, auth, utility pages)
+const SKIP_PATH_RE =
+  /\/(sign-?up|log-?in|log-?out|register|account|profile|unsubscribe|privacy|terms|faq|help|search|tags?|categor|authors?|page\/\d|feed|cart|checkout|cookie|advertis|home|index|about|contact|newsletter)\/?$/i;
+
 // RSS feed paths to try when auto-detecting
 const RSS_PATHS = [
   "/feed",
@@ -102,13 +106,14 @@ async function scrapeArticleMeta(
       $('meta[property="og:image:url"]').attr("content") ||
       null;
 
-    // Try to find published date
+    // Try to find published date; reject pages with no real date
     const dateStr =
       $('meta[property="article:published_time"]').attr("content") ||
       $('meta[name="date"]').attr("content") ||
       $("time[datetime]").first().attr("datetime") ||
       "";
-    const publishedAt = dateStr ? new Date(dateStr) : (fallbackDate ?? new Date());
+    const publishedAt = dateStr ? new Date(dateStr) : fallbackDate;
+    if (!publishedAt || isNaN(publishedAt.getTime())) return null;
 
     if (!title || !description) return null;
 
@@ -118,7 +123,7 @@ async function scrapeArticleMeta(
       imageUrl: imageUrl ? resolveUrl(imageUrl, url) : null,
       articleUrl: url,
       sourceName,
-      publishedAt: isNaN(publishedAt.getTime()) ? (fallbackDate ?? new Date()) : publishedAt,
+      publishedAt,
     };
   } catch {
     return null;
@@ -143,8 +148,9 @@ async function scrapeViaRSS(
       const articles: ScrapedArticle[] = [];
 
       for (const item of feed.items ?? []) {
-        const pubDate = item.pubDate ? new Date(item.pubDate) : new Date();
-        if (!isRecent(pubDate)) continue;
+        if (!item.pubDate && !item.isoDate) continue; // skip dateless items
+        const pubDate = new Date(item.isoDate ?? item.pubDate ?? "");
+        if (isNaN(pubDate.getTime()) || !isRecent(pubDate)) continue;
 
         const itemUrl = item.link ?? item.guid ?? "";
         if (!itemUrl) continue;
@@ -230,21 +236,35 @@ async function scrapeViaHTML(
     const html = await fetchWithTimeout(sourceUrl);
     const $ = cheerio.load(html);
     const base = new URL(sourceUrl).href;
+    const sourceOrigin = new URL(sourceUrl).origin;
 
     const links = new Set<string>();
 
-    // Find article-like links
+    // Find article-like links — look inside content containers, not nav/header/footer
     $(
-      'a[href*="/article"], a[href*="/news"], a[href*="/story"], a[href*="/post"], article a, h2 a, h3 a, .post-title a'
-    ).each((_, el) => {
-      const href = $(el).attr("href");
-      if (href) links.add(resolveUrl(href, base));
-    });
+      'a[href*="/article"], a[href*="/news"], a[href*="/story"], a[href*="/post"], article a, h2 a, h3 a, .post-title a, main a'
+    )
+      .not("nav a, header a, footer a, [role='navigation'] a, [role='banner'] a, [role='contentinfo'] a")
+      .each((_, el) => {
+        const href = $(el).attr("href");
+        if (!href) return;
+        const resolved = resolveUrl(href, base);
+        try {
+          const parsed = new URL(resolved);
+          // Same domain only
+          if (parsed.origin !== sourceOrigin) return;
+          // Skip obvious non-article paths
+          if (SKIP_PATH_RE.test(parsed.pathname)) return;
+          // Must have at least one real path segment (not just the root)
+          if (parsed.pathname.split("/").filter(Boolean).length < 1) return;
+          links.add(resolved);
+        } catch {
+          // ignore unparseable URLs
+        }
+      });
 
     const articles: ScrapedArticle[] = [];
-    const toFetch = Array.from(links)
-      .filter((l) => l.startsWith("http"))
-      .slice(0, 15); // limit to 15 per source
+    const toFetch = Array.from(links).slice(0, 15); // limit to 15 per source
 
     const results = await Promise.allSettled(
       toFetch.map((url) => scrapeArticleMeta(url, sourceName))
