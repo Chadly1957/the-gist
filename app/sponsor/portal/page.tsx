@@ -4,6 +4,7 @@ import { useEffect, useState, useRef, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Logo from "@/components/Logo";
 import SponsorPreview from "@/components/SponsorPreview";
+import UrlInput from "@/components/UrlInput";
 
 interface Spotlight {
   id: string;
@@ -641,7 +642,7 @@ function PortalContent() {
                 <div>
                   <label className="block text-xs font-semibold text-gray-600 mb-1">Logo</label>
                   <div className="flex gap-2">
-                    <input type="url" value={sForm.logoUrl} onChange={(e) => setSForm((f) => ({ ...f, logoUrl: e.target.value }))} placeholder="https://... or upload below"
+                    <UrlInput value={sForm.logoUrl} onChange={(val) => setSForm((f) => ({ ...f, logoUrl: val }))} placeholder="https://... or upload below"
                       className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
                     <input ref={sFileRef} type="file" accept="image/*" className="hidden"
                       onChange={(e) => { const f = e.target.files?.[0]; if (f) handleImageUpload(f, setSUploading, (url) => setSForm((fm) => ({ ...fm, logoUrl: url })), setSError); }} />
@@ -667,7 +668,7 @@ function PortalContent() {
                   </div>
                   <div>
                     <label className="block text-xs font-semibold text-gray-600 mb-1">Website / CTA Link *</label>
-                    <input type="url" value={sForm.ctaUrl} onChange={(e) => setSForm((f) => ({ ...f, ctaUrl: e.target.value }))} required placeholder="https://"
+                    <UrlInput value={sForm.ctaUrl} onChange={(val) => setSForm((f) => ({ ...f, ctaUrl: val }))} required placeholder="https://"
                       className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
                   </div>
                 </div>
@@ -750,7 +751,7 @@ function PortalContent() {
                 <div>
                   <label className="block text-xs font-semibold text-gray-600 mb-1">Ad Image</label>
                   <div className="flex gap-2">
-                    <input type="url" value={bForm.imageUrl} onChange={(e) => setBForm((f) => ({ ...f, imageUrl: e.target.value }))} placeholder="https://... or upload"
+                    <UrlInput value={bForm.imageUrl} onChange={(val) => setBForm((f) => ({ ...f, imageUrl: val }))} placeholder="https://... or upload"
                       className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
                     <input ref={bFileRef} type="file" accept="image/*" className="hidden"
                       onChange={(e) => { const f = e.target.files?.[0]; if (f) handleImageUpload(f, setBUploading, (url) => setBForm((fm) => ({ ...fm, imageUrl: url })), setBError); }} />
@@ -782,7 +783,7 @@ function PortalContent() {
                   </div>
                   <div>
                     <label className="block text-xs font-semibold text-gray-600 mb-1">CTA Link *</label>
-                    <input type="url" value={bForm.ctaUrl} onChange={(e) => setBForm((f) => ({ ...f, ctaUrl: e.target.value }))} required placeholder="https://"
+                    <UrlInput value={bForm.ctaUrl} onChange={(val) => setBForm((f) => ({ ...f, ctaUrl: val }))} required placeholder="https://"
                       className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
                   </div>
                 </div>
@@ -929,7 +930,7 @@ function PortalContent() {
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-gray-600 mb-1">Link <span className="font-normal text-gray-400">(more info / tickets, optional)</span></label>
-                  <input type="url" placeholder="https://" value={eForm.url} onChange={(e) => setEForm((f) => ({ ...f, url: e.target.value }))}
+                  <UrlInput placeholder="https://" value={eForm.url} onChange={(val) => setEForm((f) => ({ ...f, url: val }))}
                     className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
                 </div>
                 {eError && <p className="text-sm text-red-600">{eError}</p>}

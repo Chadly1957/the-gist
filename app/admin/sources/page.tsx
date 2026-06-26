@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import UrlInput from "@/components/UrlInput";
 
 interface Source {
   id: string;
@@ -85,11 +86,10 @@ export default function SourcesPage() {
             required
             className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
           />
-          <input
-            type="url"
+          <UrlInput
             placeholder="https://example.com or https://example.substack.com/feed"
             value={url}
-            onChange={(e) => setUrl(e.target.value)}
+            onChange={(val) => setUrl(val)}
             required
             className="flex-[2] px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
           />

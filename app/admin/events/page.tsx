@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import UrlInput from "@/components/UrlInput";
 
 interface Event {
   id: string;
@@ -169,11 +170,10 @@ export default function AdminEventsPage() {
           <div className="bg-blue-50 border border-blue-100 rounded-lg p-4 space-y-3">
             <p className="text-xs font-semibold text-blue-800">Import from URL (optional)</p>
             <div className="flex gap-2">
-              <input
-                type="url"
+              <UrlInput
                 placeholder="https://www.eventbrite.com/e/... or Facebook event link"
                 value={scrapeUrl}
-                onChange={(e) => { setScrapeUrl(e.target.value); setScrapeError(""); setScrapeWarnings([]); setScrapeFound({}); }}
+                onChange={(val) => { setScrapeUrl(val); setScrapeError(""); setScrapeWarnings([]); setScrapeFound({}); }}
                 className="flex-1 px-3 py-2 border border-blue-200 bg-white rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
               />
               <button
@@ -250,7 +250,7 @@ export default function AdminEventsPage() {
             </div>
             <div className="sm:col-span-2">
               <label className="block text-xs font-semibold text-gray-600 mb-1">Link (More Info / Tickets)</label>
-              <input type="url" placeholder="https://" value={addForm.url} onChange={(e) => setAddForm((f) => ({ ...f, url: e.target.value }))}
+              <UrlInput placeholder="https://" value={addForm.url} onChange={(val) => setAddForm((f) => ({ ...f, url: val }))}
                 className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
             </div>
           </div>
@@ -364,7 +364,7 @@ export default function AdminEventsPage() {
                         </div>
                         <div className="sm:col-span-2">
                           <label className="block text-xs font-semibold text-gray-600 mb-1">Link</label>
-                          <input type="url" value={editForm.url} onChange={(e) => setEditForm((f) => ({ ...f, url: e.target.value }))}
+                          <UrlInput value={editForm.url} onChange={(val) => setEditForm((f) => ({ ...f, url: val }))}
                             className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
                         </div>
                       </div>

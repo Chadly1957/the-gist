@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
+import UrlInput from "@/components/UrlInput";
 
 export interface Block {
   id: string;
@@ -334,10 +335,9 @@ function ImageBlockFields({
       <div>
         <label className="block text-xs font-semibold text-gray-600 mb-1">Image</label>
         <div className="flex gap-2">
-          <input
-            type="url"
+          <UrlInput
             value={c.url || ""}
-            onChange={(e) => onChange({ ...c, url: e.target.value })}
+            onChange={(val) => onChange({ ...c, url: val })}
             placeholder="https://example.com/image.jpg"
             className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
           />
@@ -445,6 +445,13 @@ function BlockFields({
             rows={rows}
             placeholder={placeholder}
             className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-green-500 resize-y"
+          />
+        ) : type === "url" ? (
+          <UrlInput
+            value={c[key] || ""}
+            onChange={(val) => onChange({ ...c, [key]: val })}
+            placeholder={placeholder}
+            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
           />
         ) : (
           <input

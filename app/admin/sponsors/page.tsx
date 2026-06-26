@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import SponsorPreview from "@/components/SponsorPreview";
+import UrlInput from "@/components/UrlInput";
 
 interface Spotlight {
   id: string;
@@ -252,8 +253,8 @@ export default function AdminSponsorsPage() {
                           </div>
                           <div>
                             <label className="block text-xs font-semibold text-gray-600 mb-1">Logo URL</label>
-                            <input type="text" value={spotlightForm.logoUrl}
-                              onChange={(e) => setSpotlightForm((f) => ({ ...f, logoUrl: e.target.value }))}
+                            <UrlInput value={spotlightForm.logoUrl}
+                              onChange={(val) => setSpotlightForm((f) => ({ ...f, logoUrl: val }))}
                               className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
                           </div>
                           <div>
@@ -271,8 +272,8 @@ export default function AdminSponsorsPage() {
                             </div>
                             <div>
                               <label className="block text-xs font-semibold text-gray-600 mb-1">CTA / Website Link</label>
-                              <input type="text" value={spotlightForm.ctaUrl}
-                                onChange={(e) => setSpotlightForm((f) => ({ ...f, ctaUrl: e.target.value }))}
+                              <UrlInput value={spotlightForm.ctaUrl}
+                                onChange={(val) => setSpotlightForm((f) => ({ ...f, ctaUrl: val }))}
                                 className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
                             </div>
                           </div>
@@ -385,8 +386,8 @@ export default function AdminSponsorsPage() {
                           </div>
                           <div>
                             <label className="block text-xs font-semibold text-gray-600 mb-1">Ad Image URL</label>
-                            <input type="text" value={bookingForm.imageUrl}
-                              onChange={(e) => setBookingForm((f) => ({ ...f, imageUrl: e.target.value }))}
+                            <UrlInput value={bookingForm.imageUrl}
+                              onChange={(val) => setBookingForm((f) => ({ ...f, imageUrl: val }))}
                               className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
                           </div>
                           <div>
@@ -410,8 +411,8 @@ export default function AdminSponsorsPage() {
                             </div>
                             <div>
                               <label className="block text-xs font-semibold text-gray-600 mb-1">CTA Link</label>
-                              <input type="text" value={bookingForm.ctaUrl}
-                                onChange={(e) => setBookingForm((f) => ({ ...f, ctaUrl: e.target.value }))}
+                              <UrlInput value={bookingForm.ctaUrl}
+                                onChange={(val) => setBookingForm((f) => ({ ...f, ctaUrl: val }))}
                                 className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
                             </div>
                           </div>
