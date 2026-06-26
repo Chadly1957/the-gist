@@ -71,6 +71,56 @@ export default function AdminSponsorsPage() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [previewId, setPreviewId] = useState<string | null>(null);
 
+  // Sponsor email compose
+  const [emailTarget, setEmailTarget] = useState<Profile | "bulk" | null>(null);
+  const [emailSubject, setEmailSubject] = useState("");
+  const [emailBody, setEmailBody] = useState("");
+  const [emailSending, setEmailSending] = useState(false);
+  const [emailResult, setEmailResult] = useState<{ ok: boolean; message: string } | null>(null);
+
+  function openEmail(target: Profile | "bulk") {
+    setEmailTarget(target);
+    setEmailSubject("");
+    setEmailBody("");
+    setEmailResult(null);
+  }
+
+  function closeEmail() {
+    setEmailTarget(null);
+    setEmailSubject("");
+    setEmailBody("");
+    setEmailResult(null);
+  }
+
+  async function sendSponsorEmail() {
+    setEmailSending(true);
+    setEmailResult(null);
+    const payload =
+      emailTarget === "bulk"
+        ? { bulk: true, subject: emailSubject, htmlBody: emailBody }
+        : { profileId: (emailTarget as Profile).id, subject: emailSubject, htmlBody: emailBody };
+    try {
+      const res = await fetch("/api/admin/sponsors/email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        const msg =
+          emailTarget === "bulk"
+            ? `Sent to ${data.sent} sponsor${data.sent !== 1 ? "s" : ""}${data.failed > 0 ? `, ${data.failed} failed` : ""}.`
+            : "Email sent!";
+        setEmailResult({ ok: true, message: msg });
+      } else {
+        setEmailResult({ ok: false, message: data.error || "Send failed." });
+      }
+    } catch {
+      setEmailResult({ ok: false, message: "Network error." });
+    }
+    setEmailSending(false);
+  }
+
   // Edit forms
   const [editingSpotlightId, setEditingSpotlightId] = useState<string | null>(null);
   const [spotlightForm, setSpotlightForm] = useState({ businessName: "", logoUrl: "", description: "", ctaLabel: "", ctaUrl: "" });
@@ -494,6 +544,15 @@ export default function AdminSponsorsPage() {
           {/* PROFILES */}
           {tab === "profiles" && (
             <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-gray-500">{profiles.length} sponsor{profiles.length !== 1 ? "s" : ""}</p>
+                {profiles.length > 0 && (
+                  <button onClick={() => openEmail("bulk")}
+                    className="px-3 py-1.5 bg-green-700 text-white rounded-lg text-xs font-semibold hover:bg-green-800">
+                    Bulk Email All Sponsors
+                  </button>
+                )}
+              </div>
               {profiles.length === 0 && <p className="text-sm text-gray-400">No sponsors yet.</p>}
               {profiles.map((p) => (
                 <div key={p.id} className="bg-white rounded-xl border border-gray-200 p-4 flex items-center gap-4">
@@ -502,12 +561,95 @@ export default function AdminSponsorsPage() {
                     <p className="text-xs text-gray-500">{p.contactName} · {p.email}{p.phone ? ` · ${p.phone}` : ""}</p>
                     {p.website && <a href={p.website} target="_blank" rel="noopener noreferrer" className="text-xs text-green-700 hover:underline">{p.website}</a>}
                   </div>
-                  <a href={p.portalUrl} target="_blank" rel="noopener noreferrer"
-                    className="text-xs text-green-700 border border-green-200 rounded-lg px-3 py-1.5 hover:bg-green-50 whitespace-nowrap">
-                    Open Portal ↗
-                  </a>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button onClick={() => openEmail(p)}
+                      className="text-xs text-green-700 border border-green-200 rounded-lg px-3 py-1.5 hover:bg-green-50 whitespace-nowrap">
+                      Email
+                    </button>
+                    <a href={p.portalUrl} target="_blank" rel="noopener noreferrer"
+                      className="text-xs text-green-700 border border-green-200 rounded-lg px-3 py-1.5 hover:bg-green-50 whitespace-nowrap">
+                      Open Portal ↗
+                    </a>
+                  </div>
                 </div>
               ))}
+            </div>
+          )}
+
+          {/* EMAIL COMPOSE MODAL */}
+          {emailTarget !== null && (
+            <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+              <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg p-6 space-y-4">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <h2 className="text-base font-bold text-gray-900">
+                      {emailTarget === "bulk"
+                        ? `Bulk Email — All Sponsors`
+                        : `Email ${(emailTarget as Profile).businessName}`}
+                    </h2>
+                    {emailTarget !== "bulk" && (
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        To: {(emailTarget as Profile).contactName} &lt;{(emailTarget as Profile).email}&gt;
+                      </p>
+                    )}
+                    {emailTarget === "bulk" && (
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        Will send to {profiles.filter((p) => p.active).length} active sponsors
+                      </p>
+                    )}
+                  </div>
+                  <button onClick={closeEmail} className="text-gray-400 hover:text-gray-600 text-lg leading-none shrink-0">✕</button>
+                </div>
+
+                {emailTarget === "bulk" && (
+                  <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 text-xs text-blue-700 space-y-1">
+                    <p className="font-semibold">Personalisation placeholders:</p>
+                    <p className="font-mono">{"{{BUSINESS_NAME}}"} · {"{{CONTACT_NAME}}"} · {"{{PORTAL_URL}}"}</p>
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Subject</label>
+                  <input
+                    type="text"
+                    value={emailSubject}
+                    onChange={(e) => setEmailSubject(e.target.value)}
+                    placeholder="Subject line…"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Body (HTML supported)</label>
+                  <textarea
+                    rows={10}
+                    value={emailBody}
+                    onChange={(e) => setEmailBody(e.target.value)}
+                    placeholder={"<p>Hi {{CONTACT_NAME}},</p>\n<p>…</p>"}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-green-500 resize-y"
+                  />
+                </div>
+
+                {emailResult && (
+                  <p className={`text-sm font-medium ${emailResult.ok ? "text-green-600" : "text-red-600"}`}>
+                    {emailResult.message}
+                  </p>
+                )}
+
+                <div className="flex gap-2">
+                  <button
+                    onClick={sendSponsorEmail}
+                    disabled={emailSending || !emailSubject.trim() || !emailBody.trim()}
+                    className="px-4 py-2 bg-green-700 text-white rounded-lg text-sm font-semibold hover:bg-green-800 disabled:opacity-50"
+                  >
+                    {emailSending ? "Sending…" : emailTarget === "bulk" ? "Send to All Sponsors" : "Send Email"}
+                  </button>
+                  <button onClick={closeEmail}
+                    className="px-4 py-2 border border-gray-200 text-gray-600 rounded-lg text-sm font-semibold hover:bg-gray-50">
+                    {emailResult?.ok ? "Close" : "Cancel"}
+                  </button>
+                </div>
+              </div>
             </div>
           )}
 
