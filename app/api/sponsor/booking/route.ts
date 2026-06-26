@@ -19,8 +19,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid type." }, { status: 400 });
   }
 
-  if (body.length > 250) {
-    return NextResponse.json({ error: "Body must be 250 characters or less." }, { status: 400 });
+  if (body.length > 400) {
+    return NextResponse.json({ error: "Body must be 400 characters or less." }, { status: 400 });
   }
 
   // Check availability

@@ -768,8 +768,8 @@ function PortalContent() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-1">Body Copy * <span className="font-normal text-gray-400">({bForm.body.length}/250)</span></label>
-                  <textarea value={bForm.body} onChange={(e) => setBForm((f) => ({ ...f, body: e.target.value }))} required rows={3} maxLength={250}
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Body Copy * <span className="font-normal text-gray-400">({bForm.body.length}/400)</span></label>
+                  <textarea value={bForm.body} onChange={(e) => setBForm((f) => ({ ...f, body: e.target.value }))} required rows={4} maxLength={400}
                     placeholder="Tell readers what you offer and why they should click."
                     className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none" />
                 </div>

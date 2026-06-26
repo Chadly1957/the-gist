@@ -397,7 +397,7 @@ export default function AdminSponsorsPage() {
                           </div>
                           <div>
                             <label className="block text-xs font-semibold text-gray-600 mb-1">Body Copy</label>
-                            <textarea value={bookingForm.body} rows={3} maxLength={250}
+                            <textarea value={bookingForm.body} rows={4} maxLength={400}
                               onChange={(e) => setBookingForm((f) => ({ ...f, body: e.target.value }))}
                               className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none" />
                           </div>
