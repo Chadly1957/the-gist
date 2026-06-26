@@ -62,6 +62,107 @@ function StatusBadge({ status }: { status: string }) {
   return <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${STATUS_COLORS[status] || "bg-gray-100 text-gray-500"}`}>{label}</span>;
 }
 
+function BookingsCalendar({
+  bookings,
+  year,
+  month,
+  onPrev,
+  onNext,
+}: {
+  bookings: Booking[];
+  year: number;
+  month: number;
+  onPrev: () => void;
+  onNext: () => void;
+}) {
+  const todayStr = new Date().toISOString().split("T")[0];
+  const firstDay = new Date(year, month, 1);
+  const startOffset = firstDay.getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const cells: (number | null)[] = [
+    ...Array(startOffset).fill(null),
+    ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
+  ];
+  while (cells.length % 7 !== 0) cells.push(null);
+
+  const monthLabel = new Date(year, month).toLocaleDateString("en-US", { month: "long", year: "numeric" });
+
+  const byDate = new Map<string, Booking[]>();
+  for (const b of bookings) {
+    if (!["approved", "pending_review"].includes(b.status)) continue;
+    const existing = byDate.get(b.date) ?? [];
+    existing.push(b);
+    byDate.set(b.date, existing);
+  }
+
+  function pad(n: number) { return String(n).padStart(2, "0"); }
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4">
+      <div className="flex items-center justify-between mb-3">
+        <button onClick={onPrev} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 text-lg leading-none">‹</button>
+        <h3 className="text-sm font-semibold text-gray-800">{monthLabel}</h3>
+        <button onClick={onNext} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 text-lg leading-none">›</button>
+      </div>
+
+      <div className="grid grid-cols-7 mb-1">
+        {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
+          <div key={d} className="text-center text-[10px] font-semibold text-gray-400 py-1">{d}</div>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-7 gap-0.5">
+        {cells.map((day, i) => {
+          if (!day) return <div key={i} className="min-h-[60px]" />;
+          const dateStr = `${year}-${pad(month + 1)}-${pad(day)}`;
+          const dayBookings = byDate.get(dateStr) ?? [];
+          const isToday = dateStr === todayStr;
+
+          return (
+            <div
+              key={i}
+              className={`min-h-[60px] p-1 rounded-lg ${isToday ? "ring-2 ring-green-500 ring-inset" : ""} ${dayBookings.length > 0 ? "bg-gray-50" : ""}`}
+            >
+              <div className={`text-[11px] font-semibold mb-0.5 w-5 h-5 flex items-center justify-center rounded-full ${isToday ? "bg-green-600 text-white" : "text-gray-500"}`}>
+                {day}
+              </div>
+              <div className="space-y-0.5">
+                {dayBookings.map((b) => (
+                  <div
+                    key={b.id}
+                    title={`${b.sponsor.businessName} — ${b.type === "presenting" ? "Presenting" : "Standard"} (${b.status === "approved" ? "Approved" : "Pending"})`}
+                    className={`text-[9px] font-bold px-1 py-px rounded leading-tight truncate ${
+                      b.status === "pending_review"
+                        ? "bg-amber-100 text-amber-700"
+                        : b.type === "presenting"
+                        ? "bg-blue-100 text-blue-700"
+                        : "bg-green-100 text-green-700"
+                    }`}
+                  >
+                    {b.type === "presenting" ? "PRE" : "STD"} · {b.sponsor.businessName.slice(0, 7)}
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="mt-3 pt-3 border-t border-gray-100 flex flex-wrap gap-x-4 gap-y-1">
+        <span className="flex items-center gap-1.5 text-[11px] text-gray-500">
+          <span className="w-6 h-3 rounded bg-green-100 inline-block shrink-0" />Approved Standard
+        </span>
+        <span className="flex items-center gap-1.5 text-[11px] text-gray-500">
+          <span className="w-6 h-3 rounded bg-blue-100 inline-block shrink-0" />Approved Presenting
+        </span>
+        <span className="flex items-center gap-1.5 text-[11px] text-gray-500">
+          <span className="w-6 h-3 rounded bg-amber-100 inline-block shrink-0" />Pending Review
+        </span>
+      </div>
+    </div>
+  );
+}
+
 export default function AdminSponsorsPage() {
   const [tab, setTab] = useState<"spotlights" | "bookings" | "profiles" | "pricing">("spotlights");
   const [spotlights, setSpotlights] = useState<Spotlight[]>([]);
@@ -70,6 +171,19 @@ export default function AdminSponsorsPage() {
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [previewId, setPreviewId] = useState<string | null>(null);
+
+  // Bookings calendar
+  const [calYear, setCalYear] = useState(() => new Date().getFullYear());
+  const [calMonth, setCalMonth] = useState(() => new Date().getMonth());
+
+  function calPrev() {
+    if (calMonth === 0) { setCalMonth(11); setCalYear((y) => y - 1); }
+    else setCalMonth((m) => m - 1);
+  }
+  function calNext() {
+    if (calMonth === 11) { setCalMonth(0); setCalYear((y) => y + 1); }
+    else setCalMonth((m) => m + 1);
+  }
 
   // Sponsor email compose
   const [emailTarget, setEmailTarget] = useState<Profile | "bulk" | null>(null);
@@ -390,6 +504,13 @@ export default function AdminSponsorsPage() {
           {/* BOOKINGS */}
           {tab === "bookings" && (
             <div className="space-y-3">
+              <BookingsCalendar
+                bookings={bookings}
+                year={calYear}
+                month={calMonth}
+                onPrev={calPrev}
+                onNext={calNext}
+              />
               {bookings.length === 0 && <p className="text-sm text-gray-400">No ad bookings yet.</p>}
               {bookings.map((b) => (
                 <div key={b.id} className="bg-white rounded-xl border border-gray-200">
