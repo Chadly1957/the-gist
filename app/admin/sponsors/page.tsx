@@ -321,6 +321,26 @@ export default function AdminSponsorsPage() {
     load();
   }
 
+  async function duplicateBooking(b: Booking) {
+    const res = await fetch(`/api/admin/sponsors/bookings/${b.id}/duplicate`, { method: "POST" });
+    if (!res.ok) return;
+    const { booking: copy } = await res.json();
+    // Insert at top of list and immediately open edit form so user can change the date
+    setBookings((prev) => [copy, ...prev]);
+    setBookingForm({
+      type: copy.type,
+      date: copy.date,
+      headline: copy.headline,
+      body: copy.body,
+      ctaUrl: copy.ctaUrl,
+      ctaLabel: copy.ctaLabel,
+      imageUrl: copy.imageUrl || "",
+      presentingBlurb: copy.presentingBlurb || "",
+    });
+    setExpandedId(copy.id);
+    setEditingBookingId(copy.id);
+  }
+
   async function deleteBooking(id: string) {
     if (!confirm("Delete this booking?")) return;
     await fetch(`/api/admin/sponsors/bookings/${id}`, { method: "DELETE" });
@@ -639,6 +659,10 @@ export default function AdminSponsorsPage() {
                             <button onClick={() => startEditBooking(b)}
                               className="px-3 py-1.5 border border-gray-200 text-gray-600 rounded-lg text-xs font-semibold hover:bg-gray-100">
                               Edit
+                            </button>
+                            <button onClick={() => duplicateBooking(b)}
+                              className="px-3 py-1.5 border border-gray-200 text-gray-600 rounded-lg text-xs font-semibold hover:bg-gray-100">
+                              Duplicate
                             </button>
                             <button onClick={() => setPreviewId(previewId === b.id ? null : b.id)}
                               className="px-3 py-1.5 border border-gray-200 text-gray-600 rounded-lg text-xs font-semibold hover:bg-gray-100">
