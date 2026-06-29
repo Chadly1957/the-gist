@@ -2,8 +2,19 @@
 
 export interface Block {
   id: string;
-  type: "header" | "text" | "image" | "articles" | "divider" | "footer" | "button" | "spotlight" | "presenting_sponsor" | "events" | "referral";
+  type: "header" | "text" | "image" | "articles" | "divider" | "footer" | "button" | "spotlight" | "presenting_sponsor" | "events" | "referral" | "poll";
   content: Record<string, unknown>;
+}
+
+export interface PollOptionData {
+  id: string;
+  label: string;
+}
+
+export interface PollData {
+  pollId: string;
+  appUrl: string;
+  options: PollOptionData[];
 }
 
 export interface EventItem {
@@ -297,6 +308,43 @@ function renderReferral(content: Record<string, unknown>): string {
     </div>`;
 }
 
+function renderPoll(content: Record<string, unknown>, polls?: Map<string, PollData>): string {
+  const question = String(content.question || "What do you think?");
+  const blockId = String(content.blockId || "");
+  const pollData = blockId ? polls?.get(blockId) : undefined;
+
+  let optionsHtml: string;
+  if (pollData) {
+    optionsHtml = pollData.options.map((opt) => {
+      const voteUrl = `${pollData.appUrl}/poll/${pollData.pollId}/${opt.id}?r=${RECIPIENT_PLACEHOLDER}`;
+      return `
+        <tr><td style="padding:5px 0;">
+          <a href="${voteUrl}" style="display:block;width:100%;box-sizing:border-box;padding:11px 18px;border:2px solid #166534;border-radius:6px;text-decoration:none;font-size:14px;font-family:sans-serif;font-weight:600;color:#166534;text-align:center;">${opt.label}</a>
+        </td></tr>`;
+    }).join("");
+  } else {
+    // Preview mode — render static buttons for each option in content
+    const rawOptions = (content.options as string[] | undefined)
+      || [content.option0, content.option1, content.option2, content.option3];
+    const options = (rawOptions as (string | undefined)[]).map(String).filter(Boolean);
+    optionsHtml = options.map((label: string) => `
+        <tr><td style="padding:5px 0;">
+          <div style="display:block;padding:11px 18px;border:2px solid #d1d5db;border-radius:6px;font-size:14px;font-family:sans-serif;font-weight:600;color:#6b7280;text-align:center;">${label}</div>
+        </td></tr>`).join("");
+  }
+
+  return `
+    <div style="padding:20px 40px;">
+      <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:24px;">
+        <div style="font-family:sans-serif;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#166534;margin-bottom:12px;">Quick Poll</div>
+        <div style="font-size:17px;font-weight:700;color:#111827;font-family:Georgia,serif;line-height:1.4;margin-bottom:16px;">${question}</div>
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+          ${optionsHtml}
+        </table>
+      </div>
+    </div>`;
+}
+
 function renderDivider(): string {
   return `<div class="block" style="padding:8px 40px;"><hr class="divider" style="border:none;border-top:1px solid #e5e7eb;margin:0;" /></div>`;
 }
@@ -331,7 +379,8 @@ export function renderTemplate(
     inArticleAds?: InArticleAdItem[];
   } = {},
   tracking?: TrackingConfig,
-  events: EventItem[] = []
+  events: EventItem[] = [],
+  polls?: Map<string, PollData>
 ): string {
   const { spotlights = [], presentingSponsor = null, inArticleAds = [] } = sponsors;
 
@@ -360,6 +409,8 @@ export function renderTemplate(
           return renderEvents(events);
         case "referral":
           return renderReferral(block.content);
+        case "poll":
+          return renderPoll(block.content, polls);
         default:
           return "";
       }

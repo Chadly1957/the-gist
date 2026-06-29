@@ -5,7 +5,7 @@ import UrlInput from "@/components/UrlInput";
 
 export interface Block {
   id: string;
-  type: "header" | "text" | "image" | "articles" | "divider" | "button" | "footer" | "spotlight" | "presenting_sponsor" | "events" | "referral";
+  type: "header" | "text" | "image" | "articles" | "divider" | "button" | "footer" | "spotlight" | "presenting_sponsor" | "events" | "referral" | "poll";
   content: Record<string, string>;
 }
 
@@ -27,6 +27,7 @@ const BLOCK_TYPES: { type: Block["type"]; label: string; icon: string }[] = [
   { type: "spotlight", label: "Community Partners", icon: "★" },
   { type: "presenting_sponsor", label: "Presenting Sponsor", icon: "✦" },
   { type: "referral", label: "Refer a Friend", icon: "🔗" },
+  { type: "poll", label: "Poll", icon: "📊" },
 ];
 
 export default function BlockEditor({ blocks, onChange }: BlockEditorProps) {
@@ -53,8 +54,16 @@ export default function BlockEditor({ blocks, onChange }: BlockEditorProps) {
         text: "Know someone who'd love The Gist Decatur? Share your unique link and earn a chance to win a prize!",
         buttonLabel: "Share Your Referral Link →",
       },
+      poll: {
+        question: "What do you think?",
+        option0: "Yes",
+        option1: "No",
+        option2: "",
+        option3: "",
+      },
     };
-    const newBlock: Block = { id: generateId(), type, content: defaults[type] };
+    const newBlock: Block = { id: generateId(), type, content: { ...defaults[type], blockId: "" } };
+    if (type === "poll") newBlock.content.blockId = newBlock.id;
     onChange([...blocks, newBlock]);
     setEditingId(newBlock.id);
   }
@@ -289,6 +298,20 @@ function BlockPreview({ block }: { block: Block }) {
           </span>
         </div>
       );
+    case "poll": {
+      const opts = [block.content.option0, block.content.option1, block.content.option2, block.content.option3].filter(Boolean);
+      return (
+        <div className="bg-green-50 border border-green-200 rounded-xl p-4">
+          <div className="text-xs font-semibold text-green-700 uppercase tracking-wide mb-1">Quick Poll</div>
+          <p className="text-sm font-bold text-gray-900 mb-2">{block.content.question || "What do you think?"}</p>
+          <div className="space-y-1">
+            {opts.map((opt, i) => (
+              <div key={i} className="border-2 border-green-600 rounded-md px-3 py-1.5 text-sm font-medium text-green-800 text-center">{opt}</div>
+            ))}
+          </div>
+        </div>
+      );
+    }
     default:
       return null;
   }
@@ -523,6 +546,17 @@ function BlockFields({
         <div className="space-y-3">
           {field("text", "Footer Text", { rows: 2 })}
           {field("unsubscribeText", "Unsubscribe Link Text")}
+        </div>
+      );
+    case "poll":
+      return (
+        <div className="space-y-3">
+          {field("question", "Poll Question", { placeholder: "What do you think?" })}
+          {field("option0", "Option 1", { placeholder: "Yes" })}
+          {field("option1", "Option 2", { placeholder: "No" })}
+          {field("option2", "Option 3 (optional)", { placeholder: "" })}
+          {field("option3", "Option 4 (optional)", { placeholder: "" })}
+          <p className="text-xs text-gray-400">Subscribers click their choice in the email. Results appear in the Polls tab after sending.</p>
         </div>
       );
     default:

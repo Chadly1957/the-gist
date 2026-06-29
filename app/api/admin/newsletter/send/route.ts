@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getAdminSession } from "@/lib/auth";
-import { renderTemplate, Block, SpotlightItem, PresentingSponsorItem, InArticleAdItem, EventItem } from "@/lib/template-renderer";
+import { renderTemplate, Block, SpotlightItem, PresentingSponsorItem, InArticleAdItem, EventItem, PollData } from "@/lib/template-renderer";
 import { getEmailClient, htmlToText } from "@/lib/email";
 import { signTrackingUrl } from "@/lib/tracking";
 import { blurbToHtml } from "@/lib/url";
@@ -121,16 +121,36 @@ export async function POST(req: NextRequest) {
     : [];
   const willSend = !!emailClient && activeSubscribers.length > 0;
 
+  // Create Poll + PollOption DB records for any poll blocks
+  const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "").replace(/\/$/, "");
+  const pollBlocks = blocks.filter((b) => b.type === "poll");
+  const pollsMap = new Map<string, PollData>();
+  for (const b of pollBlocks) {
+    const blockId = String(b.content.blockId || b.id);
+    const question = String(b.content.question || "What do you think?");
+    const rawOptions = [b.content.option0, b.content.option1, b.content.option2, b.content.option3]
+      .map(String)
+      .filter(Boolean);
+    if (rawOptions.length < 2) continue;
+    const poll = await db.poll.create({ data: { question } });
+    const options = await Promise.all(
+      rawOptions.map((label, i) =>
+        db.pollOption.create({ data: { pollId: poll.id, label, sortOrder: i } })
+      )
+    );
+    pollsMap.set(blockId, { pollId: poll.id, appUrl, options: options.map((o: { id: string; label: string }) => ({ id: o.id, label: o.label })) });
+  }
+
   // Render HTML once. Open/click tracking links embed a recipient-id
   // placeholder that gets swapped in per-recipient below, so the template
   // only needs to be rendered a single time regardless of list size.
-  const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "").replace(/\/$/, "");
   const htmlBody = renderTemplate(
     blocks,
     articles.map((a) => ({ ...a, publishedAt: a.publishedAt })),
     { spotlights, presentingSponsor, inArticleAds },
     willSend ? { baseUrl: appUrl, sign: signTrackingUrl } : undefined,
-    events
+    events,
+    pollsMap
   )
     .replace(
       /\{\{UNSUBSCRIBE_URL\}\}/g,
@@ -173,7 +193,8 @@ export async function POST(req: NextRequest) {
     articles.map((a) => ({ ...a, publishedAt: a.publishedAt })),
     { spotlights, presentingSponsor, inArticleAds },
     undefined,
-    events
+    events,
+    pollsMap
   )
     .replace(/\{\{UNSUBSCRIBE_URL\}\}/g, `${appUrl}/unsubscribe`)
     .replace(/\{\{PROFILE_URL\}\}/g, `${appUrl}/profile`)
@@ -185,6 +206,12 @@ export async function POST(req: NextRequest) {
   const newsletterSend = await prisma.newsletterSend.create({
     data: { subject, htmlBody, htmlSnapshot, recipientCount: 0, status },
   });
+
+  // Link polls to this send
+  if (pollsMap.size > 0) {
+    const pollIds = Array.from(pollsMap.values()).map((p) => p.pollId);
+    await db.poll.updateMany({ where: { id: { in: pollIds } }, data: { newsletterSendId: newsletterSend.id } });
+  }
 
   if (willSend) {
     const recipients = await Promise.all(
