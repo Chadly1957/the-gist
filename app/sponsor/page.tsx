@@ -46,7 +46,8 @@ export default async function SponsorPage() {
         "Exclusive: one sponsor per day",
       ],
       cta: "Reserve Dates",
-      highlight: true,
+      highlight: false,
+      badge: "New!",
     },
     {
       key: "spotlight",
@@ -126,6 +127,11 @@ export default async function SponsorPage() {
                   : "border-gray-200"
               }`}
             >
+              {"badge" in tier && tier.badge && (
+                <span className="text-xs font-bold text-blue-600 uppercase tracking-widest mb-2">
+                  {tier.badge}
+                </span>
+              )}
               {tier.highlight && (
                 <span className="text-xs font-bold text-green-700 uppercase tracking-widest mb-2">
                   Most Impactful
