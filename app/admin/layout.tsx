@@ -79,6 +79,15 @@ const NAV_ITEMS = [
     ),
   },
   {
+    href: "/admin/wordy",
+    label: "Wordy",
+    icon: (
+      <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 10h16M4 14h8M4 18h8" />
+      </svg>
+    ),
+  },
+  {
     href: "/admin/polls",
     label: "Polls",
     icon: (

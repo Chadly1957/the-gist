@@ -5,7 +5,7 @@ import UrlInput from "@/components/UrlInput";
 
 export interface Block {
   id: string;
-  type: "header" | "text" | "image" | "articles" | "divider" | "button" | "footer" | "spotlight" | "presenting_sponsor" | "events" | "referral" | "poll";
+  type: "header" | "text" | "image" | "articles" | "divider" | "button" | "footer" | "spotlight" | "presenting_sponsor" | "events" | "referral" | "poll" | "wordy";
   content: Record<string, string>;
 }
 
@@ -28,6 +28,7 @@ const BLOCK_TYPES: { type: Block["type"]; label: string; icon: string }[] = [
   { type: "presenting_sponsor", label: "Presenting Sponsor", icon: "✦" },
   { type: "referral", label: "Refer a Friend", icon: "🔗" },
   { type: "poll", label: "Poll", icon: "📊" },
+  { type: "wordy", label: "Decatur Wordy", icon: "🟩" },
 ];
 
 export default function BlockEditor({ blocks, onChange }: BlockEditorProps) {
@@ -61,6 +62,7 @@ export default function BlockEditor({ blocks, onChange }: BlockEditorProps) {
         option2: "",
         option3: "",
       },
+      wordy: { buttonLabel: "Play Today's Wordy →" },
     };
     const newBlock: Block = { id: generateId(), type, content: { ...defaults[type], blockId: "" } };
     if (type === "poll") newBlock.content.blockId = newBlock.id;
@@ -312,6 +314,18 @@ function BlockPreview({ block }: { block: Block }) {
         </div>
       );
     }
+    case "wordy":
+      return (
+        <div className="bg-green-50 border border-green-200 rounded-xl p-4">
+          <div className="text-xs font-semibold text-green-700 uppercase tracking-wide mb-1">Decatur Wordy</div>
+          <div className="text-lg mb-1">🟩🟨⬛🟩🟨</div>
+          <p className="text-sm font-bold text-gray-900 mb-1">Today&apos;s word — can you guess it?</p>
+          <p className="text-xs text-gray-500 mb-2">All answers are Decatur area related</p>
+          <span className="inline-block bg-green-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg">
+            {block.content.buttonLabel || "Play Today's Wordy →"}
+          </span>
+        </div>
+      );
     default:
       return null;
   }
@@ -557,6 +571,13 @@ function BlockFields({
           {field("option2", "Option 3 (optional)", { placeholder: "" })}
           {field("option3", "Option 4 (optional)", { placeholder: "" })}
           <p className="text-xs text-gray-400">Subscribers click their choice in the email. Results appear in the Polls tab after sending.</p>
+        </div>
+      );
+    case "wordy":
+      return (
+        <div className="space-y-3">
+          {field("buttonLabel", "Button Label", { placeholder: "Play Today's Wordy →" })}
+          <p className="text-xs text-gray-400">Links to thegistdecatur.com/wordy. Word length and puzzle number are pulled from the Wordy schedule at send time.</p>
         </div>
       );
     default:

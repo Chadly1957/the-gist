@@ -112,19 +112,20 @@ model LinkClick {
 }
 
 model SponsorProfile {
-  id           String             @id @default(cuid())
-  businessName String
-  contactName  String
-  email        String             @unique
-  phone        String?
-  website      String?
-  magicToken   String             @unique @default(cuid())
-  active       Boolean            @default(true)
-  notes        String?
-  createdAt    DateTime           @default(now())
-  spotlights   SpotlightListing[]
-  bookings     AdBooking[]
-  events       Event[]
+  id            String             @id @default(cuid())
+  businessName  String
+  contactName   String
+  email         String             @unique
+  phone         String?
+  website       String?
+  magicToken    String             @unique @default(cuid())
+  active        Boolean            @default(true)
+  notes         String?
+  createdAt     DateTime           @default(now())
+  spotlights    SpotlightListing[]
+  bookings      AdBooking[]
+  events        Event[]
+  wordyBookings WordyBooking[]
 }
 
 model SpotlightListing {
@@ -217,6 +218,48 @@ model ReferralSignup {
 
   @@index([referralCodeId])
   @@index([sprintId])
+}
+
+model WordyWord {
+  id        String   @id @default(cuid())
+  date      String   @unique
+  word      String
+  puzzleNum Int?
+  createdAt DateTime @default(now())
+}
+
+model WordyBooking {
+  id              String         @id @default(cuid())
+  date            String         @unique
+  sponsorId       String
+  sponsor         SponsorProfile @relation(fields: [sponsorId], references: [id], onDelete: Cascade)
+  headline        String
+  body            String         @default("")
+  ctaUrl          String         @default("")
+  ctaLabel        String         @default("Learn More")
+  imageUrl        String?
+  presentingBlurb String?
+  status          String         @default("pending_review")
+  isPaid          Boolean        @default(false)
+  adminNotes      String?
+  createdAt       DateTime       @default(now())
+  approvedAt      DateTime?
+
+  @@index([sponsorId])
+}
+
+model WordyPlay {
+  id            String   @id @default(cuid())
+  date          String
+  recipientId   String?
+  won           Boolean
+  guesses       Int
+  maxGuesses    Int
+  wordLength    Int
+  sponsorViewed Boolean  @default(false)
+  createdAt     DateTime @default(now())
+
+  @@index([date])
 }
 
 model Poll {

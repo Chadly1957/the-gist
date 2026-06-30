@@ -11,6 +11,10 @@ interface Settings {
   smtp_from_name: string;
   spotlight_count: string;
   in_article_count: string;
+  sponsorship_price_spotlight: string;
+  sponsorship_price_in_article: string;
+  sponsorship_price_presenting: string;
+  sponsorship_price_wordy: string;
 }
 
 const PROVIDERS = [
@@ -44,6 +48,10 @@ export default function SettingsPage() {
     smtp_from_name: "The Gist Decatur",
     spotlight_count: "5",
     in_article_count: "2",
+    sponsorship_price_spotlight: "Free",
+    sponsorship_price_in_article: "$15/day",
+    sponsorship_price_presenting: "$25/day",
+    sponsorship_price_wordy: "$20/day",
   });
   const [hasSmtp, setHasSmtp] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -356,6 +364,40 @@ export default function SettingsPage() {
               />
               <p className="text-xs text-gray-400 mt-1">Max standard ads woven into the newsletter (default: 2)</p>
             </div>
+          </div>
+        </div>
+
+        {/* Sponsorship Pricing */}
+        <div className="bg-white rounded-xl border border-gray-200 p-6">
+          <div className="flex items-center gap-3 mb-5">
+            <div className="w-8 h-8 rounded-lg bg-yellow-50 flex items-center justify-center">
+              <svg className="w-4 h-4 text-yellow-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <div>
+              <h2 className="text-sm font-semibold text-gray-800">Sponsorship Pricing</h2>
+              <p className="text-xs text-gray-400">Prices shown on the public /sponsor page</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            {[
+              { key: "sponsorship_price_spotlight" as const, label: "Community Partners" },
+              { key: "sponsorship_price_in_article" as const, label: "Standard Sponsorship" },
+              { key: "sponsorship_price_presenting" as const, label: "Presenting Sponsor" },
+              { key: "sponsorship_price_wordy" as const, label: "Decatur Wordy Sponsor" },
+            ].map(({ key, label }) => (
+              <div key={key}>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">{label}</label>
+                <input
+                  type="text"
+                  value={settings[key]}
+                  onChange={(e) => setSettings((s) => ({ ...s, [key]: e.target.value }))}
+                  placeholder="$20/day"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                />
+              </div>
+            ))}
           </div>
         </div>
 

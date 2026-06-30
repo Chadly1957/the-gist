@@ -9,18 +9,20 @@ const TIER_DEFAULTS = {
   spotlight: "Free",
   in_article: "$15/day",
   presenting: "$25/day",
+  wordy: "$20/day",
 };
 
 async function getPrices() {
   try {
     const rows = await prisma.setting.findMany({
-      where: { key: { in: ["sponsorship_price_spotlight", "sponsorship_price_in_article", "sponsorship_price_presenting"] } },
+      where: { key: { in: ["sponsorship_price_spotlight", "sponsorship_price_in_article", "sponsorship_price_presenting", "sponsorship_price_wordy"] } },
     });
     const map = Object.fromEntries(rows.map((r) => [r.key, r.value]));
     return {
       spotlight: map["sponsorship_price_spotlight"] || TIER_DEFAULTS.spotlight,
       in_article: map["sponsorship_price_in_article"] || TIER_DEFAULTS.in_article,
       presenting: map["sponsorship_price_presenting"] || TIER_DEFAULTS.presenting,
+      wordy: map["sponsorship_price_wordy"] || TIER_DEFAULTS.wordy,
     };
   } catch {
     return TIER_DEFAULTS;
@@ -31,6 +33,21 @@ export default async function SponsorPage() {
   const prices = await getPrices();
 
   const TIERS = [
+    {
+      key: "wordy",
+      name: "Decatur Wordy Sponsor",
+      price: prices.wordy,
+      description:
+        "Sponsor the daily Decatur Wordy puzzle. Your business is featured on the end screen that every player sees when they finish — win or lose.",
+      includes: [
+        "\"Today's Wordy is brought to you by [Your Business]\" end-screen placement",
+        "Custom headline, description, image, and call-to-action link",
+        "Every player who completes the puzzle sees your ad",
+        "Exclusive: one sponsor per day",
+      ],
+      cta: "Reserve Dates",
+      highlight: true,
+    },
     {
       key: "spotlight",
       name: "Community Partners",
@@ -99,7 +116,7 @@ export default async function SponsorPage() {
 
       {/* Tiers */}
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-10 sm:py-16">
-        <div className="grid md:grid-cols-3 gap-6">
+        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
           {TIERS.map((tier) => (
             <div
               key={tier.key}

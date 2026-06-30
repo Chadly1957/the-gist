@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getAdminSession } from "@/lib/auth";
-import { renderTemplate, Block, SpotlightItem, PresentingSponsorItem, InArticleAdItem, EventItem, PollData } from "@/lib/template-renderer";
+import { renderTemplate, Block, SpotlightItem, PresentingSponsorItem, InArticleAdItem, EventItem, PollData, WordyData } from "@/lib/template-renderer";
 import { getEmailClient, htmlToText } from "@/lib/email";
 import { signTrackingUrl } from "@/lib/tracking";
 import { blurbToHtml } from "@/lib/url";
@@ -148,6 +148,19 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // Look up Wordy data for the newsletter date (if the template has a wordy block)
+  const hasWordyBlock = blocks.some((b) => b.type === "wordy");
+  let wordyData: WordyData | undefined;
+  if (hasWordyBlock) {
+    try {
+      const wordyWord = await prisma.wordyWord.findUnique({ where: { date } });
+      if (wordyWord) {
+        const puzzleNum = wordyWord.puzzleNum ?? (await prisma.wordyWord.count({ where: { date: { lte: date } } }));
+        wordyData = { puzzleNum, wordLength: wordyWord.word.length, appUrl };
+      }
+    } catch { /* WordyWord table may not exist yet */ }
+  }
+
   // Render HTML once. Open/click tracking links embed a recipient-id
   // placeholder that gets swapped in per-recipient below, so the template
   // only needs to be rendered a single time regardless of list size.
@@ -157,7 +170,8 @@ export async function POST(req: NextRequest) {
     { spotlights, presentingSponsor, inArticleAds },
     willSend ? { baseUrl: appUrl, sign: signTrackingUrl } : undefined,
     events,
-    pollsMap
+    pollsMap,
+    wordyData
   )
     .replace(
       /\{\{UNSUBSCRIBE_URL\}\}/g,
@@ -201,7 +215,8 @@ export async function POST(req: NextRequest) {
     { spotlights, presentingSponsor, inArticleAds },
     undefined,
     events,
-    pollsMap
+    pollsMap,
+    wordyData
   )
     .replace(/\{\{UNSUBSCRIBE_URL\}\}/g, `${appUrl}/unsubscribe`)
     .replace(/\{\{PROFILE_URL\}\}/g, `${appUrl}/profile`)

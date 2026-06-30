@@ -2,8 +2,14 @@
 
 export interface Block {
   id: string;
-  type: "header" | "text" | "image" | "articles" | "divider" | "footer" | "button" | "spotlight" | "presenting_sponsor" | "events" | "referral" | "poll";
+  type: "header" | "text" | "image" | "articles" | "divider" | "footer" | "button" | "spotlight" | "presenting_sponsor" | "events" | "referral" | "poll" | "wordy";
   content: Record<string, unknown>;
+}
+
+export interface WordyData {
+  puzzleNum: number;
+  wordLength: number;
+  appUrl: string;
 }
 
 export interface PollOptionData {
@@ -345,6 +351,33 @@ function renderPoll(content: Record<string, unknown>, polls?: Map<string, PollDa
     </div>`;
 }
 
+function renderWordy(content: Record<string, unknown>, wordyData?: WordyData): string {
+  const buttonLabel = String(content.buttonLabel || "Play Today's Wordy →");
+  const appUrl = wordyData?.appUrl || "{{APP_URL}}";
+  const playUrl = `${appUrl}/wordy?r=${RECIPIENT_PLACEHOLDER}`;
+  const puzzleNum = wordyData?.puzzleNum;
+  const wordLength = wordyData?.wordLength;
+
+  return `
+    <div style="padding:20px 40px;">
+      <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:24px;text-align:center;">
+        <div style="font-family:sans-serif;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#166534;margin-bottom:10px;">
+          Decatur Wordy${puzzleNum ? ` #${puzzleNum}` : ""}
+        </div>
+        <div style="font-size:22px;letter-spacing:4px;margin-bottom:12px;">🟩🟨⬛🟩🟨</div>
+        <div style="font-size:17px;font-weight:700;color:#111827;font-family:Georgia,serif;line-height:1.4;margin-bottom:6px;">
+          Today's word has ${wordLength ? `<strong>${wordLength} letters</strong>` : "a mystery number of letters"}.
+        </div>
+        <div style="font-size:13px;color:#4b5563;font-family:sans-serif;margin-bottom:20px;">
+          All answers are Decatur area related. Can you guess it in ${wordLength ? wordLength + 1 : "??"} tries?
+        </div>
+        <a href="${playUrl}" style="display:inline-block;background:#166534;color:#ffffff;padding:12px 28px;border-radius:6px;text-decoration:none;font-size:14px;font-family:sans-serif;font-weight:700;">
+          ${buttonLabel}
+        </a>
+      </div>
+    </div>`;
+}
+
 function renderDivider(): string {
   return `<div class="block" style="padding:8px 40px;"><hr class="divider" style="border:none;border-top:1px solid #e5e7eb;margin:0;" /></div>`;
 }
@@ -380,7 +413,8 @@ export function renderTemplate(
   } = {},
   tracking?: TrackingConfig,
   events: EventItem[] = [],
-  polls?: Map<string, PollData>
+  polls?: Map<string, PollData>,
+  wordyData?: WordyData
 ): string {
   const { spotlights = [], presentingSponsor = null, inArticleAds = [] } = sponsors;
 
@@ -411,6 +445,8 @@ export function renderTemplate(
           return renderReferral(block.content);
         case "poll":
           return renderPoll(block.content, polls);
+        case "wordy":
+          return renderWordy(block.content, wordyData);
         default:
           return "";
       }
