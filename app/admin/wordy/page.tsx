@@ -7,6 +7,9 @@ interface WordEntry { id: string; date: string; word: string; puzzleNum: number;
 interface Booking { id: string; date: string; status: string; isPaid: boolean; adminNotes: string | null; headline: string; body: string; ctaUrl: string; ctaLabel: string; imageUrl: string | null; presentingBlurb: string | null; sponsorId: string; sponsor: { businessName: string; contactName: string; email: string }; }
 interface SponsorProfile { id: string; businessName: string; }
 interface Spotlight { sponsorId: string; businessName: string; logoUrl: string | null; description: string; ctaLabel: string; ctaUrl: string; status: string; }
+interface PlayStats { plays: number; wins: number; sponsorViews: number; }
+interface DayStats { date: string; plays: number; wins: number; sponsorViews: number; }
+interface Analytics { allTime: PlayStats | null; today: PlayStats | null; thisWeek: PlayStats | null; byDay: DayStats[]; }
 
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
@@ -18,7 +21,7 @@ function fmt(date: string) {
 function today() { return new Date().toLocaleDateString("en-CA"); }
 
 export default function WordyAdminPage() {
-  const [tab, setTab] = useState<"schedule" | "bookings">("schedule");
+  const [tab, setTab] = useState<"schedule" | "bookings" | "analytics">("schedule");
 
   // --- Schedule tab ---
   const [calYear, setCalYear]   = useState(() => new Date().getFullYear());
@@ -28,6 +31,10 @@ export default function WordyAdminPage() {
   const [wordInput, setWordInput] = useState("");
   const [wordSaving, setWordSaving] = useState(false);
   const [wordError, setWordError]   = useState("");
+
+  // --- Analytics tab ---
+  const [analytics, setAnalytics] = useState<Analytics | null>(null);
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
 
   // --- Bookings tab ---
   const [bookings, setBookings]   = useState<Booking[]>([]);
@@ -50,6 +57,15 @@ export default function WordyAdminPage() {
   }, []);
 
   useEffect(() => { loadWords(); }, [loadWords]);
+  useEffect(() => {
+    if (tab === "analytics" && !analytics) {
+      setAnalyticsLoading(true);
+      fetch("/api/admin/wordy/analytics")
+        .then(r => r.json())
+        .then(d => setAnalytics(d))
+        .finally(() => setAnalyticsLoading(false));
+    }
+  }, [tab, analytics]);
   useEffect(() => {
     loadBookings();
     fetch("/api/admin/sponsors")
@@ -143,10 +159,10 @@ export default function WordyAdminPage() {
 
       {/* Tabs */}
       <div className="flex gap-1 p-1 bg-gray-100 rounded-xl w-fit mb-6">
-        {(["schedule","bookings"] as const).map(t => (
+        {(["schedule","bookings","analytics"] as const).map(t => (
           <button key={t} onClick={() => setTab(t)}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors capitalize ${tab === t ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}>
-            {t === "schedule" ? "Word Schedule" : "Sponsor Bookings"}
+            {t === "schedule" ? "Word Schedule" : t === "bookings" ? "Sponsor Bookings" : "Analytics"}
           </button>
         ))}
       </div>
@@ -306,6 +322,90 @@ export default function WordyAdminPage() {
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── ANALYTICS TAB ── */}
+      {tab === "analytics" && (
+        <div>
+          {analyticsLoading ? (
+            <div className="py-12 flex justify-center">
+              <div className="w-6 h-6 border-2 border-green-600 border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : !analytics?.allTime ? (
+            <p className="text-sm text-gray-400 py-8 text-center">No play data yet — analytics will appear once people start playing.</p>
+          ) : (
+            <div className="space-y-6">
+              {/* Period stat cards */}
+              {[
+                { label: "Today", stats: analytics.today },
+                { label: "Last 7 Days", stats: analytics.thisWeek },
+                { label: "All Time", stats: analytics.allTime },
+              ].map(({ label, stats }) => stats && (
+                <div key={label}>
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">{label}</p>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="bg-white border border-gray-200 rounded-xl p-4 text-center">
+                      <p className="text-2xl font-bold text-gray-900">{stats.plays.toLocaleString()}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">Games Played</p>
+                    </div>
+                    <div className="bg-white border border-gray-200 rounded-xl p-4 text-center">
+                      <p className="text-2xl font-bold text-green-700">
+                        {stats.plays > 0 ? Math.round((stats.wins / stats.plays) * 100) : 0}%
+                      </p>
+                      <p className="text-xs text-gray-500 mt-0.5">Win Rate</p>
+                      <p className="text-xs text-gray-400">{stats.wins} wins</p>
+                    </div>
+                    <div className="bg-white border border-gray-200 rounded-xl p-4 text-center">
+                      <p className="text-2xl font-bold text-blue-600">
+                        {stats.plays > 0 ? Math.round((stats.sponsorViews / stats.plays) * 100) : 0}%
+                      </p>
+                      <p className="text-xs text-gray-500 mt-0.5">End-Screen Views</p>
+                      <p className="text-xs text-gray-400">{stats.sponsorViews} views</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+
+              {/* Per-day breakdown */}
+              {analytics.byDay.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Last 30 Days</p>
+                  <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-gray-100 bg-gray-50">
+                          <th className="text-left text-xs font-semibold text-gray-500 px-4 py-2.5">Date</th>
+                          <th className="text-center text-xs font-semibold text-gray-500 px-4 py-2.5">Plays</th>
+                          <th className="text-center text-xs font-semibold text-gray-500 px-4 py-2.5">Wins</th>
+                          <th className="text-center text-xs font-semibold text-gray-500 px-4 py-2.5">Win %</th>
+                          <th className="text-center text-xs font-semibold text-gray-500 px-4 py-2.5">End-Screen Views</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {analytics.byDay.map((row, i) => (
+                          <tr key={row.date} className={i % 2 === 0 ? "" : "bg-gray-50/50"}>
+                            <td className="px-4 py-2.5 text-xs text-gray-700 font-medium">{fmt(row.date)}</td>
+                            <td className="px-4 py-2.5 text-xs text-gray-900 text-center font-semibold">{row.plays}</td>
+                            <td className="px-4 py-2.5 text-xs text-gray-500 text-center">{row.wins}</td>
+                            <td className="px-4 py-2.5 text-xs text-green-700 text-center font-medium">
+                              {row.plays > 0 ? Math.round((row.wins / row.plays) * 100) : 0}%
+                            </td>
+                            <td className="px-4 py-2.5 text-xs text-center">
+                              <span className={row.sponsorViews > 0 ? "text-blue-600 font-medium" : "text-gray-300"}>
+                                {row.sponsorViews}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-2">End-screen views = sponsor ad seen (every completed game, win or lose).</p>
+                </div>
+              )}
             </div>
           )}
         </div>
