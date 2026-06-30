@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import Logo from "@/components/Logo";
@@ -12,6 +12,14 @@ export default function LandingPage() {
   const [firstName, setFirstName] = useState("");
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [message, setMessage] = useState("");
+  const [subCount, setSubCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    fetch("/api/subscriber-count")
+      .then((r) => r.json())
+      .then((d) => setSubCount(d.rounded ?? null))
+      .catch(() => null);
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -64,19 +72,19 @@ export default function LandingPage() {
           <div className="grid lg:grid-cols-2 gap-12 lg:gap-20 items-center">
             {/* Left: copy + form */}
             <div>
-              <div className="inline-flex items-center gap-2 bg-green-50 text-green-700 text-xs font-bold px-3 py-1.5 rounded-full mb-6 border border-green-100 uppercase tracking-widest">
+              <div className="inline-flex items-center gap-2 bg-green-50 text-green-700 text-xs font-bold px-3 py-1.5 rounded-full mb-6 border border-green-100">
                 <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block animate-pulse" />
-                Free · Daily · Local
+                Join {subCount !== null ? `${subCount.toLocaleString()}+` : "hundreds of"} Decatur neighbors
               </div>
 
               <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-gray-900 leading-[1.08] tracking-tight mb-5 sm:mb-6">
-                The stories<br />
-                that matter<br />
-                <span className="text-green-700">in Decatur.</span>
+                If it&apos;s happening<br />
+                in Decatur,<br />
+                <span className="text-green-700">you&apos;ll hear it here first.</span>
               </h1>
 
               <p className="text-base sm:text-lg text-gray-500 leading-relaxed mb-8 sm:mb-10 max-w-md">
-                Every morning, The Gist Decatur curates the most important local news, events, and conversations in a quick read you&apos;ll actually finish.
+                Join hundreds of neighbors who start their morning with The Gist Decatur, the one email that tells you what actually matters in Decatur today.
               </p>
 
               {status === "success" ? (
