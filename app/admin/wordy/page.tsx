@@ -6,6 +6,7 @@ import UrlInput from "@/components/UrlInput";
 interface WordEntry { id: string; date: string; word: string; puzzleNum: number; }
 interface Booking { id: string; date: string; status: string; isPaid: boolean; adminNotes: string | null; headline: string; body: string; ctaUrl: string; ctaLabel: string; imageUrl: string | null; presentingBlurb: string | null; sponsorId: string; sponsor: { businessName: string; contactName: string; email: string }; }
 interface SponsorProfile { id: string; businessName: string; }
+interface Spotlight { sponsorId: string; businessName: string; logoUrl: string | null; description: string; ctaLabel: string; ctaUrl: string; status: string; }
 
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
@@ -31,6 +32,7 @@ export default function WordyAdminPage() {
   // --- Bookings tab ---
   const [bookings, setBookings]   = useState<Booking[]>([]);
   const [sponsors, setSponsors]   = useState<SponsorProfile[]>([]);
+  const [spotlightMap, setSpotlightMap] = useState<Map<string, Spotlight>>(new Map());
   const [editBooking, setEditBooking] = useState<Partial<Booking> & { date?: string } | null>(null);
   const [bookSaving, setBookSaving] = useState(false);
   const [bookError, setBookError]   = useState("");
@@ -50,7 +52,17 @@ export default function WordyAdminPage() {
   useEffect(() => { loadWords(); }, [loadWords]);
   useEffect(() => {
     loadBookings();
-    fetch("/api/admin/sponsors/profiles").then(r => r.json()).then(d => setSponsors((d.profiles || []).filter((p: { active: boolean }) => p.active)));
+    fetch("/api/admin/sponsors")
+      .then(r => r.json())
+      .then(d => {
+        setSponsors((d.profiles || []).filter((p: { active: boolean }) => p.active));
+        // Build a map of sponsorId → their best approved spotlight for auto-fill
+        const map = new Map<string, Spotlight>();
+        for (const s of (d.spotlights || []) as Spotlight[]) {
+          if (s.status === "approved" && !map.has(s.sponsorId)) map.set(s.sponsorId, s);
+        }
+        setSpotlightMap(map);
+      });
   }, [loadBookings]);
 
   // Calendar helpers
@@ -321,11 +333,32 @@ export default function WordyAdminPage() {
 
               <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-1">Sponsor</label>
-                <select value={editBooking.sponsorId || ""} onChange={e => setEditBooking(b => ({ ...b!, sponsorId: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500">
+                <select
+                  value={editBooking.sponsorId || ""}
+                  onChange={e => {
+                    const id = e.target.value;
+                    const spotlight = spotlightMap.get(id);
+                    const profile = sponsors.find(s => s.id === id);
+                    setEditBooking(b => ({
+                      ...b!,
+                      sponsorId: id,
+                      // Auto-fill from their Community Partners listing if not already filled
+                      headline: b?.headline || (profile ? `Visit ${profile.businessName}` : ""),
+                      body: b?.body || spotlight?.description || "",
+                      ctaUrl: b?.ctaUrl || spotlight?.ctaUrl || "",
+                      ctaLabel: b?.ctaLabel || spotlight?.ctaLabel || "Learn More",
+                      imageUrl: b?.imageUrl || spotlight?.logoUrl || "",
+                      presentingBlurb: b?.presentingBlurb || (profile ? `Today's Decatur Wordy is brought to you by ${profile.businessName}.` : ""),
+                    }));
+                  }}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                >
                   <option value="">Select a sponsor…</option>
                   {sponsors.map(s => <option key={s.id} value={s.id}>{s.businessName}</option>)}
                 </select>
+                {editBooking.sponsorId && spotlightMap.has(editBooking.sponsorId) && (
+                  <p className="text-xs text-green-600 mt-1">✓ Auto-filled from their Community Partners listing</p>
+                )}
               </div>
 
               <div>
