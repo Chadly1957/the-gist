@@ -254,6 +254,7 @@ function PortalContent() {
   const [bSuccess, setBSuccess] = useState(false);
   const [bPartialErrors, setBPartialErrors] = useState<{ date: string; error: string }[]>([]);
   const [bShowPreview, setBShowPreview] = useState(false);
+  const [bAutoFilled, setBAutoFilled] = useState(false);
   const bFileRef = useRef<HTMLInputElement>(null);
 
   // Event form
@@ -509,7 +510,25 @@ function PortalContent() {
                 </div>
               </button>
               <button
-                onClick={() => { setView("booking"); setBSuccess(false); setBError(""); }}
+                onClick={() => {
+                  const approved = profile?.spotlights.find(s => s.status === "approved");
+                  if (approved) {
+                    setBForm({
+                      headline: `Visit ${approved.businessName}`,
+                      body: approved.description,
+                      ctaUrl: approved.ctaUrl,
+                      ctaLabel: approved.ctaLabel || "Learn More",
+                      imageUrl: approved.logoUrl || "",
+                      presentingBlurb: "",
+                    });
+                    setBAutoFilled(true);
+                  } else {
+                    setBAutoFilled(false);
+                  }
+                  setView("booking");
+                  setBSuccess(false);
+                  setBError("");
+                }}
                 className="flex items-center gap-3 p-4 bg-white rounded-xl border border-gray-200 hover:border-green-400 hover:shadow-sm transition-all text-left"
               >
                 <div className="w-9 h-9 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
@@ -703,7 +722,11 @@ function PortalContent() {
         {view === "booking" && (
           <div>
             <h1 className="text-2xl font-bold text-gray-900 mb-1">Book an Ad Date</h1>
-            <p className="text-sm text-gray-500 mb-6">Choose your ad type, pick a date, and fill in your ad content. We&apos;ll review and confirm within 1-2 business days. Payment is collected separately.</p>
+            <p className="text-sm text-gray-500 mb-1">Choose your ad type, pick a date, and fill in your ad content. We&apos;ll review and confirm within 1-2 business days. Payment is collected separately.</p>
+            {bAutoFilled && (
+              <p className="text-xs text-green-600 mb-5">✓ Pre-filled from your Community Partners listing — edit as needed.</p>
+            )}
+            {!bAutoFilled && <div className="mb-5" />}
 
             {bSuccess ? (
               <div className="bg-green-50 border border-green-100 rounded-xl p-6 text-center">
@@ -718,7 +741,7 @@ function PortalContent() {
                   </div>
                 )}
                 <div className="flex gap-3 justify-center mt-4">
-                  <button onClick={() => { setBSuccess(false); setBPartialErrors([]); setBForm({ headline: "", body: "", ctaUrl: "", ctaLabel: "Learn More", imageUrl: "", presentingBlurb: "" }); setBDates([]); }}
+                  <button onClick={() => { setBSuccess(false); setBPartialErrors([]); setBForm({ headline: "", body: "", ctaUrl: "", ctaLabel: "Learn More", imageUrl: "", presentingBlurb: "" }); setBDates([]); setBAutoFilled(false); }}
                     className="text-sm text-green-700 underline">Book another date</button>
                   <button onClick={() => { setBSuccess(false); setView("overview"); }} className="text-sm text-gray-500 underline">Back to portal</button>
                 </div>
