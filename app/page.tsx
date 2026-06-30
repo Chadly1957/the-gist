@@ -56,6 +56,9 @@ export default function LandingPage() {
             <Logo className="h-10 sm:h-14 w-auto" />
           </div>
           <nav className="flex items-center gap-6">
+            <Link href="/wordy" className="text-sm font-semibold text-gray-700 hover:text-gray-900 transition-colors">
+              Wordy
+            </Link>
             <Link href="/sponsor" className="text-sm font-semibold text-green-700 hover:text-green-800 transition-colors">
               Advertise
             </Link>
@@ -311,6 +314,7 @@ export default function LandingPage() {
             <Logo className="h-8 sm:h-10 w-auto" />
           </div>
           <div className="flex items-center gap-6 text-xs text-gray-400">
+            <Link href="/wordy" className="hover:text-gray-600 transition-colors">Wordy</Link>
             <Link href="/sponsor" className="hover:text-gray-600 transition-colors">Advertise</Link>
             <Link href="/unsubscribe" className="hover:text-gray-600 transition-colors">Unsubscribe</Link>
             <span>&copy; {new Date().getFullYear()} The Gist Decatur</span>
