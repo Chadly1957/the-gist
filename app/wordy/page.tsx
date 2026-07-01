@@ -66,14 +66,15 @@ function WordyGame() {
     });
   }
 
-  function finishGame(newPhase: "won" | "lost", revealedAnswer: string, finalGuesses: string[], finalResults: LetterState[][], m: GameMeta) {
+  async function finishGame(newPhase: "won" | "lost", revealedAnswer: string, finalGuesses: string[], finalResults: LetterState[][], m: GameMeta) {
     setPhase(newPhase);
     setAnswer(revealedAnswer);
-    fetch(`/api/wordy/sponsor?date=${m.date}`).then(r => r.json()).then(d => { if (d.sponsor) setSponsor(d.sponsor); }).catch(() => {});
+    const sponsorData = await fetch(`/api/wordy/sponsor?date=${m.date}`).then(r => r.json()).catch(() => ({}));
+    if (sponsorData.sponsor) setSponsor(sponsorData.sponsor);
     fetch("/api/wordy/complete", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ date: m.date, won: newPhase === "won", guesses: finalGuesses.length, maxGuesses: m.maxGuesses, wordLength: m.wordLength, recipientId }),
+      body: JSON.stringify({ date: m.date, won: newPhase === "won", guesses: finalGuesses.length, maxGuesses: m.maxGuesses, wordLength: m.wordLength, recipientId, sponsorViewed: !!sponsorData.sponsor }),
     }).catch(() => {});
     const lsKey = `decatur_wordy_${m.date}`;
     localStorage.setItem(lsKey, JSON.stringify({ guesses: finalGuesses, results: finalResults, phase: newPhase, answer: revealedAnswer }));
@@ -147,7 +148,7 @@ function WordyGame() {
       fetch("/api/wordy/complete", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ date: meta.date, won: false, guesses: newGuesses.length, maxGuesses: meta.maxGuesses, wordLength: meta.wordLength, recipientId }),
+        body: JSON.stringify({ date: meta.date, won: false, guesses: newGuesses.length, maxGuesses: meta.maxGuesses, wordLength: meta.wordLength, recipientId, sponsorViewed: !!sponsorData.sponsor }),
       }).catch(() => {});
       localStorage.setItem(`decatur_wordy_${meta.date}`, JSON.stringify({ guesses: newGuesses, results: newResults, phase: "lost", answer: finalAnswer }));
     } else {
