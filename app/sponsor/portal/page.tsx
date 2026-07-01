@@ -257,6 +257,9 @@ function PortalContent() {
   const [bAutoFilled, setBAutoFilled] = useState(false);
   const bFileRef = useRef<HTMLInputElement>(null);
 
+  // Callout bubble on "Book Ad Date" — shown after listing creation
+  const [showBookingCallout, setShowBookingCallout] = useState(false);
+
   // Event form
   const [eForm, setEForm] = useState({ title: "", description: "", eventDate: "", startTime: "", endTime: "", location: "", url: "", cost: "" });
   const [eSubmitting, setESubmitting] = useState(false);
@@ -281,7 +284,12 @@ function PortalContent() {
       })
       .catch(() => setError("Failed to load. Please try again."))
       .finally(() => setLoading(false));
-  }, [token]);
+
+    // Show callout if redirected here right after listing creation
+    if (searchParams.get("callout") === "booking") {
+      setShowBookingCallout(true);
+    }
+  }, [token, searchParams]);
 
   async function handleImageUpload(
     file: File,
@@ -436,7 +444,7 @@ function PortalContent() {
       <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         {/* Navigation */}
         {view !== "overview" && (
-          <button onClick={() => { setView("overview"); setSSuccess(false); setBSuccess(false); setEditingSpotlight(null); }} className="text-sm text-green-700 hover:underline mb-6 inline-block">
+          <button onClick={() => { if (sSuccess) setShowBookingCallout(true); setView("overview"); setSSuccess(false); setBSuccess(false); setEditingSpotlight(null); }} className="text-sm text-green-700 hover:underline mb-6 inline-block">
             ← Back to overview
           </button>
         )}
@@ -525,12 +533,21 @@ function PortalContent() {
                   } else {
                     setBAutoFilled(false);
                   }
+                  setShowBookingCallout(false);
                   setView("booking");
                   setBSuccess(false);
                   setBError("");
                 }}
-                className="flex items-center gap-3 p-4 bg-white rounded-xl border border-gray-200 hover:border-green-400 hover:shadow-sm transition-all text-left"
+                className="flex items-center gap-3 p-4 bg-white rounded-xl border border-gray-200 hover:border-green-400 hover:shadow-sm transition-all text-left relative"
               >
+                {showBookingCallout && (
+                  <div className="absolute -top-12 left-0 right-0 flex justify-center pointer-events-none z-10">
+                    <div className="bg-green-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg shadow-lg whitespace-nowrap animate-bounce">
+                      Schedule an ad now for maximum engagement!
+                      <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-green-700" />
+                    </div>
+                  </div>
+                )}
                 <div className="w-9 h-9 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
                   <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />

@@ -151,7 +151,7 @@ export default async function SponsorPage() {
                 ))}
               </ul>
               <Link
-                href="/sponsor/apply"
+                href={`/sponsor/apply?tier=${tier.key}`}
                 className={`block text-center py-2.5 rounded-xl text-sm font-semibold transition-colors ${
                   tier.highlight
                     ? "bg-green-700 text-white hover:bg-green-800"
