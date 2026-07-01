@@ -43,6 +43,7 @@ interface SponsorEntry {
   label: string;
   impressions: number;
   clicks: number;
+  issues: number;
 }
 
 interface SponsorBreakdown {
@@ -183,6 +184,7 @@ export default function AnalyticsPage() {
                   <tr className="bg-gray-50 border-b border-gray-100">
                     <th className="text-left px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wide">Sponsor</th>
                     <th className="text-left px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wide">Type</th>
+                    <th className="text-right px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wide">Issues</th>
                     <th className="text-right px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wide">Impressions</th>
                     <th className="text-right px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wide">Clicks</th>
                     <th className="text-right px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wide">CTR</th>
@@ -212,6 +214,7 @@ export default function AnalyticsPage() {
                             {SPONSOR_TYPE_LABELS[s.type] ?? s.type}
                           </span>
                         </td>
+                        <td className="px-5 py-3 text-right text-gray-700 font-medium">{s.issues > 0 ? s.issues : "—"}</td>
                         <td className="px-5 py-3 text-right text-gray-500">{s.impressions.toLocaleString()}</td>
                         <td className="px-5 py-3 text-right font-semibold text-gray-900">{s.clicks.toLocaleString()}</td>
                         <td className="px-5 py-3 text-right font-semibold text-green-700">{pct(ctr)}</td>
