@@ -169,7 +169,7 @@ export default function AnalyticsPage() {
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
           <div className="px-5 py-4 border-b border-gray-100">
             <p className="text-sm font-semibold text-gray-800">Top Performing Sponsors</p>
-            <p className="text-xs text-gray-400 mt-0.5">All-time, ranked by clicks</p>
+            <p className="text-xs text-gray-400 mt-0.5">All-time · ranked by clicks</p>
           </div>
           {loading || !sponsorBreakdown ? (
             <div className="py-10 text-center">
