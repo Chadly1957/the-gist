@@ -56,6 +56,7 @@ const STATUS_LABELS: Record<string, { label: string; color: string }> = {
   approved: { label: "Approved", color: "bg-green-50 text-green-700" },
   expired: { label: "Expired", color: "bg-gray-100 text-gray-500" },
   pending_review: { label: "Pending Review", color: "bg-yellow-50 text-yellow-700" },
+  pending_payment: { label: "Awaiting Payment", color: "bg-orange-50 text-orange-700" },
   rejected: { label: "Not Approved", color: "bg-red-50 text-red-600" },
   completed: { label: "Completed", color: "bg-gray-100 text-gray-500" },
 };
@@ -268,6 +269,8 @@ function PortalContent() {
 
   // Callout bubble on "Book Ad Date" — shown after listing creation
   const [showBookingCallout, setShowBookingCallout] = useState(false);
+  // Stripe return banners
+  const [bookingBanner, setBookingBanner] = useState<"success" | "cancelled" | null>(null);
 
   // Event form
   const [eForm, setEForm] = useState({ title: "", description: "", eventDate: "", startTime: "", endTime: "", location: "", url: "", cost: "" });
@@ -297,6 +300,11 @@ function PortalContent() {
     // Show callout if redirected here right after listing creation
     if (searchParams.get("callout") === "booking") {
       setShowBookingCallout(true);
+    }
+    // Stripe return
+    const bookingParam = searchParams.get("booking");
+    if (bookingParam === "success" || bookingParam === "cancelled") {
+      setBookingBanner(bookingParam);
     }
   }, [token, searchParams]);
 
@@ -371,36 +379,24 @@ function PortalContent() {
   async function submitBooking(e: React.FormEvent) {
     e.preventDefault();
     if (bDates.length === 0) { setBError("Select at least one date."); return; }
-    setBSubmitting(true); setBError(""); setBPartialErrors([]);
-
-    const succeeded: Booking[] = [];
-    const failed: { date: string; error: string }[] = [];
-
-    for (const date of bDates) {
-      try {
-        const res = await fetch("/api/sponsor/booking", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ token, type: bType, date, ...bForm }),
-        });
-        const data = await res.json();
-        if (res.ok) succeeded.push(data.booking);
-        else failed.push({ date, error: data.error || "Submission failed." });
-      } catch (_e) {
-        failed.push({ date, error: "Connection error." });
+    setBSubmitting(true); setBError("");
+    try {
+      const res = await fetch("/api/sponsor/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token, bookingType: bType, dates: bDates, ...bForm }),
+      });
+      const data = await res.json();
+      if (res.ok && data.url) {
+        window.location.href = data.url;
+      } else {
+        setBError(data.error || "Submission failed.");
+        setBSubmitting(false);
       }
+    } catch (_e) {
+      setBError("Connection error.");
+      setBSubmitting(false);
     }
-
-    if (succeeded.length > 0) {
-      setProfile((p) => (p ? { ...p, bookings: [...p.bookings, ...succeeded] } : p));
-    }
-    if (succeeded.length > 0) {
-      setBSuccess(true);
-      setBPartialErrors(failed);
-    } else {
-      setBError(failed.map((f) => `${f.date}: ${f.error}`).join(" "));
-    }
-    setBSubmitting(false);
   }
 
   async function submitWordyBooking(e: React.FormEvent) {
@@ -408,16 +404,19 @@ function PortalContent() {
     if (!wDate) { setWError("Please select a date."); return; }
     setWSubmitting(true); setWError("");
     try {
-      const res = await fetch("/api/sponsor/wordy-booking", {
+      const res = await fetch("/api/sponsor/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, date: wDate, ...wForm }),
+        body: JSON.stringify({ token, bookingType: "wordy", dates: [wDate], ...wForm }),
       });
       const data = await res.json();
-      if (res.ok) { setWSuccess(true); }
-      else { setWError(data.error || "Submission failed."); }
-    } catch { setWError("Connection error."); }
-    finally { setWSubmitting(false); }
+      if (res.ok && data.url) {
+        window.location.href = data.url;
+      } else {
+        setWError(data.error || "Submission failed.");
+        setWSubmitting(false);
+      }
+    } catch { setWError("Connection error."); setWSubmitting(false); }
   }
 
   async function submitEvent(e: React.FormEvent) {
@@ -478,6 +477,34 @@ function PortalContent() {
         {/* OVERVIEW */}
         {view === "overview" && (
           <div className="space-y-6">
+            {bookingBanner === "success" && (
+              <div className="bg-green-50 border border-green-200 rounded-xl p-4 flex items-start gap-3">
+                <svg className="w-5 h-5 text-green-600 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <div>
+                  <p className="text-sm font-semibold text-green-800">Payment received — booking confirmed!</p>
+                  <p className="text-xs text-green-700 mt-0.5">Your ad date(s) are secured. You&apos;ll see them in the list below.</p>
+                </div>
+                <button onClick={() => setBookingBanner(null)} className="ml-auto text-green-500 hover:text-green-700">
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+              </div>
+            )}
+            {bookingBanner === "cancelled" && (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3">
+                <svg className="w-5 h-5 text-amber-600 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <div>
+                  <p className="text-sm font-semibold text-amber-800">Payment cancelled</p>
+                  <p className="text-xs text-amber-700 mt-0.5">Your booking was not saved. You can try again anytime.</p>
+                </div>
+                <button onClick={() => setBookingBanner(null)} className="ml-auto text-amber-500 hover:text-amber-700">
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+              </div>
+            )}
             <div className="flex items-start justify-between">
               <div>
                 <h1 className="text-2xl font-bold text-gray-900">Sponsor Portal</h1>
@@ -792,7 +819,7 @@ function PortalContent() {
         {view === "booking" && (
           <div>
             <h1 className="text-2xl font-bold text-gray-900 mb-1">Book an Ad Date</h1>
-            <p className="text-sm text-gray-500 mb-1">Choose your ad type, pick a date, and fill in your ad content. We&apos;ll review and confirm within 1-2 business days. Payment is collected separately.</p>
+            <p className="text-sm text-gray-500 mb-1">Choose your ad type, pick a date, and fill in your ad content. You&apos;ll pay securely at checkout — your date is confirmed instantly.</p>
             {bAutoFilled && (
               <p className="text-xs text-green-600 mb-5">✓ Pre-filled from your Community Partners listing — edit as needed.</p>
             )}
@@ -912,9 +939,13 @@ function PortalContent() {
                   )}
                 </div>
 
-                <button type="submit" disabled={bSubmitting}
+                <button type="submit" disabled={bSubmitting || bDates.length === 0}
                   className="w-full bg-green-700 hover:bg-green-800 disabled:opacity-50 text-white font-semibold py-2.5 rounded-xl text-sm transition-colors">
-                  {bSubmitting ? "Submitting…" : "Submit Booking for Review"}
+                  {bSubmitting
+                    ? "Redirecting to checkout…"
+                    : bDates.length > 1
+                    ? `Pay & Book ${bDates.length} Dates →`
+                    : "Pay & Book →"}
                 </button>
               </form>
             )}
@@ -965,7 +996,7 @@ function PortalContent() {
         {view === "wordy" && (
           <div>
             <h1 className="text-2xl font-bold text-gray-900 mb-1">Sponsor The Decatur Wordy</h1>
-            <p className="text-sm text-gray-500 mb-6">Pick your preferred date and enter your ad details. We&apos;ll confirm availability and follow up within 24 hours. Payment is collected separately.</p>
+            <p className="text-sm text-gray-500 mb-6">Pick your date and fill in your ad details. You&apos;ll pay securely at checkout — your sponsorship is confirmed instantly.</p>
 
             {wSuccess ? (
               <div className="bg-green-50 border border-green-100 rounded-xl p-6 text-center">
@@ -1029,7 +1060,7 @@ function PortalContent() {
 
                 <button type="submit" disabled={wSubmitting}
                   className="w-full bg-green-700 hover:bg-green-800 disabled:opacity-50 text-white font-semibold py-2.5 rounded-xl text-sm transition-colors">
-                  {wSubmitting ? "Submitting…" : "Submit Wordy Request"}
+                  {wSubmitting ? "Redirecting to checkout…" : "Pay & Book Wordy Sponsorship →"}
                 </button>
               </form>
             )}

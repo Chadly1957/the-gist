@@ -15,6 +15,9 @@ interface Settings {
   sponsorship_price_in_article: string;
   sponsorship_price_presenting: string;
   sponsorship_price_wordy: string;
+  stripe_price_in_article_cents: string;
+  stripe_price_presenting_cents: string;
+  stripe_price_wordy_cents: string;
 }
 
 const PROVIDERS = [
@@ -52,6 +55,9 @@ export default function SettingsPage() {
     sponsorship_price_in_article: "$15/day",
     sponsorship_price_presenting: "$25/day",
     sponsorship_price_wordy: "$20/day",
+    stripe_price_in_article_cents: "1500",
+    stripe_price_presenting_cents: "2500",
+    stripe_price_wordy_cents: "2000",
   });
   const [hasSmtp, setHasSmtp] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -398,6 +404,50 @@ export default function SettingsPage() {
                 />
               </div>
             ))}
+          </div>
+        </div>
+
+        {/* Stripe Checkout Prices */}
+        <div className="bg-white rounded-xl border border-gray-200 p-6">
+          <div className="flex items-center gap-3 mb-1">
+            <div className="w-8 h-8 rounded-lg bg-purple-50 flex items-center justify-center">
+              <svg className="w-4 h-4 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+              </svg>
+            </div>
+            <div>
+              <h2 className="text-sm font-semibold text-gray-800">Stripe Checkout Prices</h2>
+              <p className="text-xs text-gray-400">Actual amounts charged at checkout. Requires <code className="bg-gray-100 px-1 rounded">STRIPE_SECRET_KEY</code> and <code className="bg-gray-100 px-1 rounded">STRIPE_WEBHOOK_SECRET</code> env vars.</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-3 gap-4 mt-5">
+            {[
+              { key: "stripe_price_in_article_cents" as const, label: "Standard Ad" },
+              { key: "stripe_price_presenting_cents" as const, label: "Presenting Sponsor" },
+              { key: "stripe_price_wordy_cents" as const, label: "Decatur Wordy" },
+            ].map(({ key, label }) => {
+              const dollars = (parseInt(settings[key] || "0", 10) / 100).toFixed(2);
+              return (
+                <div key={key}>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    {label} <span className="text-gray-400 font-normal text-xs">(= ${dollars})</span>
+                  </label>
+                  <div className="relative">
+                    <span className="absolute inset-y-0 left-3 flex items-center text-sm text-gray-400 pointer-events-none">¢</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="1"
+                      value={settings[key]}
+                      onChange={(e) => setSettings((s) => ({ ...s, [key]: e.target.value }))}
+                      placeholder="1500"
+                      className="w-full pl-7 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                    />
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1">Enter cents (e.g. 1500 = $15.00)</p>
+                </div>
+              );
+            })}
           </div>
         </div>
 

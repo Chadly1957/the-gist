@@ -51,14 +51,20 @@ interface Profile {
 const STATUS_COLORS: Record<string, string> = {
   pending: "bg-yellow-50 text-yellow-700",
   pending_review: "bg-yellow-50 text-yellow-700",
+  pending_payment: "bg-orange-50 text-orange-700",
   approved: "bg-green-50 text-green-700",
   expired: "bg-gray-100 text-gray-500",
   rejected: "bg-red-50 text-red-600",
   completed: "bg-gray-100 text-gray-500",
 };
 
+const STATUS_LABELS: Record<string, string> = {
+  pending_review: "Pending Review",
+  pending_payment: "Awaiting Payment",
+};
+
 function StatusBadge({ status }: { status: string }) {
-  const label = status === "pending_review" ? "Pending Review" : status.charAt(0).toUpperCase() + status.slice(1);
+  const label = STATUS_LABELS[status] ?? (status.charAt(0).toUpperCase() + status.slice(1));
   return <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${STATUS_COLORS[status] || "bg-gray-100 text-gray-500"}`}>{label}</span>;
 }
 
@@ -89,7 +95,7 @@ function BookingsCalendar({
 
   const byDate = new Map<string, Booking[]>();
   for (const b of bookings) {
-    if (!["approved", "pending_review"].includes(b.status)) continue;
+    if (!["approved", "pending_review", "pending_payment"].includes(b.status)) continue;
     const existing = byDate.get(b.date) ?? [];
     existing.push(b);
     byDate.set(b.date, existing);
