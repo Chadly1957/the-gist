@@ -43,7 +43,8 @@ export async function POST(req: NextRequest) {
       location: location?.trim() || null,
       url: url?.trim() || null,
       cost: cost?.trim() || null,
-      status: "pending",
+      status: "approved",
+      approvedAt: new Date(),
       sponsorId: profile.id,
     },
   });
