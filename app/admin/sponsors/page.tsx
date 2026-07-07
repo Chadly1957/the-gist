@@ -265,6 +265,32 @@ export default function AdminSponsorsPage() {
   const [newBookingUploading, setNewBookingUploading] = useState(false);
   const [newBookingUploadError, setNewBookingUploadError] = useState<string | null>(null);
   const newBookingFileRef = useRef<HTMLInputElement>(null);
+  const [editBookingUploading, setEditBookingUploading] = useState(false);
+  const [editBookingUploadError, setEditBookingUploadError] = useState<string | null>(null);
+  const editBookingFileRef = useRef<HTMLInputElement>(null);
+
+  async function handleEditBookingImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setEditBookingUploading(true);
+    setEditBookingUploadError(null);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/admin/upload", { method: "POST", body: fd });
+      const data = await res.json();
+      if (!res.ok) {
+        setEditBookingUploadError(data.error || "Upload failed.");
+      } else {
+        setBookingForm((f) => ({ ...f, imageUrl: data.url }));
+      }
+    } catch {
+      setEditBookingUploadError("Upload failed. Check your connection.");
+    } finally {
+      setEditBookingUploading(false);
+      if (editBookingFileRef.current) editBookingFileRef.current.value = "";
+    }
+  }
 
   async function handleNewBookingImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -698,9 +724,29 @@ export default function AdminSponsorsPage() {
                           </div>
                           <div>
                             <label className="block text-xs font-semibold text-gray-600 mb-1">Ad Image URL</label>
-                            <UrlInput value={bookingForm.imageUrl}
-                              onChange={(val) => setBookingForm((f) => ({ ...f, imageUrl: val }))}
-                              className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+                            <div className="flex gap-2">
+                              <UrlInput value={bookingForm.imageUrl}
+                                onChange={(val) => setBookingForm((f) => ({ ...f, imageUrl: val }))}
+                                className="flex-1 px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+                              <input
+                                ref={editBookingFileRef}
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                id="edit-booking-image-upload"
+                                onChange={handleEditBookingImageUpload}
+                              />
+                              <label
+                                htmlFor="edit-booking-image-upload"
+                                className={`cursor-pointer flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors whitespace-nowrap ${editBookingUploading ? "opacity-60 pointer-events-none" : ""}`}
+                              >
+                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                                </svg>
+                                {editBookingUploading ? "Uploading…" : "Upload"}
+                              </label>
+                            </div>
+                            {editBookingUploadError && <p className="text-xs text-red-500 mt-1">{editBookingUploadError}</p>}
                           </div>
                           <div>
                             <label className="block text-xs font-semibold text-gray-600 mb-1">Headline</label>
