@@ -2,6 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getAdminSession } from "@/lib/auth";
 
+function hostname(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return "";
+  }
+}
+
 export async function GET() {
   const session = await getAdminSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -14,31 +22,23 @@ export async function GET() {
     }),
   ]);
 
-  // Count clicks per article URL
-  const clicksByUrl = new Map<string, number>();
-  for (const c of articleClicks) {
-    clicksByUrl.set(c.url, (clicksByUrl.get(c.url) ?? 0) + 1);
+  // Match click URLs to sources by hostname — avoids depending on the Article
+  // table, which can be cleared while LinkClick records persist.
+  const sourceByHost = new Map<string, string>(); // hostname → source.id
+  for (const s of sources) {
+    const host = hostname(s.url);
+    if (host) sourceByHost.set(host, s.id);
   }
 
-  // Map article URL → sourceName via Article table
-  const clickedUrls = Array.from(clicksByUrl.keys());
-  const articles = clickedUrls.length > 0
-    ? await prisma.article.findMany({
-        where: { articleUrl: { in: clickedUrls } },
-        select: { articleUrl: true, sourceName: true },
-      })
-    : [];
-
-  // Aggregate total clicks per sourceName
-  const clicksBySource = new Map<string, number>();
-  for (const a of articles) {
-    const count = clicksByUrl.get(a.articleUrl) ?? 0;
-    clicksBySource.set(a.sourceName, (clicksBySource.get(a.sourceName) ?? 0) + count);
+  const clicksBySourceId = new Map<string, number>();
+  for (const c of articleClicks) {
+    const sourceId = sourceByHost.get(hostname(c.url));
+    if (sourceId) clicksBySourceId.set(sourceId, (clicksBySourceId.get(sourceId) ?? 0) + 1);
   }
 
   const sourcesWithClicks = sources.map((s) => ({
     ...s,
-    clickCount: clicksBySource.get(s.name) ?? 0,
+    clickCount: clicksBySourceId.get(s.id) ?? 0,
   }));
 
   return NextResponse.json({ sources: sourcesWithClicks });
