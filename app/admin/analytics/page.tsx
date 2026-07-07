@@ -9,6 +9,12 @@ interface SponsoredClick {
   impressions: number;
 }
 
+interface ArticleClick {
+  label: string;
+  url: string;
+  clicks: number;
+}
+
 interface SendStats {
   id: string;
   subject: string;
@@ -23,6 +29,7 @@ interface SendStats {
   totalClicks: number;
   unsubscribes: number;
   sponsoredClicks: SponsoredClick[];
+  articleClicks: ArticleClick[];
 }
 
 interface Summary {
@@ -261,12 +268,14 @@ export default function AnalyticsPage() {
             )}
             {sends.map((send) => {
               const sponsorTotal = send.sponsoredClicks.reduce((sum, s) => sum + s.clicks, 0);
+              const articleTotal = (send.articleClicks ?? []).reduce((sum, a) => sum + a.clicks, 0);
+              const isExpandable = sponsorTotal > 0 || articleTotal > 0;
               const isExpanded = expanded === send.id;
               return (
                 <Fragment key={send.id}>
                   <tr
-                    className={`border-b border-gray-100 last:border-0 ${sponsorTotal > 0 ? "cursor-pointer hover:bg-gray-50" : ""}`}
-                    onClick={() => sponsorTotal > 0 && setExpanded(isExpanded ? null : send.id)}
+                    className={`border-b border-gray-100 last:border-0 ${isExpandable ? "cursor-pointer hover:bg-gray-50" : ""}`}
+                    onClick={() => isExpandable && setExpanded(isExpanded ? null : send.id)}
                   >
                     <td className="px-5 py-3 font-medium text-gray-800">{send.subject}</td>
                     <td className="px-5 py-3 text-gray-500">
@@ -286,7 +295,7 @@ export default function AnalyticsPage() {
                     </td>
                     <td className="px-5 py-3 text-gray-500">{send.tracked ? send.unsubscribes : "—"}</td>
                     <td className="px-5 py-3 text-gray-500">
-                      {sponsorTotal > 0 ? (
+                      {isExpandable ? (
                         <span className="inline-flex items-center gap-1.5">
                           {sponsorTotal}
                           <svg
@@ -306,32 +315,63 @@ export default function AnalyticsPage() {
                   </tr>
                   {isExpanded && (
                     <tr className="bg-gray-50 border-b border-gray-100">
-                      <td colSpan={7} className="px-5 py-3">
-                        <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
-                          Sponsor click breakdown
-                        </div>
-                        <div className="space-y-1.5">
-                          {send.sponsoredClicks.map((s, i) => {
-                            const ctr = s.impressions > 0 ? s.clicks / s.impressions : 0;
-                            return (
-                              <div key={i} className="flex items-center justify-between text-sm gap-4">
-                                <span className="text-gray-700 min-w-0">
-                                  {s.label}{" "}
-                                  <span className="text-gray-400 text-xs">
-                                    ({SPONSOR_TYPE_LABELS[s.type] || s.type})
+                      <td colSpan={7} className="px-5 py-4 space-y-4">
+                        {/* Article clicks */}
+                        {(send.articleClicks ?? []).length > 0 && (
+                          <div>
+                            <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
+                              Article clicks
+                            </div>
+                            <div className="space-y-1.5">
+                              {(send.articleClicks ?? []).map((a, i) => (
+                                <div key={i} className="flex items-center justify-between text-sm gap-4">
+                                  <a
+                                    href={a.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-gray-700 min-w-0 truncate hover:text-green-700 hover:underline"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    {a.label}
+                                  </a>
+                                  <span className="font-semibold text-gray-900 shrink-0">
+                                    {a.clicks} {a.clicks === 1 ? "click" : "clicks"}
                                   </span>
-                                </span>
-                                <span className="text-gray-500 shrink-0 text-xs">
-                                  {s.impressions.toLocaleString()} impressions
-                                  {" · "}
-                                  <span className="font-semibold text-gray-900">{s.clicks} clicks</span>
-                                  {" · "}
-                                  <span className="text-green-700">{pct(ctr)} CTR</span>
-                                </span>
-                              </div>
-                            );
-                          })}
-                        </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {/* Sponsor clicks */}
+                        {send.sponsoredClicks.length > 0 && (
+                          <div>
+                            <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
+                              Sponsor click breakdown
+                            </div>
+                            <div className="space-y-1.5">
+                              {send.sponsoredClicks.map((s, i) => {
+                                const ctr = s.impressions > 0 ? s.clicks / s.impressions : 0;
+                                return (
+                                  <div key={i} className="flex items-center justify-between text-sm gap-4">
+                                    <span className="text-gray-700 min-w-0">
+                                      {s.label}{" "}
+                                      <span className="text-gray-400 text-xs">
+                                        ({SPONSOR_TYPE_LABELS[s.type] || s.type})
+                                      </span>
+                                    </span>
+                                    <span className="text-gray-500 shrink-0 text-xs">
+                                      {s.impressions.toLocaleString()} impressions
+                                      {" · "}
+                                      <span className="font-semibold text-gray-900">{s.clicks} clicks</span>
+                                      {" · "}
+                                      <span className="text-green-700">{pct(ctr)} CTR</span>
+                                    </span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
                       </td>
                     </tr>
                   )}

@@ -21,7 +21,7 @@ export async function GET() {
 
   const sendDates = sends.map((s) => s.sentAt.toISOString().split("T")[0]);
 
-  const [recipients, sponsorClicks, spotlightAppearances, adBookings] = await Promise.all([
+  const [recipients, sponsorClicks, articleClicks, spotlightAppearances, adBookings] = await Promise.all([
     prisma.newsletterRecipient.findMany({
       where: { newsletterSendId: { in: sendIds } },
       select: { newsletterSendId: true, openCount: true, clickCount: true, unsubscribedAt: true },
@@ -34,6 +34,17 @@ export async function GET() {
       select: {
         linkType: true,
         label: true,
+        newsletterRecipient: { select: { newsletterSendId: true } },
+      },
+    }),
+    prisma.linkClick.findMany({
+      where: {
+        linkType: "article",
+        newsletterRecipient: { newsletterSendId: { in: sendIds } },
+      },
+      select: {
+        label: true,
+        url: true,
         newsletterRecipient: { select: { newsletterSendId: true } },
       },
     }),
@@ -64,7 +75,7 @@ export async function GET() {
     const totalClicks = recips.reduce((sum, r) => sum + r.clickCount, 0);
     const unsubscribes = recips.filter((r) => r.unsubscribedAt).length;
 
-    // Clicks map
+    // Sponsor clicks map
     const sponsorMap = new Map<string, { type: string; label: string; clicks: number }>();
     for (const c of sponsorClicks) {
       if (c.newsletterRecipient.newsletterSendId !== send.id) continue;
@@ -75,6 +86,18 @@ export async function GET() {
     }
 
     const sponsoredClicks = Array.from(sponsorMap.values()).sort((a, b) => b.clicks - a.clicks);
+
+    // Article clicks map
+    const articleMap = new Map<string, { label: string; url: string; clicks: number }>();
+    for (const c of articleClicks) {
+      if (c.newsletterRecipient.newsletterSendId !== send.id) continue;
+      const key = c.url || c.label || "Unknown";
+      const existing = articleMap.get(key);
+      if (existing) existing.clicks++;
+      else articleMap.set(key, { label: c.label || c.url || "Unknown", url: c.url || "", clicks: 1 });
+    }
+
+    const articleClickList = Array.from(articleMap.values()).sort((a, b) => b.clicks - a.clicks);
 
     return {
       id: send.id,
@@ -91,6 +114,7 @@ export async function GET() {
       unsubscribes,
       // impressions = uniqueOpens; every opener saw all sponsors in that send
       sponsoredClicks: sponsoredClicks.map((s) => ({ ...s, impressions: uniqueOpens })),
+      articleClicks: articleClickList,
       spotlightNames: spotlightsBySend.get(send.id) ?? [],
     };
   });
