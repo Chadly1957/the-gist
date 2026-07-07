@@ -74,12 +74,14 @@ function BookingsCalendar({
   month,
   onPrev,
   onNext,
+  onDateClick,
 }: {
   bookings: Booking[];
   year: number;
   month: number;
   onPrev: () => void;
   onNext: () => void;
+  onDateClick?: (date: string) => void;
 }) {
   const todayStr = new Date().toISOString().split("T")[0];
   const firstDay = new Date(year, month, 1);
@@ -124,10 +126,13 @@ function BookingsCalendar({
           const dayBookings = byDate.get(dateStr) ?? [];
           const isToday = dateStr === todayStr;
 
+          const clickable = !!onDateClick;
+
           return (
             <div
               key={i}
-              className={`min-h-[60px] p-1 rounded-lg ${isToday ? "ring-2 ring-green-500 ring-inset" : ""} ${dayBookings.length > 0 ? "bg-gray-50" : ""}`}
+              onClick={() => clickable && onDateClick!(dateStr)}
+              className={`min-h-[60px] p-1 rounded-lg ${isToday ? "ring-2 ring-green-500 ring-inset" : ""} ${dayBookings.length > 0 ? "bg-gray-50" : ""} ${clickable ? "cursor-pointer hover:bg-green-50 transition-colors" : ""}`}
             >
               <div className={`text-[11px] font-semibold mb-0.5 w-5 h-5 flex items-center justify-center rounded-full ${isToday ? "bg-green-600 text-white" : "text-gray-500"}`}>
                 {day}
@@ -239,6 +244,58 @@ export default function AdminSponsorsPage() {
       setEmailResult({ ok: false, message: "Network error." });
     }
     setEmailSending(false);
+  }
+
+  // New booking modal (triggered by calendar date click)
+  const [newBookingDate, setNewBookingDate] = useState<string | null>(null);
+  const [newBookingForm, setNewBookingForm] = useState({
+    profileId: "",
+    type: "in_article",
+    date: "",
+    headline: "",
+    body: "",
+    ctaUrl: "",
+    ctaLabel: "",
+    imageUrl: "",
+    presentingBlurb: "",
+  });
+  const [newBookingAutoFilled, setNewBookingAutoFilled] = useState(false);
+  const [newBookingSubmitting, setNewBookingSubmitting] = useState(false);
+  const [newBookingError, setNewBookingError] = useState<string | null>(null);
+
+  function openNewBookingModal(date: string) {
+    setNewBookingDate(date);
+    setNewBookingForm({ profileId: "", type: "in_article", date, headline: "", body: "", ctaUrl: "", ctaLabel: "", imageUrl: "", presentingBlurb: "" });
+    setNewBookingAutoFilled(false);
+    setNewBookingError(null);
+  }
+
+  function closeNewBookingModal() {
+    setNewBookingDate(null);
+    setNewBookingError(null);
+  }
+
+  async function submitNewBooking() {
+    setNewBookingSubmitting(true);
+    setNewBookingError(null);
+    try {
+      const res = await fetch("/api/admin/sponsors/bookings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newBookingForm),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setNewBookingError(data.error || "Failed to create booking.");
+        setNewBookingSubmitting(false);
+        return;
+      }
+      closeNewBookingModal();
+      load();
+    } catch {
+      setNewBookingError("Network error.");
+    }
+    setNewBookingSubmitting(false);
   }
 
   // Edit forms
@@ -538,6 +595,7 @@ export default function AdminSponsorsPage() {
                 month={calMonth}
                 onPrev={calPrev}
                 onNext={calNext}
+                onDateClick={openNewBookingModal}
               />
               {bookings.length === 0 && <p className="text-sm text-gray-400">No ad bookings yet.</p>}
               {bookings.map((b) => (
@@ -755,6 +813,180 @@ export default function AdminSponsorsPage() {
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+
+          {/* NEW BOOKING MODAL */}
+          {newBookingDate !== null && (
+            <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={(e) => { if (e.target === e.currentTarget) closeNewBookingModal(); }}>
+              <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <h2 className="text-base font-bold text-gray-900">New Booking</h2>
+                    <p className="text-xs text-gray-500 mt-0.5">{newBookingForm.date}</p>
+                  </div>
+                  <button onClick={closeNewBookingModal} className="text-gray-400 hover:text-gray-600 text-lg leading-none shrink-0">✕</button>
+                </div>
+
+                {/* Sponsor selector */}
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Select a Sponsor</label>
+                  <select
+                    value={newBookingForm.profileId}
+                    onChange={(e) => {
+                      const pid = e.target.value;
+                      setNewBookingForm((f) => ({ ...f, profileId: pid, headline: "", body: "", ctaUrl: "", ctaLabel: "", imageUrl: "" }));
+                      setNewBookingAutoFilled(false);
+                    }}
+                    className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                  >
+                    <option value="">— choose a sponsor —</option>
+                    {profiles.map((p) => (
+                      <option key={p.id} value={p.id}>{p.businessName} ({p.contactName})</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Autofill from Community Partners listing */}
+                {(() => {
+                  if (!newBookingForm.profileId) return null;
+                  const profile = profiles.find((p) => p.id === newBookingForm.profileId);
+                  if (!profile) return null;
+                  const listing = spotlights.find((s) => s.sponsor.email === profile.email && s.status === "approved");
+                  if (!listing) return null;
+                  return (
+                    <div className="flex items-center justify-between bg-green-50 border border-green-100 rounded-lg px-3 py-2">
+                      <p className="text-xs text-green-700">Community Partners listing available</p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setNewBookingForm((f) => ({
+                            ...f,
+                            headline: `Visit ${listing.businessName}`,
+                            body: listing.description,
+                            ctaUrl: listing.ctaUrl,
+                            ctaLabel: listing.ctaLabel,
+                            imageUrl: listing.logoUrl || "",
+                          }));
+                          setNewBookingAutoFilled(true);
+                        }}
+                        className="text-xs font-semibold text-green-700 hover:text-green-800"
+                      >
+                        Auto-fill from listing
+                      </button>
+                    </div>
+                  );
+                })()}
+                {newBookingAutoFilled && (
+                  <p className="text-xs text-green-600">✓ Auto-filled from their Community Partners listing</p>
+                )}
+
+                {/* Ad type + date */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">Ad Type</label>
+                    <select
+                      value={newBookingForm.type}
+                      onChange={(e) => setNewBookingForm((f) => ({ ...f, type: e.target.value }))}
+                      className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                    >
+                      <option value="in_article">Standard</option>
+                      <option value="presenting">Presenting</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">Newsletter Date</label>
+                    <input
+                      type="date"
+                      value={newBookingForm.date}
+                      onChange={(e) => setNewBookingForm((f) => ({ ...f, date: e.target.value }))}
+                      className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                    />
+                  </div>
+                </div>
+
+                {/* Ad image */}
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Ad Image URL</label>
+                  <UrlInput
+                    value={newBookingForm.imageUrl}
+                    onChange={(val) => setNewBookingForm((f) => ({ ...f, imageUrl: val }))}
+                    className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                  />
+                </div>
+
+                {/* Headline */}
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Headline</label>
+                  <input
+                    type="text"
+                    value={newBookingForm.headline}
+                    onChange={(e) => setNewBookingForm((f) => ({ ...f, headline: e.target.value }))}
+                    className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                  />
+                </div>
+
+                {/* Body */}
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Body Copy</label>
+                  <textarea
+                    value={newBookingForm.body}
+                    rows={4}
+                    maxLength={400}
+                    onChange={(e) => setNewBookingForm((f) => ({ ...f, body: e.target.value }))}
+                    className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none"
+                  />
+                </div>
+
+                {/* CTA */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">CTA Label</label>
+                    <input
+                      type="text"
+                      value={newBookingForm.ctaLabel}
+                      onChange={(e) => setNewBookingForm((f) => ({ ...f, ctaLabel: e.target.value }))}
+                      className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">CTA Link</label>
+                    <UrlInput
+                      value={newBookingForm.ctaUrl}
+                      onChange={(val) => setNewBookingForm((f) => ({ ...f, ctaUrl: val }))}
+                      className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                    />
+                  </div>
+                </div>
+
+                {/* Presenting blurb */}
+                {newBookingForm.type === "presenting" && (
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">Custom Intro Blurb</label>
+                    <textarea
+                      value={newBookingForm.presentingBlurb}
+                      rows={2}
+                      onChange={(e) => setNewBookingForm((f) => ({ ...f, presentingBlurb: e.target.value }))}
+                      className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none"
+                    />
+                  </div>
+                )}
+
+                {newBookingError && <p className="text-sm text-red-600">{newBookingError}</p>}
+
+                <div className="flex gap-2">
+                  <button
+                    onClick={submitNewBooking}
+                    disabled={newBookingSubmitting || !newBookingForm.profileId || !newBookingForm.date || !newBookingForm.headline || !newBookingForm.body || !newBookingForm.ctaUrl || !newBookingForm.ctaLabel}
+                    className="px-4 py-2 bg-green-700 text-white rounded-lg text-sm font-semibold hover:bg-green-800 disabled:opacity-50"
+                  >
+                    {newBookingSubmitting ? "Creating…" : "Create Booking"}
+                  </button>
+                  <button onClick={closeNewBookingModal} className="px-4 py-2 border border-gray-200 text-gray-600 rounded-lg text-sm font-semibold hover:bg-gray-50">
+                    Cancel
+                  </button>
+                </div>
+              </div>
             </div>
           )}
 
