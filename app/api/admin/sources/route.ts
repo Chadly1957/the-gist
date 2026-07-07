@@ -6,10 +6,42 @@ export async function GET() {
   const session = await getAdminSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const sources = await prisma.source.findMany({
-    orderBy: { createdAt: "desc" },
-  });
-  return NextResponse.json({ sources });
+  const [sources, articleClicks] = await Promise.all([
+    prisma.source.findMany({ orderBy: { createdAt: "desc" } }),
+    prisma.linkClick.findMany({
+      where: { linkType: "article" },
+      select: { url: true },
+    }),
+  ]);
+
+  // Count clicks per article URL
+  const clicksByUrl = new Map<string, number>();
+  for (const c of articleClicks) {
+    clicksByUrl.set(c.url, (clicksByUrl.get(c.url) ?? 0) + 1);
+  }
+
+  // Map article URL → sourceName via Article table
+  const clickedUrls = Array.from(clicksByUrl.keys());
+  const articles = clickedUrls.length > 0
+    ? await prisma.article.findMany({
+        where: { articleUrl: { in: clickedUrls } },
+        select: { articleUrl: true, sourceName: true },
+      })
+    : [];
+
+  // Aggregate total clicks per sourceName
+  const clicksBySource = new Map<string, number>();
+  for (const a of articles) {
+    const count = clicksByUrl.get(a.articleUrl) ?? 0;
+    clicksBySource.set(a.sourceName, (clicksBySource.get(a.sourceName) ?? 0) + count);
+  }
+
+  const sourcesWithClicks = sources.map((s) => ({
+    ...s,
+    clickCount: clicksBySource.get(s.name) ?? 0,
+  }));
+
+  return NextResponse.json({ sources: sourcesWithClicks });
 }
 
 export async function POST(req: NextRequest) {

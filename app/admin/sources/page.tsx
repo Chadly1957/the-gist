@@ -9,6 +9,7 @@ interface Source {
   url: string;
   active: boolean;
   createdAt: string;
+  clickCount: number;
 }
 
 export default function SourcesPage() {
@@ -135,6 +136,7 @@ export default function SourcesPage() {
                 <th className="text-left px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wide">Name</th>
                 <th className="text-left px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wide">URL</th>
                 <th className="text-left px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wide">Status</th>
+                <th className="text-right px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wide">Source Views</th>
                 <th className="text-right px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wide">Actions</th>
               </tr>
             </thead>
@@ -168,6 +170,9 @@ export default function SourcesPage() {
                       />
                       {source.active ? "Active" : "Paused"}
                     </button>
+                  </td>
+                  <td className="px-5 py-3 text-right font-medium text-gray-800">
+                    {source.clickCount > 0 ? source.clickCount.toLocaleString() : "—"}
                   </td>
                   <td className="px-5 py-3 text-right">
                     <button
