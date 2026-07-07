@@ -127,23 +127,7 @@ export default function SubscribersPage() {
   }
 
   function exportCSV() {
-    const rows = [
-      ["Email", "First Name", "Subscribed At", "Active"],
-      ...subscribers.map((s) => [
-        s.email,
-        s.firstName || "",
-        new Date(s.subscribedAt).toLocaleDateString(),
-        s.active ? "Yes" : "No",
-      ]),
-    ];
-    const csv = rows.map((r) => r.map((c) => `"${c}"`).join(",")).join("\n");
-    const blob = new Blob([csv], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `subscribers-${new Date().toISOString().slice(0, 10)}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+    window.location.href = "/api/admin/subscribers/export";
   }
 
   const totalPages = Math.ceil(total / 50);
