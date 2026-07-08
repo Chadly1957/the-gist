@@ -135,9 +135,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   const sidebarNav = (
     <>
-      <div className="px-5 py-6 border-b border-gray-800">
+      <div className="px-5 py-6 border-b border-gray-200">
         <Logo className="h-14 w-auto" />
-        <p className="text-gray-500 text-xs mt-0.5 ml-4">Admin</p>
+        <p className="text-gray-400 text-xs mt-0.5 ml-4">Admin</p>
       </div>
 
       <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
@@ -154,7 +154,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                 isActive
                   ? "bg-green-700 text-white"
-                  : "text-gray-400 hover:text-white hover:bg-gray-800"
+                  : "text-gray-600 hover:text-gray-900 hover:bg-gray-200"
               }`}
             >
               {item.icon}
@@ -164,11 +164,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         })}
       </nav>
 
-      <div className="px-3 py-4 border-t border-gray-800">
+      <div className="px-3 py-4 border-t border-gray-200">
         <button
           onClick={handleLogout}
           disabled={loggingOut}
-          className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white hover:bg-gray-800 transition-colors w-full"
+          className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-200 transition-colors w-full"
         >
           <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
@@ -190,13 +190,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       )}
 
       {/* Desktop sidebar — fixed, always visible */}
-      <aside className="hidden md:flex fixed inset-y-0 left-0 z-30 w-56 bg-gray-900 flex-col">
+      <aside className="hidden md:flex fixed inset-y-0 left-0 z-30 w-56 bg-gray-100 flex-col">
         {sidebarNav}
       </aside>
 
       {/* Mobile drawer — slides in from left */}
       <aside
-        className={`fixed inset-y-0 left-0 z-30 w-64 bg-gray-900 flex flex-col transform transition-transform duration-200 ease-in-out md:hidden ${
+        className={`fixed inset-y-0 left-0 z-30 w-64 bg-gray-100 flex flex-col transform transition-transform duration-200 ease-in-out md:hidden ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
