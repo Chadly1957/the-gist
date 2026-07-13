@@ -1132,7 +1132,7 @@ export default function AdminSponsorsPage() {
                             {!bulkExcluded.has(p.id) && (
                               <button
                                 type="button"
-                                onClick={() => setBulkExcluded((s) => new Set([...s, p.id]))}
+                                onClick={() => setBulkExcluded((s) => new Set(Array.from(s).concat(p.id)))}
                                 className="text-gray-400 hover:text-red-500 leading-none ml-0.5"
                                 title={`Remove ${p.email}`}
                               >
