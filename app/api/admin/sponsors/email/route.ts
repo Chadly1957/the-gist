@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
   const session = await getAdminSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { profileId, bulk, subject, htmlBody } = await req.json();
+  const { profileId, bulk, subject, htmlBody, excludedIds } = await req.json();
 
   if (!subject?.trim() || !htmlBody?.trim()) {
     return NextResponse.json({ error: "Subject and body are required." }, { status: 400 });
@@ -80,8 +80,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ sent: 1, failed: 0 });
   }
 
-  // Bulk — send to all active sponsor profiles
-  const profiles = await prisma.sponsorProfile.findMany({ where: { active: true } });
+  // Bulk — send to all active sponsor profiles (minus any the admin excluded)
+  const excluded = Array.isArray(excludedIds) ? excludedIds as string[] : [];
+  const profiles = await prisma.sponsorProfile.findMany({
+    where: { active: true, ...(excluded.length > 0 ? { id: { notIn: excluded } } : {}) },
+  });
   if (profiles.length === 0) return NextResponse.json({ sent: 0, failed: 0 });
 
   const emails = profiles.map((p) => ({

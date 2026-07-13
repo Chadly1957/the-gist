@@ -202,12 +202,14 @@ export default function AdminSponsorsPage() {
   const [emailBody, setEmailBody] = useState("");
   const [emailSending, setEmailSending] = useState(false);
   const [emailResult, setEmailResult] = useState<{ ok: boolean; message: string } | null>(null);
+  const [bulkExcluded, setBulkExcluded] = useState<Set<string>>(new Set());
 
   function openEmail(target: Profile | "bulk") {
     setEmailTarget(target);
     setEmailSubject("");
     setEmailBody("");
     setEmailResult(null);
+    setBulkExcluded(new Set());
   }
 
   function closeEmail() {
@@ -215,6 +217,7 @@ export default function AdminSponsorsPage() {
     setEmailSubject("");
     setEmailBody("");
     setEmailResult(null);
+    setBulkExcluded(new Set());
   }
 
   async function sendSponsorEmail() {
@@ -222,7 +225,7 @@ export default function AdminSponsorsPage() {
     setEmailResult(null);
     const payload =
       emailTarget === "bulk"
-        ? { bulk: true, subject: emailSubject, htmlBody: emailBody }
+        ? { bulk: true, subject: emailSubject, htmlBody: emailBody, excludedIds: Array.from(bulkExcluded) }
         : { profileId: (emailTarget as Profile).id, subject: emailSubject, htmlBody: emailBody };
     try {
       const res = await fetch("/api/admin/sponsors/email", {
@@ -1098,20 +1101,63 @@ export default function AdminSponsorsPage() {
                         To: {(emailTarget as Profile).contactName} &lt;{(emailTarget as Profile).email}&gt;
                       </p>
                     )}
-                    {emailTarget === "bulk" && (
-                      <p className="text-xs text-gray-500 mt-0.5">
-                        Will send to {profiles.filter((p) => p.active).length} active sponsors
-                      </p>
-                    )}
+                    {emailTarget === "bulk" && (() => {
+                      const activeProfiles = profiles.filter((p) => p.active);
+                      const sendCount = activeProfiles.filter((p) => !bulkExcluded.has(p.id)).length;
+                      return (
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          Sending to <span className="font-semibold text-gray-700">{sendCount}</span> of {activeProfiles.length} active sponsors
+                        </p>
+                      );
+                    })()}
                   </div>
                   <button onClick={closeEmail} className="text-gray-400 hover:text-gray-600 text-lg leading-none shrink-0">✕</button>
                 </div>
 
                 {emailTarget === "bulk" && (
-                  <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 text-xs text-blue-700 space-y-1">
-                    <p className="font-semibold">Personalisation placeholders:</p>
-                    <p className="font-mono">{"{{BUSINESS_NAME}}"} · {"{{CONTACT_NAME}}"} · {"{{PORTAL_URL}}"}</p>
-                  </div>
+                  <>
+                    <div>
+                      <p className="text-xs font-semibold text-gray-600 mb-2">Recipients — click × to remove</p>
+                      <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto p-2 bg-gray-50 border border-gray-200 rounded-lg">
+                        {profiles.filter((p) => p.active).map((p) => (
+                          <span
+                            key={p.id}
+                            className={`inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full border transition-colors ${
+                              bulkExcluded.has(p.id)
+                                ? "line-through bg-gray-100 text-gray-400 border-gray-200"
+                                : "bg-white text-gray-700 border-gray-300"
+                            }`}
+                          >
+                            {p.email}
+                            {!bulkExcluded.has(p.id) && (
+                              <button
+                                type="button"
+                                onClick={() => setBulkExcluded((s) => new Set([...s, p.id]))}
+                                className="text-gray-400 hover:text-red-500 leading-none ml-0.5"
+                                title={`Remove ${p.email}`}
+                              >
+                                ×
+                              </button>
+                            )}
+                            {bulkExcluded.has(p.id) && (
+                              <button
+                                type="button"
+                                onClick={() => setBulkExcluded((s) => { const n = new Set(s); n.delete(p.id); return n; })}
+                                className="text-gray-400 hover:text-green-600 leading-none ml-0.5"
+                                title={`Re-add ${p.email}`}
+                              >
+                                +
+                              </button>
+                            )}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 text-xs text-blue-700 space-y-1">
+                      <p className="font-semibold">Personalisation placeholders:</p>
+                      <p className="font-mono">{"{{BUSINESS_NAME}}"} · {"{{CONTACT_NAME}}"} · {"{{PORTAL_URL}}"}</p>
+                    </div>
+                  </>
                 )}
 
                 <div>
@@ -1146,10 +1192,14 @@ export default function AdminSponsorsPage() {
                 <div className="flex gap-2">
                   <button
                     onClick={sendSponsorEmail}
-                    disabled={emailSending || !emailSubject.trim() || !emailBody.trim()}
+                    disabled={emailSending || !emailSubject.trim() || !emailBody.trim() || (emailTarget === "bulk" && profiles.filter((p) => p.active && !bulkExcluded.has(p.id)).length === 0)}
                     className="px-4 py-2 bg-green-700 text-white rounded-lg text-sm font-semibold hover:bg-green-800 disabled:opacity-50"
                   >
-                    {emailSending ? "Sending…" : emailTarget === "bulk" ? "Send to All Sponsors" : "Send Email"}
+                    {emailSending
+                      ? "Sending…"
+                      : emailTarget === "bulk"
+                      ? `Send to ${profiles.filter((p) => p.active && !bulkExcluded.has(p.id)).length} Sponsor${profiles.filter((p) => p.active && !bulkExcluded.has(p.id)).length !== 1 ? "s" : ""}`
+                      : "Send Email"}
                   </button>
                   <button onClick={closeEmail}
                     className="px-4 py-2 border border-gray-200 text-gray-600 rounded-lg text-sm font-semibold hover:bg-gray-50">
