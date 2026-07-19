@@ -69,17 +69,27 @@ export class UnosendClient {
   }
 
   async sendBatch(emails: EmailPayload[]): Promise<SendResult> {
-    // Unosend has no batch endpoint — send concurrently in chunks of 10
     const results: Array<{ id?: string }> = [];
-    for (let i = 0; i < emails.length; i += 10) {
-      const chunk = emails.slice(i, i + 10);
+    let failures = 0;
+
+    for (let i = 0; i < emails.length; i += 5) {
+      const chunk = emails.slice(i, i + 5);
       const chunkResults = await Promise.all(
         chunk.map(async (e) => {
           const r = await this.sendEmail(e);
+          if (!r.success) failures++;
           return { id: r.success ? "sent" : undefined };
         })
       );
       results.push(...chunkResults);
+      // Pace sends to stay under Unosend rate limits
+      if (i + 5 < emails.length) {
+        await new Promise((res) => setTimeout(res, 200));
+      }
+    }
+
+    if (failures > 0) {
+      console.error(`[unosend] sendBatch: ${failures}/${emails.length} sends failed`);
     }
     return { success: true, data: results };
   }
