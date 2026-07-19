@@ -27,7 +27,7 @@ export class UnosendClient {
 
   private async post(payload: { from: string; to: string[]; subject: string; html: string }) {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 30000);
+    const timeout = setTimeout(() => controller.abort(), 15000);
     try {
       return await fetch("https://api.unosend.co/emails", {
         method: "POST",
@@ -54,11 +54,15 @@ export class UnosendClient {
       });
       if (!res.ok) {
         const text = await res.text().catch(() => res.statusText);
-        return { success: false, error: text };
+        const msg = `Unosend HTTP ${res.status}: ${text}`;
+        console.error("[unosend] send failed:", msg);
+        return { success: false, error: msg };
       }
       return { success: true };
     } catch (err) {
-      return { success: false, error: String(err) };
+      const msg = String(err);
+      console.error("[unosend] send error:", msg);
+      return { success: false, error: msg };
     }
   }
 
