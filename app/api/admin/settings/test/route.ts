@@ -15,25 +15,28 @@ export async function POST() {
   const user = settings["smtp_user"] || process.env.SMTP_USER || "";
   const source = settings["smtp_host"] ? "database" : process.env.SMTP_HOST ? "env" : "";
 
+  const unosendKey = settings["unosend_api_key"] || process.env.UNOSEND_API_KEY || "";
+  const isUnosend = Boolean(unosendKey);
+
   const client = getEmailClient(settings);
   if (!client) {
     return NextResponse.json(
-      { message: "SMTP credentials must be configured first." },
+      { message: "No email provider configured. Add a Unosend API key or SMTP credentials." },
       { status: 400 }
     );
   }
 
   const result = await client.testConnection();
   if (result.success) {
-    return NextResponse.json({
-      message: `Connected to ${host} as ${user}${source === "env" ? " (from env vars)" : ""}`,
-    });
+    const message = isUnosend
+      ? `Unosend configured${source === "env" ? " (from env vars)" : ""} — ready to send.`
+      : `Connected to ${host} as ${user}${source === "env" ? " (from env vars)" : ""}`;
+    return NextResponse.json({ message });
   }
 
-  // Strip verbose nodemailer prefix from error for readability
   const err = (result.error || "Unknown error").replace(/^Error:\s*/i, "");
   return NextResponse.json(
-    { message: `${host}: ${err}` },
+    { message: isUnosend ? `Unosend: ${err}` : `${host}: ${err}` },
     { status: 400 }
   );
 }

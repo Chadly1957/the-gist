@@ -14,6 +14,71 @@ interface SendResult {
   error?: string;
 }
 
+export class UnosendClient {
+  private apiKey: string;
+  private from: string;
+
+  constructor(opts: { apiKey: string; fromEmail: string; fromName: string }) {
+    this.apiKey = opts.apiKey;
+    this.from = opts.fromName
+      ? `${opts.fromName} <${opts.fromEmail}>`
+      : opts.fromEmail;
+  }
+
+  private async post(payload: { from: string; to: string[]; subject: string; html: string }) {
+    return fetch("https://api.unosend.co/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${this.apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async sendEmail(payload: EmailPayload): Promise<{ success: boolean; error?: string }> {
+    try {
+      const res = await this.post({
+        from: this.from,
+        to: [payload.to],
+        subject: payload.subject,
+        html: payload.htmlBody,
+      });
+      if (!res.ok) {
+        const text = await res.text().catch(() => res.statusText);
+        return { success: false, error: text };
+      }
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: String(err) };
+    }
+  }
+
+  async sendBatch(emails: EmailPayload[]): Promise<SendResult> {
+    // Unosend has no batch endpoint — send concurrently in chunks of 10
+    const results: Array<{ id?: string }> = [];
+    for (let i = 0; i < emails.length; i += 10) {
+      const chunk = emails.slice(i, i + 10);
+      const chunkResults = await Promise.all(
+        chunk.map(async (e) => {
+          const r = await this.sendEmail(e);
+          return { id: r.success ? "sent" : undefined };
+        })
+      );
+      results.push(...chunkResults);
+    }
+    return { success: true, data: results };
+  }
+
+  async testConnection(): Promise<{ success: boolean; error?: string }> {
+    if (!this.apiKey) return { success: false, error: "No API key set." };
+    if (!this.apiKey.startsWith("un_")) {
+      return { success: false, error: "Unosend API keys start with 'un_'." };
+    }
+    return { success: true };
+  }
+}
+
 export class SmtpEmailClient {
   private transportOpts: {
     host: string;
@@ -103,19 +168,24 @@ export class SmtpEmailClient {
 
 export function getEmailClient(
   settings: Record<string, string>
-): SmtpEmailClient | null {
+): UnosendClient | SmtpEmailClient | null {
+  // Unosend takes priority if an API key is configured
+  const unosendKey = settings["unosend_api_key"] || process.env.UNOSEND_API_KEY || "";
+  if (unosendKey) {
+    return new UnosendClient({
+      apiKey: unosendKey,
+      fromEmail: settings["unosend_from_email"] || process.env.UNOSEND_FROM_EMAIL || "newsletter@thegistdecatur.com",
+      fromName: settings["unosend_from_name"] || process.env.UNOSEND_FROM_NAME || "The Gist Decatur",
+    });
+  }
+
+  // Fall back to SMTP
   const host = settings["smtp_host"] || process.env.SMTP_HOST || "";
   const port = parseInt(settings["smtp_port"] || process.env.SMTP_PORT || "587");
   const user = settings["smtp_user"] || process.env.SMTP_USER || "";
   const pass = settings["smtp_pass"] || process.env.SMTP_PASS || "";
-  const fromEmail =
-    settings["smtp_from"] ||
-    process.env.SMTP_FROM ||
-    "newsletter@thegistdecatur.com";
-  const fromName =
-    settings["smtp_from_name"] ||
-    process.env.SMTP_FROM_NAME ||
-    "The Gist Decatur";
+  const fromEmail = settings["smtp_from"] || process.env.SMTP_FROM || "newsletter@thegistdecatur.com";
+  const fromName = settings["smtp_from_name"] || process.env.SMTP_FROM_NAME || "The Gist Decatur";
 
   if (!host || !user || !pass) return null;
 

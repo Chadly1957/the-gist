@@ -3,6 +3,9 @@
 import { useEffect, useState } from "react";
 
 interface Settings {
+  unosend_api_key: string;
+  unosend_from_email: string;
+  unosend_from_name: string;
   smtp_host: string;
   smtp_port: string;
   smtp_user: string;
@@ -43,6 +46,9 @@ const PROVIDERS = [
 
 export default function SettingsPage() {
   const [settings, setSettings] = useState<Settings>({
+    unosend_api_key: "",
+    unosend_from_email: "newsletter@thegistdecatur.com",
+    unosend_from_name: "The Gist Decatur",
     smtp_host: "",
     smtp_port: "587",
     smtp_user: "",
@@ -120,6 +126,60 @@ export default function SettingsPage() {
       </div>
 
       <form onSubmit={handleSave} className="space-y-6">
+        {/* Unosend */}
+        <div className={`bg-white rounded-xl border p-6 ${settings.unosend_api_key ? "border-green-300 ring-1 ring-green-200" : "border-gray-200"}`}>
+          <div className="flex items-center gap-3 mb-5">
+            <div className="w-8 h-8 rounded-lg bg-green-50 flex items-center justify-center">
+              <svg className="w-4 h-4 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
+            </div>
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <h2 className="text-sm font-semibold text-gray-800">Unosend</h2>
+                {settings.unosend_api_key && (
+                  <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">Active</span>
+                )}
+              </div>
+              <p className="text-xs text-gray-400">API-based sending — takes priority over SMTP when configured</p>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">API Key</label>
+              <input
+                type="password"
+                value={settings.unosend_api_key}
+                onChange={(e) => setSettings((s) => ({ ...s, unosend_api_key: e.target.value }))}
+                placeholder="un_your_api_key"
+                autoComplete="new-password"
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">From Email</label>
+                <input
+                  type="email"
+                  value={settings.unosend_from_email}
+                  onChange={(e) => setSettings((s) => ({ ...s, unosend_from_email: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">From Name</label>
+                <input
+                  type="text"
+                  value={settings.unosend_from_name}
+                  onChange={(e) => setSettings((s) => ({ ...s, unosend_from_name: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* SMTP Email */}
         <div className="bg-white rounded-xl border border-gray-200 p-6">
           <div className="flex items-center gap-3 mb-5">
