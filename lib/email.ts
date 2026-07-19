@@ -26,14 +26,22 @@ export class UnosendClient {
   }
 
   private async post(payload: { from: string; to: string[]; subject: string; html: string }) {
-    return fetch("https://api.unosend.co/emails", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${this.apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
-    });
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 30000);
+    try {
+      return await fetch("https://api.unosend.co/emails", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${this.apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+        signal: controller.signal,
+        cache: "no-store",
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
   }
 
   async sendEmail(payload: EmailPayload): Promise<{ success: boolean; error?: string }> {
