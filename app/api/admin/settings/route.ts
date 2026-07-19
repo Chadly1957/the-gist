@@ -3,6 +3,9 @@ import { prisma } from "@/lib/db";
 import { getAdminSession } from "@/lib/auth";
 
 const ALLOWED_KEYS = [
+  "unosend_api_key",
+  "unosend_from_email",
+  "unosend_from_name",
   "smtp_host",
   "smtp_port",
   "smtp_user",
@@ -12,6 +15,10 @@ const ALLOWED_KEYS = [
   "sponsorship_price_spotlight",
   "sponsorship_price_in_article",
   "sponsorship_price_presenting",
+  "sponsorship_price_wordy",
+  "stripe_price_in_article_cents",
+  "stripe_price_presenting_cents",
+  "stripe_price_wordy_cents",
   "spotlight_count",
   "in_article_count",
 ];
@@ -26,7 +33,7 @@ export async function GET() {
 
   const settings: Record<string, string> = {};
   for (const row of rows) {
-    if (row.key === "smtp_pass" && row.value) {
+    if ((row.key === "smtp_pass" || row.key === "unosend_api_key") && row.value) {
       settings[row.key] = "••••••••" + row.value.slice(-4);
     } else {
       settings[row.key] = row.value;
@@ -51,7 +58,7 @@ export async function POST(req: NextRequest) {
 
   for (const [key, value] of Object.entries(settings)) {
     if (!ALLOWED_KEYS.includes(key)) continue;
-    if (key === "smtp_pass" && String(value).startsWith("••••")) continue;
+    if ((key === "smtp_pass" || key === "unosend_api_key") && String(value).startsWith("••••")) continue;
 
     await prisma.setting.upsert({
       where: { key },
