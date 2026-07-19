@@ -25,7 +25,7 @@ export class UnosendClient {
       : opts.fromEmail;
   }
 
-  private async post(payload: { from: string; to: string[]; subject: string; html: string }) {
+  private async post(payload: { from: string; to: string[]; subject: string; html: string; text?: string; headers?: Record<string, string> }) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 15000);
     try {
@@ -51,6 +51,8 @@ export class UnosendClient {
         to: [payload.to],
         subject: payload.subject,
         html: payload.htmlBody,
+        ...(payload.textBody ? { text: payload.textBody } : {}),
+        ...(payload.headers ? { headers: payload.headers } : {}),
       });
       if (!res.ok) {
         const text = await res.text().catch(() => res.statusText);
