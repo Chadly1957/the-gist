@@ -4,5 +4,13 @@
       "path": "/api/cron/sponsor-analytics",
       "schedule": "0 * * * *"
     }
-  ]
+  ],
+  "functions": {
+    "app/api/admin/newsletter/**": {
+      "maxDuration": 60
+    },
+    "app/api/admin/send/**": {
+      "maxDuration": 60
+    }
+  }
 }

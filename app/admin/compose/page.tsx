@@ -195,22 +195,27 @@ export default function ComposePage() {
     }
     setTestSending(true);
     setSendResult(null);
-    const res = await fetch("/api/admin/newsletter/test", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        testEmail,
-        subject,
-        templateId: selectedTemplateId,
-        articleIds: selectedArticles.map((a) => a.id),
-        blurb,
-        newsletterDate,
-      }),
-    });
-    const data = await res.json();
-    setSendResult({ ok: res.ok, message: data.message || data.error || "Unknown error" });
-    setTestSending(false);
-    if (res.ok) setShowTestForm(false);
+    try {
+      const res = await fetch("/api/admin/newsletter/test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          testEmail,
+          subject,
+          templateId: selectedTemplateId,
+          articleIds: selectedArticles.map((a) => a.id),
+          blurb,
+          newsletterDate,
+        }),
+      });
+      const data = await res.json();
+      setSendResult({ ok: res.ok, message: data.message || data.error || "Unknown error" });
+      if (res.ok) setShowTestForm(false);
+    } catch {
+      setSendResult({ ok: false, message: "Request timed out or network error. Check Vercel logs for details." });
+    } finally {
+      setTestSending(false);
+    }
   }
 
   const previewHtml = preview ? buildPreviewHtml() : "";
