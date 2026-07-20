@@ -2,7 +2,13 @@
 
 import { useEffect, useState } from "react";
 
+type EmailProvider = "resend" | "unosend" | "smtp";
+
 interface Settings {
+  email_provider: EmailProvider | "";
+  resend_api_key: string;
+  resend_from_email: string;
+  resend_from_name: string;
   unosend_api_key: string;
   unosend_from_email: string;
   unosend_from_name: string;
@@ -46,6 +52,10 @@ const PROVIDERS = [
 
 export default function SettingsPage() {
   const [settings, setSettings] = useState<Settings>({
+    email_provider: "",
+    resend_api_key: "",
+    resend_from_email: "newsletter@thegistdecatur.com",
+    resend_from_name: "The Gist Decatur",
     unosend_api_key: "",
     unosend_from_email: "newsletter@thegistdecatur.com",
     unosend_from_name: "The Gist Decatur",
@@ -126,8 +136,102 @@ export default function SettingsPage() {
       </div>
 
       <form onSubmit={handleSave} className="space-y-6">
-        {/* Unosend */}
-        <div className={`bg-white rounded-xl border p-6 ${settings.unosend_api_key ? "border-green-300 ring-1 ring-green-200" : "border-gray-200"}`}>
+
+        {/* ── Provider toggle ───────────────────────────────────────────── */}
+        <div className="bg-white rounded-xl border border-gray-200 p-6">
+          <h2 className="text-sm font-semibold text-gray-800 mb-1">Email Provider</h2>
+          <p className="text-xs text-gray-400 mb-4">Choose which service sends your newsletters. Configure credentials in the matching section below.</p>
+          <div className="grid grid-cols-3 gap-3">
+            {([
+              { value: "resend", label: "Resend", badge: "Recommended", color: "indigo" },
+              { value: "unosend", label: "Unosend", badge: null, color: "green" },
+              { value: "smtp", label: "SMTP", badge: "Fallback", color: "gray" },
+            ] as const).map(({ value, label, badge, color }) => {
+              const active = settings.email_provider === value;
+              const colors: Record<string, string> = {
+                indigo: "border-indigo-500 bg-indigo-50 text-indigo-700",
+                green: "border-green-500 bg-green-50 text-green-700",
+                gray: "border-gray-400 bg-gray-50 text-gray-700",
+              };
+              return (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setSettings((s) => ({ ...s, email_provider: value }))}
+                  className={`relative flex flex-col items-center justify-center gap-1 py-3 px-2 rounded-lg border-2 text-sm font-semibold transition-all ${
+                    active ? colors[color] : "border-gray-200 text-gray-500 hover:border-gray-300 hover:bg-gray-50"
+                  }`}
+                >
+                  {label}
+                  {badge && (
+                    <span className={`text-xs font-normal ${active ? "opacity-80" : "text-gray-400"}`}>{badge}</span>
+                  )}
+                  {active && (
+                    <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-green-500 rounded-full flex items-center justify-center">
+                      <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                      </svg>
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* ── Resend ───────────────────────────────────────────────────── */}
+        <div className={`bg-white rounded-xl border p-6 transition-all ${settings.email_provider === "resend" ? "border-indigo-300 ring-1 ring-indigo-100" : "border-gray-200 opacity-60"}`}>
+          <div className="flex items-center gap-3 mb-5">
+            <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center">
+              <svg className="w-4 h-4 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+            </div>
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <h2 className="text-sm font-semibold text-gray-800">Resend</h2>
+                {settings.email_provider === "resend" && <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-medium">Active</span>}
+              </div>
+              <p className="text-xs text-gray-400">Best deliverability · true batch API · free up to 3k emails/month</p>
+            </div>
+          </div>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">API Key</label>
+              <input
+                type="password"
+                value={settings.resend_api_key}
+                onChange={(e) => setSettings((s) => ({ ...s, resend_api_key: e.target.value }))}
+                placeholder="re_xxxxxxxxxxxxxxxx"
+                autoComplete="new-password"
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">From Email</label>
+                <input
+                  type="email"
+                  value={settings.resend_from_email}
+                  onChange={(e) => setSettings((s) => ({ ...s, resend_from_email: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">From Name</label>
+                <input
+                  type="text"
+                  value={settings.resend_from_name}
+                  onChange={(e) => setSettings((s) => ({ ...s, resend_from_name: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ── Unosend ──────────────────────────────────────────────────── */}
+        <div className={`bg-white rounded-xl border p-6 transition-all ${settings.email_provider === "unosend" ? "border-green-300 ring-1 ring-green-100" : "border-gray-200 opacity-60"}`}>
           <div className="flex items-center gap-3 mb-5">
             <div className="w-8 h-8 rounded-lg bg-green-50 flex items-center justify-center">
               <svg className="w-4 h-4 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -137,14 +241,11 @@ export default function SettingsPage() {
             <div className="flex-1">
               <div className="flex items-center gap-2">
                 <h2 className="text-sm font-semibold text-gray-800">Unosend</h2>
-                {settings.unosend_api_key && (
-                  <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">Active</span>
-                )}
+                {settings.email_provider === "unosend" && <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">Active</span>}
               </div>
-              <p className="text-xs text-gray-400">API-based sending — takes priority over SMTP when configured</p>
+              <p className="text-xs text-gray-400">API-based sending</p>
             </div>
           </div>
-
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">API Key</label>
@@ -316,14 +417,11 @@ export default function SettingsPage() {
               <button
                 type="button"
                 onClick={handleTestConnection}
-                disabled={testing || !hasSmtp}
+                disabled={testing}
                 className="px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
               >
                 {testing ? "Testing…" : "Test Connection"}
               </button>
-              {!hasSmtp && (
-                <span className="text-xs text-gray-400">Save your SMTP credentials first to test</span>
-              )}
               {testResult && (
                 <span className={`text-sm font-medium ${testResult.ok ? "text-green-600" : "text-red-500"}`}>
                   {testResult.message}

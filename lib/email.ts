@@ -8,6 +8,131 @@ interface EmailPayload {
   headers?: Record<string, string>;
 }
 
+export class ResendClient {
+  private apiKey: string;
+  private from: string;
+
+  constructor(opts: { apiKey: string; fromEmail: string; fromName: string }) {
+    this.apiKey = opts.apiKey;
+    this.from = opts.fromName ? `${opts.fromName} <${opts.fromEmail}>` : opts.fromEmail;
+  }
+
+  private authHeaders() {
+    return { Authorization: `Bearer ${this.apiKey}`, "Content-Type": "application/json" };
+  }
+
+  async sendEmail(payload: EmailPayload): Promise<{ success: boolean; error?: string }> {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+    try {
+      const res = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: this.authHeaders(),
+        body: JSON.stringify({
+          from: this.from,
+          to: [payload.to],
+          subject: payload.subject,
+          html: payload.htmlBody,
+          ...(payload.textBody ? { text: payload.textBody } : {}),
+          ...(payload.headers ? { headers: payload.headers } : {}),
+        }),
+        signal: controller.signal,
+        cache: "no-store",
+      });
+      if (!res.ok) {
+        const text = await res.text().catch(() => res.statusText);
+        const msg = `Resend HTTP ${res.status}: ${text}`;
+        console.error("[resend] send failed:", msg);
+        return { success: false, error: msg };
+      }
+      return { success: true };
+    } catch (err) {
+      const msg = String(err);
+      console.error("[resend] send error:", msg);
+      return { success: false, error: msg };
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  async sendBatch(emails: EmailPayload[]): Promise<SendResult> {
+    const results: Array<{ id?: string }> = [];
+    let failures = 0;
+
+    // Resend batch endpoint accepts up to 100 per request
+    for (let i = 0; i < emails.length; i += 100) {
+      const chunk = emails.slice(i, i + 100);
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 30000);
+      try {
+        const res = await fetch("https://api.resend.com/emails/batch", {
+          method: "POST",
+          headers: this.authHeaders(),
+          body: JSON.stringify(
+            chunk.map((e) => ({
+              from: this.from,
+              to: [e.to],
+              subject: e.subject,
+              html: e.htmlBody,
+              ...(e.textBody ? { text: e.textBody } : {}),
+              ...(e.headers ? { headers: e.headers } : {}),
+            }))
+          ),
+          signal: controller.signal,
+          cache: "no-store",
+        });
+        if (!res.ok) {
+          const text = await res.text().catch(() => res.statusText);
+          console.error(`[resend] batch failed HTTP ${res.status}:`, text);
+          failures += chunk.length;
+          results.push(...chunk.map(() => ({ id: undefined })));
+        } else {
+          const data = await res.json();
+          const ids: Array<{ id?: string }> = (data.data || []).map((d: { id?: string }) => ({ id: d.id }));
+          results.push(...ids);
+        }
+      } catch (err) {
+        console.error("[resend] batch error:", String(err));
+        failures += chunk.length;
+        results.push(...chunk.map(() => ({ id: undefined })));
+      } finally {
+        clearTimeout(timeout);
+      }
+      // Small pause between chunks
+      if (i + 100 < emails.length) {
+        await new Promise((res) => setTimeout(res, 200));
+      }
+    }
+
+    if (failures > 0) {
+      console.error(`[resend] sendBatch: ${failures}/${emails.length} sends failed`);
+    }
+    return { success: true, data: results };
+  }
+
+  async testConnection(): Promise<{ success: boolean; error?: string }> {
+    if (!this.apiKey) return { success: false, error: "No API key set." };
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000);
+    try {
+      const res = await fetch("https://api.resend.com/domains", {
+        headers: this.authHeaders(),
+        signal: controller.signal,
+        cache: "no-store",
+      });
+      if (res.status === 401) return { success: false, error: "Invalid API key." };
+      if (!res.ok) return { success: false, error: `HTTP ${res.status}` };
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: String(err) };
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+}
+
+
+
 interface SendResult {
   success: boolean;
   data?: Array<{ id?: string }>;
@@ -192,18 +317,32 @@ export class SmtpEmailClient {
 
 export function getEmailClient(
   settings: Record<string, string>
-): UnosendClient | SmtpEmailClient | null {
-  // Unosend takes priority if an API key is configured
-  const unosendKey = settings["unosend_api_key"] || process.env.UNOSEND_API_KEY || "";
-  if (unosendKey) {
-    return new UnosendClient({
-      apiKey: unosendKey,
-      fromEmail: settings["unosend_from_email"] || process.env.UNOSEND_FROM_EMAIL || "newsletter@thegistdecatur.com",
-      fromName: settings["unosend_from_name"] || process.env.UNOSEND_FROM_NAME || "The Gist Decatur",
-    });
+): ResendClient | UnosendClient | SmtpEmailClient | null {
+  const provider = settings["email_provider"] || process.env.EMAIL_PROVIDER || "";
+
+  if (provider === "resend" || (!provider && (settings["resend_api_key"] || process.env.RESEND_API_KEY))) {
+    const apiKey = settings["resend_api_key"] || process.env.RESEND_API_KEY || "";
+    if (apiKey) {
+      return new ResendClient({
+        apiKey,
+        fromEmail: settings["resend_from_email"] || process.env.RESEND_FROM_EMAIL || "newsletter@thegistdecatur.com",
+        fromName: settings["resend_from_name"] || process.env.RESEND_FROM_NAME || "The Gist Decatur",
+      });
+    }
   }
 
-  // Fall back to SMTP
+  if (provider === "unosend" || (!provider && (settings["unosend_api_key"] || process.env.UNOSEND_API_KEY))) {
+    const apiKey = settings["unosend_api_key"] || process.env.UNOSEND_API_KEY || "";
+    if (apiKey) {
+      return new UnosendClient({
+        apiKey,
+        fromEmail: settings["unosend_from_email"] || process.env.UNOSEND_FROM_EMAIL || "newsletter@thegistdecatur.com",
+        fromName: settings["unosend_from_name"] || process.env.UNOSEND_FROM_NAME || "The Gist Decatur",
+      });
+    }
+  }
+
+  // SMTP fallback
   const host = settings["smtp_host"] || process.env.SMTP_HOST || "";
   const port = parseInt(settings["smtp_port"] || process.env.SMTP_PORT || "587");
   const user = settings["smtp_user"] || process.env.SMTP_USER || "";
@@ -212,7 +351,6 @@ export function getEmailClient(
   const fromName = settings["smtp_from_name"] || process.env.SMTP_FROM_NAME || "The Gist Decatur";
 
   if (!host || !user || !pass) return null;
-
   return new SmtpEmailClient({ host, port, user, pass, fromEmail, fromName });
 }
 
