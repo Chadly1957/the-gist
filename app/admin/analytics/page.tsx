@@ -81,6 +81,22 @@ export default function AnalyticsPage() {
   const [sponsorBreakdown, setSponsorBreakdown] = useState<SponsorBreakdown | null>(null);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [resending, setResending] = useState<Record<string, boolean>>({});
+  const [resendResult, setResendResult] = useState<Record<string, { ok: boolean; message: string } | undefined>>({});
+
+  async function handleResend(sendId: string) {
+    setResending((prev) => ({ ...prev, [sendId]: true }));
+    setResendResult((prev) => ({ ...prev, [sendId]: undefined }));
+    try {
+      const res = await fetch(`/api/admin/newsletter/resend/${sendId}`, { method: "POST" });
+      const data = await res.json();
+      setResendResult((prev) => ({ ...prev, [sendId]: { ok: res.ok, message: data.message || data.error || "Unknown error" } }));
+    } catch {
+      setResendResult((prev) => ({ ...prev, [sendId]: { ok: false, message: "Request failed — check Vercel logs." } }));
+    } finally {
+      setResending((prev) => ({ ...prev, [sendId]: false }));
+    }
+  }
 
   useEffect(() => {
     fetch("/api/admin/analytics")
@@ -269,13 +285,12 @@ export default function AnalyticsPage() {
             {sends.map((send) => {
               const sponsorTotal = send.sponsoredClicks.reduce((sum, s) => sum + s.clicks, 0);
               const articleTotal = (send.articleClicks ?? []).reduce((sum, a) => sum + a.clicks, 0);
-              const isExpandable = sponsorTotal > 0 || articleTotal > 0;
               const isExpanded = expanded === send.id;
               return (
                 <Fragment key={send.id}>
                   <tr
-                    className={`border-b border-gray-100 last:border-0 ${isExpandable ? "cursor-pointer hover:bg-gray-50" : ""}`}
-                    onClick={() => isExpandable && setExpanded(isExpanded ? null : send.id)}
+                    className="border-b border-gray-100 last:border-0 cursor-pointer hover:bg-gray-50"
+                    onClick={() => setExpanded(isExpanded ? null : send.id)}
                   >
                     <td className="px-5 py-3 font-medium text-gray-800">{send.subject}</td>
                     <td className="px-5 py-3 text-gray-500">
@@ -295,27 +310,41 @@ export default function AnalyticsPage() {
                     </td>
                     <td className="px-5 py-3 text-gray-500">{send.tracked ? send.unsubscribes : "—"}</td>
                     <td className="px-5 py-3 text-gray-500">
-                      {isExpandable ? (
-                        <span className="inline-flex items-center gap-1.5">
-                          {sponsorTotal}
-                          <svg
-                            className={`w-3.5 h-3.5 text-gray-400 transition-transform ${isExpanded ? "rotate-180" : ""}`}
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                            strokeWidth={2}
-                          >
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                          </svg>
-                        </span>
-                      ) : (
-                        send.tracked ? "0" : "—"
-                      )}
+                      <span className="inline-flex items-center gap-1.5">
+                        {send.tracked ? sponsorTotal : "—"}
+                        <svg
+                          className={`w-3.5 h-3.5 text-gray-400 transition-transform ${isExpanded ? "rotate-180" : ""}`}
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          strokeWidth={2}
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </span>
                     </td>
                   </tr>
                   {isExpanded && (
                     <tr className="bg-gray-50 border-b border-gray-100">
                       <td colSpan={7} className="px-5 py-4 space-y-4">
+                        {/* Resend */}
+                        <div className="flex items-center gap-3">
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleResend(send.id); }}
+                            disabled={resending[send.id]}
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-800 hover:bg-gray-900 disabled:opacity-50 text-white text-xs font-semibold rounded-lg transition-colors"
+                          >
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                            </svg>
+                            {resending[send.id] ? "Resending…" : "Resend to all subscribers"}
+                          </button>
+                          {resendResult[send.id] && (
+                            <span className={`text-xs font-medium ${resendResult[send.id].ok ? "text-green-700" : "text-red-600"}`}>
+                              {resendResult[send.id].message}
+                            </span>
+                          )}
+                        </div>
                         {/* Article clicks */}
                         {(send.articleClicks ?? []).length > 0 && (
                           <div>

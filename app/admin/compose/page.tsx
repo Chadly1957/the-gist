@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { renderTemplate } from "@/lib/template-renderer";
 import { blurbToHtml } from "@/lib/url";
 
@@ -22,15 +22,25 @@ interface Template {
   isDefault: boolean;
 }
 
+const DRAFT_KEY = "gist_compose_draft";
+
+function todayStr() {
+  return new Date().toISOString().split("T")[0];
+}
+
+function defaultSubject() {
+  return `The Gist Decatur: ${new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}`;
+}
+
 export default function ComposePage() {
   const [articles, setArticles] = useState<Article[]>([]);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
-  const [subject, setSubject] = useState(
-    `The Gist Decatur: ${new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}`
-  );
+  const [subject, setSubject] = useState(defaultSubject());
   const [blurb, setBlurb] = useState("");
-  const [newsletterDate, setNewsletterDate] = useState(new Date().toISOString().split("T")[0]);
+  const [newsletterDate, setNewsletterDate] = useState(todayStr());
+  const savedDraftRef = useRef<{ selectedTemplateId?: string; selectedArticleIds?: string[] } | null>(null);
+  const draftReadyRef = useRef(false);
   const [scraping, setScraping] = useState(false);
   const [sending, setSending] = useState(false);
   const [sendResult, setSendResult] = useState<{ ok: boolean; message: string } | null>(null);
@@ -44,6 +54,40 @@ export default function ComposePage() {
   const [newKeyword, setNewKeyword] = useState("");
   const [clearingPool, setClearingPool] = useState(false);
   const [mobileTab, setMobileTab] = useState<"articles" | "compose">("articles");
+
+  // Restore draft from localStorage on mount (runs before fetch effects)
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(DRAFT_KEY);
+      if (!raw) return;
+      const saved = JSON.parse(raw);
+      if (saved.date !== todayStr()) {
+        localStorage.removeItem(DRAFT_KEY);
+        return;
+      }
+      if (saved.subject) setSubject(saved.subject);
+      if (saved.blurb !== undefined) setBlurb(saved.blurb);
+      if (saved.newsletterDate) setNewsletterDate(saved.newsletterDate);
+      savedDraftRef.current = {
+        selectedTemplateId: saved.selectedTemplateId,
+        selectedArticleIds: saved.selectedArticleIds || [],
+      };
+    } catch { /* ignore malformed storage */ }
+  }, []);
+
+  // Save draft whenever compose state changes (only after initial data has loaded)
+  useEffect(() => {
+    if (!draftReadyRef.current) return;
+    const draft = {
+      date: todayStr(),
+      subject,
+      blurb,
+      newsletterDate,
+      selectedTemplateId,
+      selectedArticleIds: articles.filter((a) => a.selected).map((a) => a.id),
+    };
+    localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+  }, [subject, blurb, newsletterDate, selectedTemplateId, articles]);
 
   useEffect(() => {
     const saved = localStorage.getItem("gist_keyword_filters");
@@ -66,14 +110,29 @@ export default function ComposePage() {
       .then((r) => r.json())
       .then((data) => {
         setTemplates(data.templates || []);
+        const savedId = savedDraftRef.current?.selectedTemplateId;
         const def = (data.templates || []).find((t: Template) => t.isDefault);
-        if (def) setSelectedTemplateId(def.id);
-        else if (data.templates?.length) setSelectedTemplateId(data.templates[0].id);
+        if (savedId && (data.templates || []).find((t: Template) => t.id === savedId)) {
+          setSelectedTemplateId(savedId);
+        } else if (def) {
+          setSelectedTemplateId(def.id);
+        } else if (data.templates?.length) {
+          setSelectedTemplateId(data.templates[0].id);
+        }
       });
     // Load already-scraped articles
     fetch("/api/admin/articles")
       .then((r) => r.json())
-      .then((data) => setArticles(data.articles || []));
+      .then((data) => {
+        const savedIds = new Set(savedDraftRef.current?.selectedArticleIds || []);
+        setArticles(
+          (data.articles || []).map((a: Article) => ({
+            ...a,
+            selected: savedIds.has(a.id),
+          }))
+        );
+        draftReadyRef.current = true;
+      });
   }, []);
 
   async function handleScrape() {
@@ -122,6 +181,18 @@ export default function ComposePage() {
   function removeSavedKeyword(keyword: string) {
     setSavedKeywords((prev) => prev.filter((k) => k !== keyword));
     if (activeKeyword === keyword) setActiveKeyword("");
+  }
+
+  function handleResetDraft() {
+    localStorage.removeItem(DRAFT_KEY);
+    savedDraftRef.current = null;
+    setSubject(defaultSubject());
+    setBlurb("");
+    setNewsletterDate(todayStr());
+    const def = templates.find((t) => t.isDefault);
+    if (def) setSelectedTemplateId(def.id);
+    else if (templates.length) setSelectedTemplateId(templates[0].id);
+    setArticles((prev) => prev.map((a) => ({ ...a, selected: false })));
   }
 
   async function handleClearPool() {
@@ -441,6 +512,13 @@ export default function ComposePage() {
           <div className="flex items-center justify-between px-6 py-3 gap-4">
             <h2 className="text-base font-bold text-gray-900 shrink-0">Compose Issue</h2>
             <div className="flex items-center gap-2 ml-auto">
+              <button
+                onClick={handleResetDraft}
+                title="Clear subject, blurb, and article selections"
+                className="px-3 py-1.5 rounded-lg text-sm font-medium border border-gray-200 text-gray-400 hover:text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                Reset
+              </button>
               <button
                 onClick={() => setPreview(!preview)}
                 className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
