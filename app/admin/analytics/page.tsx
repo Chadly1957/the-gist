@@ -339,11 +339,14 @@ export default function AnalyticsPage() {
                             </svg>
                             {resending[send.id] ? "Resending…" : "Resend to all subscribers"}
                           </button>
-                          {resendResult[send.id] && (
-                            <span className={`text-xs font-medium ${resendResult[send.id].ok ? "text-green-700" : "text-red-600"}`}>
-                              {resendResult[send.id].message}
-                            </span>
-                          )}
+                          {(() => {
+                            const r = resendResult[send.id];
+                            return r ? (
+                              <span className={`text-xs font-medium ${r.ok ? "text-green-700" : "text-red-600"}`}>
+                                {r.message}
+                              </span>
+                            ) : null;
+                          })()}
                         </div>
                         {/* Article clicks */}
                         {(send.articleClicks ?? []).length > 0 && (
