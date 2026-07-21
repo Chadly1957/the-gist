@@ -375,19 +375,24 @@ export default function AdminSponsorsPage() {
 
   async function load() {
     setLoading(true);
-    const [sponsorRes, settingsRes] = await Promise.all([
-      fetch("/api/admin/sponsors"),
-      fetch("/api/admin/settings"),
-    ]);
-    const data = await sponsorRes.json();
-    const settingsData = await settingsRes.json();
-    setSpotlights(data.spotlights || []);
-    setBookings(data.bookings || []);
-    setProfiles(data.profiles || []);
-    setPrices((p) => ({ ...p, ...Object.fromEntries(
-      Object.entries(settingsData.settings || {}).filter(([k]) => k.startsWith("sponsorship_price_"))
-    )}));
-    setLoading(false);
+    try {
+      const [sponsorRes, settingsRes] = await Promise.all([
+        fetch("/api/admin/sponsors"),
+        fetch("/api/admin/settings"),
+      ]);
+      const data = await sponsorRes.json();
+      const settingsData = await settingsRes.json();
+      setSpotlights(data.spotlights || []);
+      setBookings(data.bookings || []);
+      setProfiles(data.profiles || []);
+      setPrices((p) => ({ ...p, ...Object.fromEntries(
+        Object.entries(settingsData.settings || {}).filter(([k]) => k.startsWith("sponsorship_price_"))
+      )}));
+    } catch (err) {
+      console.error("[sponsors] load failed:", err);
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => { load(); }, []);
