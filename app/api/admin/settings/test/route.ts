@@ -1,14 +1,27 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getAdminSession } from "@/lib/auth";
 import { getEmailClient } from "@/lib/email";
 
-export async function POST() {
+export async function POST(req: NextRequest) {
   const session = await getAdminSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+  // Merge DB settings with any unsaved form values sent in the request body.
+  // This lets the test reflect the current toggle state without requiring a save first.
+  const body = await req.json().catch(() => ({}));
+  const formSettings: Record<string, string> = body.settings || {};
+
   const rows = await prisma.setting.findMany();
-  const settings = Object.fromEntries(rows.map((r) => [r.key, r.value]));
+  const dbSettings = Object.fromEntries(rows.map((r) => [r.key, r.value]));
+
+  // Form takes precedence over DB (but skip masked password placeholders)
+  const settings: Record<string, string> = { ...dbSettings };
+  for (const [key, value] of Object.entries(formSettings)) {
+    if (typeof value === "string" && !value.startsWith("••••")) {
+      settings[key] = value;
+    }
+  }
 
   const provider = settings["email_provider"] || process.env.EMAIL_PROVIDER || "";
   const resendKey = settings["resend_api_key"] || process.env.RESEND_API_KEY || "";

@@ -116,7 +116,11 @@ export default function SettingsPage() {
   async function handleTestConnection() {
     setTesting(true);
     setTestResult(null);
-    const res = await fetch("/api/admin/settings/test", { method: "POST" });
+    const res = await fetch("/api/admin/settings/test", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ settings }),
+    });
     const data = await res.json();
     setTestResult({ ok: res.ok, message: data.message });
     setTesting(false);
