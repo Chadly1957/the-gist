@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
   const bookings = await prisma.adBooking.findMany({
     where: {
       date: { gte: startDate, lte: endDate },
-      status: { in: ["pending_review", "approved"] },
+      status: { in: ["pending_review", "approved", "pending_payment"] },
     },
     select: { date: true, type: true },
   });

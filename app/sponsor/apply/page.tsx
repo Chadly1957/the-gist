@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Logo from "@/components/Logo";
 import UrlInput from "@/components/UrlInput";
+import MultiDateCalendar from "@/components/MultiDateCalendar";
 import { normalizeUrl } from "@/lib/url";
 
 type Step = "apply" | "listing" | "booking" | "done";
@@ -60,7 +61,7 @@ function ApplyContent() {
   const [lError, setLError] = useState("");
 
   // Step 2b — booking (in_article / presenting / wordy)
-  const [bDate, setBDate] = useState("");
+  const [bDates, setBDates] = useState<string[]>([]);
   const [bForm, setBForm] = useState({
     type: "in_article" as "in_article" | "presenting",
     headline: "",
@@ -134,7 +135,7 @@ function ApplyContent() {
           imageUrl: "",
           presentingBlurb: tier === "presenting" ? `Today's Gist is brought to you by ${form.businessName}.` : "",
         });
-        setBDate("");
+        setBDates([]);
         setStep("booking");
       }
     } catch {
@@ -171,7 +172,8 @@ function ApplyContent() {
 
   async function submitBooking(e: React.FormEvent) {
     e.preventDefault();
-    if (!bDate) { setBError("Please select a date."); return; }
+    if (tier === "wordy" && bDates.length === 0) { setBError("Please select a date."); return; }
+    if (tier !== "wordy" && bDates.length === 0) { setBError("Please select at least one date."); return; }
     setBSubmitting(true);
     setBError("");
     const endpoint = tier === "wordy" ? "/api/sponsor/wordy-booking" : "/api/sponsor/booking";
@@ -179,14 +181,18 @@ function ApplyContent() {
       const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, date: bDate, ...bForm }),
+        body: JSON.stringify({ token, dates: bDates, date: bDates[0], ...bForm }),
       });
       const data = await res.json();
       if (res.ok) {
+        const subs: Array<{ original: string; replacement: string }> = data.substitutions || [];
+        const subNote = subs.length > 0
+          ? ` Note: ${subs.length} date${subs.length !== 1 ? "s were" : " was"} unavailable and substituted with the next available slot${subs.length !== 1 ? "s" : ""} — your discount is preserved.`
+          : "";
         setDoneMessage(
           tier === "wordy"
             ? "Your Wordy sponsorship request is in — we'll reach out within 24 hours to confirm your date and collect payment."
-            : "Your booking request has been submitted — we'll confirm within 1–2 business days and collect payment then."
+            : `Your booking request has been submitted — we'll confirm within 1–2 business days and collect payment then.${subNote}`
         );
         setStep("done");
       } else {
@@ -198,8 +204,6 @@ function ApplyContent() {
       setBSubmitting(false);
     }
   }
-
-  const todayStr = new Date().toLocaleDateString("en-CA");
 
   // ── DONE ──
   if (step === "done") {
@@ -391,13 +395,25 @@ function ApplyContent() {
               )}
 
               <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1">
-                  {tier === "wordy" ? "Preferred Date *" : "Newsletter Date *"}
+                <label className="block text-xs font-semibold text-gray-600 mb-2">
+                  {tier === "wordy" ? "Preferred Date *" : "Newsletter Date(s) *"}
                 </label>
-                <input type="date" value={bDate} onChange={(e) => setBDate(e.target.value)} required min={todayStr}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
-                {tier === "wordy" && (
-                  <p className="text-xs text-gray-400 mt-1">We&apos;ll confirm availability and follow up within 24 hours.</p>
+                {tier === "wordy" ? (
+                  <>
+                    <MultiDateCalendar
+                      bookingType="wordy"
+                      selectedDates={bDates}
+                      onChange={(d) => setBDates(d.slice(0, 1))}
+                    />
+                    <p className="text-xs text-gray-400 mt-1">We&apos;ll confirm availability and follow up within 24 hours.</p>
+                  </>
+                ) : (
+                  <MultiDateCalendar
+                    bookingType={bForm.type as "in_article" | "presenting"}
+                    selectedDates={bDates}
+                    onChange={setBDates}
+                    pricePerDay={bForm.type === "presenting" ? 25 : 15}
+                  />
                 )}
               </div>
 

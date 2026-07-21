@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import Stripe from "stripe";
+import { getDayDiscount, applyDiscount } from "@/lib/discount";
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +35,12 @@ function formatDate(dateStr: string): string {
   });
 }
 
+function addDays(dateStr: string, n: number): string {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const next = new Date(y, m - 1, d + n);
+  return `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}-${String(next.getDate()).padStart(2, "0")}`;
+}
+
 export async function POST(req: NextRequest) {
   const {
     token,
@@ -65,51 +72,92 @@ export async function POST(req: NextRequest) {
     (await prisma.setting.findMany()).map((r: { key: string; value: string }) => [r.key, r.value])
   );
   const settingKey = PRICE_SETTING_KEYS[bookingType];
-  const priceCents = settingKey && allSettings[settingKey]
+  const basePriceCents = settingKey && allSettings[settingKey]
     ? parseInt(allSettings[settingKey], 10)
     : (DEFAULT_PRICES_CENTS[bookingType] ?? 1500);
 
-  // Check availability for all requested dates
   const takenStatuses = ["pending_review", "approved", "pending_payment"];
-  for (const date of dates) {
+  const inArticleLimit = 2;
+
+  // Resolve conflicts: auto-substitute unavailable dates with next available after the window
+  const requestedDates: string[] = [...dates].sort();
+  const confirmedDates: string[] = [];
+  const substitutions: Array<{ original: string; replacement: string }> = [];
+  const lastRequested = requestedDates[requestedDates.length - 1];
+  let searchAnchor = lastRequested;
+
+  for (const date of requestedDates) {
     if (bookingType === "wordy") {
       const existing = await db.wordyBooking.findFirst({
         where: { date, status: { in: takenStatuses } },
       });
-      if (existing) {
-        return NextResponse.json(
-          { error: `${date} is already booked for a Wordy sponsorship.` },
-          { status: 409 }
-        );
+      if (!existing) {
+        confirmedDates.push(date);
+        continue;
       }
     } else {
       const existing = await prisma.adBooking.findMany({
         where: { date, type: bookingType, status: { in: takenStatuses } },
       });
-      const limit = bookingType === "in_article" ? 2 : 1;
-      if (existing.length >= limit) {
-        return NextResponse.json(
-          { error: `${date} is already fully booked for this placement type.` },
-          { status: 409 }
-        );
+      const limit = bookingType === "in_article" ? inArticleLimit : 1;
+      if (existing.length < limit) {
+        confirmedDates.push(date);
+        continue;
       }
     }
+
+    // Conflict — find next available after the window
+    let offset = 1;
+    while (true) {
+      const candidate = addDays(searchAnchor, offset);
+      const alreadyChosen =
+        confirmedDates.includes(candidate) || substitutions.some((s) => s.replacement === candidate);
+
+      if (!alreadyChosen) {
+        let available = false;
+        if (bookingType === "wordy") {
+          const ex = await db.wordyBooking.findFirst({ where: { date: candidate, status: { in: takenStatuses } } });
+          available = !ex;
+        } else {
+          const ex = await prisma.adBooking.findMany({
+            where: { date: candidate, type: bookingType, status: { in: takenStatuses } },
+          });
+          const limit = bookingType === "in_article" ? inArticleLimit : 1;
+          available = ex.length < limit;
+        }
+
+        if (available) {
+          substitutions.push({ original: date, replacement: candidate });
+          confirmedDates.push(candidate);
+          if (candidate > searchAnchor) searchAnchor = candidate;
+          break;
+        }
+      }
+
+      offset++;
+      if (offset > 365) break; // safety valve
+    }
   }
+
+  const totalDays = confirmedDates.length;
+  const discountPct = bookingType === "wordy" ? 0 : getDayDiscount(totalDays);
+  const unitPriceCents = bookingType === "wordy" ? basePriceCents : applyDiscount(basePriceCents, totalDays);
 
   const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
   const placementName = PLACEMENT_NAMES[bookingType] ?? bookingType;
 
-  // Create Stripe checkout session
+  const discountLabel = discountPct > 0 ? ` (${discountPct}% multi-day discount)` : "";
+
   const session = await stripe.checkout.sessions.create({
     payment_method_types: ["card"],
-    line_items: (dates as string[]).map((date) => ({
+    line_items: confirmedDates.map((date) => ({
       price_data: {
         currency: "usd",
         product_data: {
-          name: `${placementName} — ${formatDate(date)}`,
+          name: `${placementName} — ${formatDate(date)}${discountLabel}`,
           description: `The Gist Decatur newsletter placement on ${formatDate(date)}`,
         },
-        unit_amount: priceCents,
+        unit_amount: unitPriceCents,
       },
       quantity: 1,
     })),
@@ -124,7 +172,7 @@ export async function POST(req: NextRequest) {
   });
 
   // Create bookings with pending_payment status so dates are reserved
-  for (const date of dates as string[]) {
+  for (const date of confirmedDates) {
     if (bookingType === "wordy") {
       await db.wordyBooking.create({
         data: {
@@ -145,6 +193,7 @@ export async function POST(req: NextRequest) {
           sponsorId: profile.id,
           type: bookingType,
           date,
+          discountPct,
           headline: headline.trim(),
           body: body?.trim() || "",
           ctaUrl: ctaUrl.trim(),
@@ -158,5 +207,5 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({ url: session.url });
+  return NextResponse.json({ url: session.url, substitutions, discountPct });
 }

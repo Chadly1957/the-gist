@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import Logo from "@/components/Logo";
 import SponsorPreview from "@/components/SponsorPreview";
 import UrlInput from "@/components/UrlInput";
+import MultiDateCalendar from "@/components/MultiDateCalendar";
 
 interface Spotlight {
   id: string;
@@ -388,6 +389,14 @@ function PortalContent() {
       });
       const data = await res.json();
       if (res.ok && data.url) {
+        const subs: Array<{ original: string; replacement: string }> = data.substitutions || [];
+        if (subs.length > 0) {
+          const msg = subs.map((s) => `${s.original} → ${s.replacement}`).join(", ");
+          const proceed = confirm(
+            `${subs.length} date${subs.length !== 1 ? "s were" : " was"} unavailable and replaced with the next available slot${subs.length !== 1 ? "s" : ""}:\n${msg}\n\nYour discount is preserved. Proceed to checkout?`
+          );
+          if (!proceed) { setBSubmitting(false); return; }
+        }
         window.location.href = data.url;
       } else {
         setBError(data.error || "Submission failed.");
@@ -860,12 +869,13 @@ function PortalContent() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-1">Newsletter Date(s) *</label>
-                  <BookingDatePicker selectedDates={bDates} onToggleDate={toggleBookingDate} adType={bType} />
-                  <p className="text-xs text-gray-400 mt-1">
-                    Click to select one or more dates. Grayed-out days are already fully booked.{" "}
-                    {bType === "in_article" ? "Up to 2 standard ad slots per day." : "Only 1 presenting sponsor per day."}
-                  </p>
+                  <label className="block text-xs font-semibold text-gray-600 mb-2">Newsletter Date(s) *</label>
+                  <MultiDateCalendar
+                    bookingType={bType}
+                    selectedDates={bDates}
+                    onChange={setBDates}
+                    pricePerDay={bType === "presenting" ? 25 : 15}
+                  />
                 </div>
 
                 <div>

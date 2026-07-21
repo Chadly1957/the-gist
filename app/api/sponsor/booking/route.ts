@@ -1,18 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { getDayDiscount } from "@/lib/discount";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
-  const { token, type, date, headline, body, ctaUrl, ctaLabel, imageUrl, presentingBlurb } = await req.json();
+  const { token, type, dates, date, headline, body, ctaUrl, ctaLabel, imageUrl, presentingBlurb } = await req.json();
 
   if (!token) return NextResponse.json({ error: "Token required." }, { status: 401 });
 
   const profile = await prisma.sponsorProfile.findUnique({ where: { magicToken: token } });
   if (!profile) return NextResponse.json({ error: "Invalid token." }, { status: 401 });
 
-  if (!type || !date || !headline || !body || !ctaUrl) {
-    return NextResponse.json({ error: "Type, date, headline, body, and CTA URL are required." }, { status: 400 });
+  // Accept either a single `date` or an array `dates`
+  const requestedDates: string[] = dates?.length ? dates : date ? [date] : [];
+
+  if (!type || !requestedDates.length || !headline || !body || !ctaUrl) {
+    return NextResponse.json({ error: "Type, date(s), headline, body, and CTA URL are required." }, { status: 400 });
   }
 
   if (!["in_article", "presenting"].includes(type)) {
@@ -23,34 +27,71 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Body must be 400 characters or less." }, { status: 400 });
   }
 
-  // Check availability
-  const existing = await prisma.adBooking.findMany({
-    where: { date, status: { in: ["pending_review", "approved"] } },
-  });
+  const takenStatuses = ["pending_review", "approved", "pending_payment"];
+  const inArticleLimit = 2;
 
-  const inArticleCount = existing.filter((b) => b.type === "in_article").length;
-  const presentingCount = existing.filter((b) => b.type === "presenting").length;
+  // Check all requested dates for availability; auto-substitute conflicted ones
+  const confirmedDates: string[] = [];
+  const substitutions: Array<{ original: string; replacement: string }> = [];
 
-  if (type === "in_article" && inArticleCount >= 2) {
-    return NextResponse.json({ error: "This date is fully booked for standard ad sponsorships." }, { status: 409 });
+  const sortedDates = [...requestedDates].sort();
+  const lastRequested = sortedDates[sortedDates.length - 1];
+
+  for (const d of requestedDates) {
+    const existing = await prisma.adBooking.findMany({
+      where: { date: d, type, status: { in: takenStatuses } },
+    });
+    const taken = type === "in_article" ? existing.length >= inArticleLimit : existing.length >= 1;
+
+    if (!taken) {
+      confirmedDates.push(d);
+    } else {
+      // Find next available date after the window
+      let candidate = lastRequested;
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        // Increment candidate by one day
+        const [cy, cm, cd] = candidate.split("-").map(Number);
+        const next = new Date(cy, cm - 1, cd + 1);
+        candidate = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}-${String(next.getDate()).padStart(2, "0")}`;
+
+        const alreadyChosen = confirmedDates.includes(candidate) || substitutions.some((s) => s.replacement === candidate);
+        if (alreadyChosen) continue;
+
+        const ex = await prisma.adBooking.findMany({
+          where: { date: candidate, type, status: { in: takenStatuses } },
+        });
+        const cTaken = type === "in_article" ? ex.length >= inArticleLimit : ex.length >= 1;
+        if (!cTaken) {
+          substitutions.push({ original: d, replacement: candidate });
+          confirmedDates.push(candidate);
+          break;
+        }
+      }
+    }
   }
-  if (type === "presenting" && presentingCount >= 1) {
-    return NextResponse.json({ error: "This date already has a presenting sponsor." }, { status: 409 });
-  }
 
-  const booking = await prisma.adBooking.create({
-    data: {
-      sponsorId: profile.id,
-      type,
-      date,
-      headline: headline.trim(),
-      body: body.trim(),
-      ctaUrl: ctaUrl.trim(),
-      ctaLabel: ctaLabel?.trim() || "Learn More",
-      imageUrl: imageUrl?.trim() || null,
-      presentingBlurb: presentingBlurb?.trim() || null,
-    },
-  });
+  const totalDays = confirmedDates.length;
+  const discountPct = getDayDiscount(totalDays);
 
-  return NextResponse.json({ booking });
+  const bookings = await Promise.all(
+    confirmedDates.map((d) =>
+      prisma.adBooking.create({
+        data: {
+          sponsorId: profile.id,
+          type,
+          date: d,
+          discountPct,
+          headline: headline.trim(),
+          body: body.trim(),
+          ctaUrl: ctaUrl.trim(),
+          ctaLabel: ctaLabel?.trim() || "Learn More",
+          imageUrl: imageUrl?.trim() || null,
+          presentingBlurb: presentingBlurb?.trim() || null,
+        },
+      })
+    )
+  );
+
+  return NextResponse.json({ bookings, substitutions, discountPct });
 }

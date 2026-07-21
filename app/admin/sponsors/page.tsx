@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import SponsorPreview from "@/components/SponsorPreview";
 import UrlInput from "@/components/UrlInput";
+import MultiDateCalendar from "@/components/MultiDateCalendar";
 
 interface Spotlight {
   id: string;
@@ -251,10 +252,10 @@ export default function AdminSponsorsPage() {
 
   // New booking modal (triggered by calendar date click)
   const [newBookingDate, setNewBookingDate] = useState<string | null>(null);
+  const [newBookingDates, setNewBookingDates] = useState<string[]>([]);
   const [newBookingForm, setNewBookingForm] = useState({
     profileId: "",
     type: "in_article",
-    date: "",
     headline: "",
     body: "",
     ctaUrl: "",
@@ -320,24 +321,27 @@ export default function AdminSponsorsPage() {
 
   function openNewBookingModal(date: string) {
     setNewBookingDate(date);
-    setNewBookingForm({ profileId: "", type: "in_article", date, headline: "", body: "", ctaUrl: "", ctaLabel: "", imageUrl: "", presentingBlurb: "" });
+    setNewBookingDates([date]);
+    setNewBookingForm({ profileId: "", type: "in_article", headline: "", body: "", ctaUrl: "", ctaLabel: "", imageUrl: "", presentingBlurb: "" });
     setNewBookingAutoFilled(false);
     setNewBookingError(null);
   }
 
   function closeNewBookingModal() {
     setNewBookingDate(null);
+    setNewBookingDates([]);
     setNewBookingError(null);
   }
 
   async function submitNewBooking() {
+    if (newBookingDates.length === 0) { setNewBookingError("Select at least one date."); return; }
     setNewBookingSubmitting(true);
     setNewBookingError(null);
     try {
       const res = await fetch("/api/admin/sponsors/bookings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(newBookingForm),
+        body: JSON.stringify({ ...newBookingForm, dates: newBookingDates }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -898,7 +902,7 @@ export default function AdminSponsorsPage() {
                 <div className="flex items-start justify-between gap-2">
                   <div>
                     <h2 className="text-base font-bold text-gray-900">New Booking</h2>
-                    <p className="text-xs text-gray-500 mt-0.5">{newBookingForm.date}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">{newBookingDate}</p>
                   </div>
                   <button onClick={closeNewBookingModal} className="text-gray-400 hover:text-gray-600 text-lg leading-none shrink-0">✕</button>
                 </div>
@@ -956,28 +960,27 @@ export default function AdminSponsorsPage() {
                   <p className="text-xs text-green-600">✓ Auto-filled from their Community Partners listing</p>
                 )}
 
-                {/* Ad type + date */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">Ad Type</label>
-                    <select
-                      value={newBookingForm.type}
-                      onChange={(e) => setNewBookingForm((f) => ({ ...f, type: e.target.value }))}
-                      className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-                    >
-                      <option value="in_article">Standard</option>
-                      <option value="presenting">Presenting</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">Newsletter Date</label>
-                    <input
-                      type="date"
-                      value={newBookingForm.date}
-                      onChange={(e) => setNewBookingForm((f) => ({ ...f, date: e.target.value }))}
-                      className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-                    />
-                  </div>
+                {/* Ad type */}
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Ad Type</label>
+                  <select
+                    value={newBookingForm.type}
+                    onChange={(e) => setNewBookingForm((f) => ({ ...f, type: e.target.value }))}
+                    className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                  >
+                    <option value="in_article">Standard</option>
+                    <option value="presenting">Presenting</option>
+                  </select>
+                </div>
+
+                {/* Date picker */}
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-2">Newsletter Date(s)</label>
+                  <MultiDateCalendar
+                    bookingType={newBookingForm.type as "in_article" | "presenting"}
+                    selectedDates={newBookingDates}
+                    onChange={setNewBookingDates}
+                  />
                 </div>
 
                 {/* Ad image */}
@@ -1072,7 +1075,7 @@ export default function AdminSponsorsPage() {
                 <div className="flex gap-2">
                   <button
                     onClick={submitNewBooking}
-                    disabled={newBookingSubmitting || !newBookingForm.profileId || !newBookingForm.date || !newBookingForm.headline || !newBookingForm.body || !newBookingForm.ctaUrl || !newBookingForm.ctaLabel}
+                    disabled={newBookingSubmitting || !newBookingForm.profileId || newBookingDates.length === 0 || !newBookingForm.headline || !newBookingForm.body || !newBookingForm.ctaUrl || !newBookingForm.ctaLabel}
                     className="px-4 py-2 bg-green-700 text-white rounded-lg text-sm font-semibold hover:bg-green-800 disabled:opacity-50"
                   >
                     {newBookingSubmitting ? "Creating…" : "Create Booking"}

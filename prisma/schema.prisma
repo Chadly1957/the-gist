@@ -153,6 +153,7 @@ model AdBooking {
   date            String
   status          String         @default("pending_review")
   isPaid          Boolean        @default(false)
+  discountPct     Int            @default(0)
   stripeSessionId String?
   imageUrl        String?
   headline        String
