@@ -1,8 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { prisma } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
+
+function getR2Client() {
+  const accountId = process.env.R2_ACCOUNT_ID;
+  const accessKeyId = process.env.R2_ACCESS_KEY_ID;
+  const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY;
+  if (!accountId || !accessKeyId || !secretAccessKey) return null;
+  return new S3Client({
+    region: "auto",
+    endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
+    credentials: { accessKeyId, secretAccessKey },
+  });
+}
 
 export async function POST(req: NextRequest) {
   const formData = await req.formData();
@@ -18,23 +30,24 @@ export async function POST(req: NextRequest) {
   if (!file.type.startsWith("image/")) return NextResponse.json({ error: "File must be an image." }, { status: 400 });
   if (file.size > 5 * 1024 * 1024) return NextResponse.json({ error: "Image must be under 5MB." }, { status: 400 });
 
-  const supabaseUrl = process.env.SUPABASE_URL;
-  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!supabaseUrl || !supabaseKey) {
+  const r2 = getR2Client();
+  const bucket = process.env.R2_BUCKET_NAME;
+  const publicUrl = process.env.R2_PUBLIC_URL?.replace(/\/$/, "");
+
+  if (!r2 || !bucket || !publicUrl) {
     return NextResponse.json({ error: "Image uploads not configured. Please paste an image URL instead." }, { status: 500 });
   }
 
-  const supabase = createClient(supabaseUrl, supabaseKey);
   const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
-  const filename = `sponsors/${Date.now()}-${Math.random().toString(36).slice(2, 9)}.${ext}`;
+  const key = `sponsors/${Date.now()}-${Math.random().toString(36).slice(2, 9)}.${ext}`;
   const buffer = Buffer.from(await file.arrayBuffer());
 
-  const { error } = await supabase.storage
-    .from("newsletter-images")
-    .upload(filename, buffer, { contentType: file.type, upsert: false });
+  await r2.send(new PutObjectCommand({
+    Bucket: bucket,
+    Key: key,
+    Body: buffer,
+    ContentType: file.type,
+  }));
 
-  if (error) return NextResponse.json({ error: `Upload failed: ${error.message}` }, { status: 500 });
-
-  const { data: { publicUrl } } = supabase.storage.from("newsletter-images").getPublicUrl(filename);
-  return NextResponse.json({ url: publicUrl });
+  return NextResponse.json({ url: `${publicUrl}/${key}` });
 }
