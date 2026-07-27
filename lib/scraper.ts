@@ -336,20 +336,43 @@ export async function scrapeSource(
   return combined.filter((a) => passesSourceFilter(a.title, a.description, keywords));
 }
 
-// Scrape all active sources, then tag each article with location keywords
-export async function scrapeAllSources(
-  sources: { url: string; name: string; keywords?: string }[]
-): Promise<ScrapedArticle[]> {
-  const results = await Promise.allSettled(
-    sources.map((s) => scrapeSource(s.url, s.name, s.keywords ?? ""))
-  );
+const SOURCE_TIMEOUT_MS = 30_000;
 
+export interface SourceResult {
+  name: string;
+  count: number;
+  error?: string;
+}
+
+// Scrape all active sources, then tag each article with location keywords.
+// onSourceDone is called as each source finishes (or times out) so callers
+// can stream real-time progress to the client.
+export async function scrapeAllSources(
+  sources: { url: string; name: string; keywords?: string }[],
+  onSourceDone?: (result: SourceResult) => void
+): Promise<ScrapedArticle[]> {
   const all: ScrapedArticle[] = [];
-  for (const result of results) {
-    if (result.status === "fulfilled") {
-      all.push(...result.value);
-    }
-  }
+
+  await Promise.allSettled(
+    sources.map(async (s) => {
+      try {
+        const articles = await Promise.race([
+          scrapeSource(s.url, s.name, s.keywords ?? ""),
+          new Promise<ScrapedArticle[]>((_, reject) =>
+            setTimeout(() => reject(new Error("Timed out")), SOURCE_TIMEOUT_MS)
+          ),
+        ]);
+        all.push(...articles);
+        onSourceDone?.({ name: s.name, count: articles.length });
+      } catch (err) {
+        onSourceDone?.({
+          name: s.name,
+          count: 0,
+          error: String(err).replace(/^Error:\s*/, ""),
+        });
+      }
+    })
+  );
 
   // Deduplicate by URL, sort newest first, then apply location tags
   const seen = new Set<string>();

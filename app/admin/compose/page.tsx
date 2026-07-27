@@ -54,6 +54,10 @@ export default function ComposePage() {
   const [activeKeyword, setActiveKeyword] = useState("");
   const [newKeyword, setNewKeyword] = useState("");
   const [localFirst, setLocalFirst] = useState(true);
+  const [scrapeProgress, setScrapeProgress] = useState<{
+    total: number;
+    results: Array<{ name: string; count: number; error?: string }>;
+  } | null>(null);
   const [clearingPool, setClearingPool] = useState(false);
   const [mobileTab, setMobileTab] = useState<"articles" | "compose">("articles");
 
@@ -142,14 +146,77 @@ export default function ComposePage() {
   async function handleScrape() {
     setScraping(true);
     setScrapeError("");
-    const res = await fetch("/api/admin/scrape", { method: "POST" });
-    const data = await res.json();
-    if (res.ok) {
-      setArticles(data.articles || []);
-    } else {
-      setScrapeError(data.error || "Scrape failed.");
+    setScrapeProgress({ total: 0, results: [] });
+
+    try {
+      const res = await fetch("/api/admin/scrape", { method: "POST" });
+
+      // Non-streaming error (auth, no sources, etc.)
+      if (!res.body || res.headers.get("Content-Type")?.includes("application/json")) {
+        const data = await res.json().catch(() => ({}));
+        setScrapeError((data as { error?: string }).error || "Scrape failed.");
+        return;
+      }
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = "";
+      let finalArticles: Article[] | null = null;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        const lines = buf.split("\n");
+        buf = lines.pop() ?? "";
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          try {
+            const evt = JSON.parse(line) as {
+              type: string;
+              total?: number;
+              name?: string;
+              count?: number;
+              error?: string;
+              message?: string;
+              articles?: Article[];
+            };
+            if (evt.type === "start") {
+              setScrapeProgress({ total: evt.total ?? 0, results: [] });
+            } else if (evt.type === "source_done" || evt.type === "source_error") {
+              setScrapeProgress((p) =>
+                p
+                  ? {
+                      ...p,
+                      results: [
+                        ...p.results,
+                        { name: evt.name!, count: evt.count ?? 0, error: evt.error },
+                      ],
+                    }
+                  : p
+              );
+            } else if (evt.type === "done") {
+              if (evt.articles) finalArticles = evt.articles;
+              if (evt.error) setScrapeError(evt.error);
+            } else if (evt.type === "error") {
+              setScrapeError(evt.message || "Scrape failed.");
+            }
+          } catch {
+            // ignore malformed lines
+          }
+        }
+      }
+
+      if (finalArticles) {
+        const savedIds = new Set(savedDraftRef.current?.selectedArticleIds ?? []);
+        setArticles(finalArticles.map((a) => ({ ...a, selected: savedIds.has(a.id) })));
+      }
+    } catch {
+      setScrapeError("Network error — scrape may have timed out.");
+    } finally {
+      setScraping(false);
+      setScrapeProgress(null);
     }
-    setScraping(false);
   }
 
   function toggleArticle(id: string) {
@@ -379,6 +446,41 @@ export default function ComposePage() {
             </div>
           )}
         </div>
+
+        {/* Per-source scrape progress */}
+        {scraping && scrapeProgress && scrapeProgress.total > 0 && (
+          <div className="px-5 py-3 border-b border-gray-100 bg-gray-50 space-y-1.5">
+            <p className="text-xs font-medium text-gray-500">
+              {scrapeProgress.results.length < scrapeProgress.total
+                ? `Scanning sources… ${scrapeProgress.results.length} / ${scrapeProgress.total}`
+                : "Saving articles…"}
+            </p>
+            {scrapeProgress.results.map((r) => (
+              <div key={r.name} className="flex items-center gap-2 text-xs">
+                {r.error ? (
+                  <svg className="w-3 h-3 shrink-0 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                ) : (
+                  <svg className="w-3 h-3 shrink-0 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                )}
+                <span className="text-gray-600 truncate flex-1 min-w-0">{r.name}</span>
+                <span className={`shrink-0 ${r.error ? "text-red-400" : "text-gray-400"}`}>
+                  {r.error ? r.error : `${r.count} found`}
+                </span>
+              </div>
+            ))}
+            {/* Pending placeholder rows */}
+            {Array.from({ length: scrapeProgress.total - scrapeProgress.results.length }).map((_, i) => (
+              <div key={`pending-${i}`} className="flex items-center gap-2 text-xs">
+                <span className="w-3 h-3 shrink-0 rounded-full bg-gray-200 animate-pulse" />
+                <span className="text-gray-300">scanning…</span>
+              </div>
+            ))}
+          </div>
+        )}
 
         {scrapeError && (
           <div className="px-5 py-2 bg-red-50 border-b border-red-100">
