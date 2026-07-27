@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { SendToMissedButton } from "@/app/admin/components/SendToMissedButton";
+import { ResendUnopenedButton } from "@/app/admin/components/ResendUnopenedButton";
 
 // Always render at request time — requires DB access, not available at build
 export const dynamic = "force-dynamic";
@@ -236,25 +237,32 @@ async function RecentSends() {
 
   const activeEmails = new Set(activeSubscribers.map((s) => s.email));
 
-  // Fetch all recipient emails for recent sends in one query
+  // Fetch recipient rows for all recent sends in one query (email + open status)
   const recipientRows = await prisma.newsletterRecipient.findMany({
     where: { newsletterSendId: { in: sends.map((s) => s.id) } },
-    select: { newsletterSendId: true, email: true },
+    select: { newsletterSendId: true, email: true, openedAt: true },
   });
 
-  // Build a map of sendId → Set of recipient emails
+  // Build per-send maps: all recipients and non-openers
   const recipientsBySend = new Map<string, Set<string>>();
+  const nonOpenersBySend = new Map<string, number>();
+
   for (const r of recipientRows) {
     if (!recipientsBySend.has(r.newsletterSendId)) {
       recipientsBySend.set(r.newsletterSendId, new Set());
+      nonOpenersBySend.set(r.newsletterSendId, 0);
     }
     recipientsBySend.get(r.newsletterSendId)!.add(r.email);
+    // Non-opener = has a recipient record, hasn't opened, is still an active subscriber
+    if (!r.openedAt && activeEmails.has(r.email)) {
+      nonOpenersBySend.set(r.newsletterSendId, (nonOpenersBySend.get(r.newsletterSendId) ?? 0) + 1);
+    }
   }
 
-  // Missed = active subscribers whose email isn't in the send's recipient list
+  // Missed = active subscribers with NO recipient record for this send at all
   const missedBySend = sends.map((send) => {
     const recipients = recipientsBySend.get(send.id) ?? new Set<string>();
-    return Array.from(activeEmails).filter((email) => !recipients.has(email)).length;
+    return Array.from(activeEmails).filter((email) => !recipients.has(email as string)).length;
   });
 
   return (
@@ -280,12 +288,15 @@ async function RecentSends() {
                 Status
               </th>
               <th className="text-left px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wide">
-                Missed
+                Recovery
               </th>
             </tr>
           </thead>
           <tbody>
-            {sends.map((send, i) => (
+            {sends.map((send, i) => {
+              const missed = missedBySend[i];
+              const unopened = nonOpenersBySend.get(send.id) ?? 0;
+              return (
               <tr key={send.id} className="border-b border-gray-100 last:border-0">
                 <td className="px-5 py-3 font-medium text-gray-800">
                   {send.subject}
@@ -308,14 +319,21 @@ async function RecentSends() {
                   </span>
                 </td>
                 <td className="px-5 py-3">
-                  {missedBySend[i] > 0 ? (
-                    <SendToMissedButton sendId={send.id} missedCount={missedBySend[i]} />
-                  ) : (
-                    <span className="text-xs text-gray-300">—</span>
-                  )}
+                  <div className="flex flex-col gap-1">
+                    {missed > 0 && (
+                      <SendToMissedButton sendId={send.id} missedCount={missed} />
+                    )}
+                    {unopened > 0 && (
+                      <ResendUnopenedButton sendId={send.id} unopenedCount={unopened} />
+                    )}
+                    {missed === 0 && unopened === 0 && (
+                      <span className="text-xs text-gray-300">—</span>
+                    )}
+                  </div>
                 </td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
         </div>
