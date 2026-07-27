@@ -126,6 +126,7 @@ async function scrapeArticleMeta(
       articleUrl: url,
       sourceName,
       publishedAt,
+      tags: [],
     };
   } catch {
     return null;
