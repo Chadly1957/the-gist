@@ -133,11 +133,108 @@ async function scrapeArticleMeta(
   }
 }
 
+// Check if a source URL is a Google News search feed
+function isGoogleNewsFeed(url: string): boolean {
+  try {
+    return new URL(url).hostname === "news.google.com";
+  } catch {
+    return false;
+  }
+}
+
+// Follow all redirects and return the final landing URL + page HTML.
+// Used to resolve Google News redirect URLs to the actual article page.
+async function fetchFollowingRedirects(
+  url: string,
+  timeoutMs = 10000
+): Promise<{ finalUrl: string; html: string }> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await axios.get(url, {
+      signal: controller.signal as AbortSignal,
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (compatible; TheGistBot/1.0; newsletter aggregator)",
+        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*",
+      },
+      timeout: timeoutMs,
+      maxRedirects: 10,
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const finalUrl: string = (res.request as any)?.res?.responseUrl ?? url;
+    return { finalUrl, html: String(res.data) };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// Enrich a Google News RSS item by following its redirect URL to the real
+// article page, then scraping OG metadata for image, description, and title.
+// Google News titles end with " - Publisher Name"; that suffix is stripped to
+// produce a clean headline. sourceName is the user-assigned name from Sources.
+async function enrichGoogleNewsItem(
+  googleUrl: string,
+  rawTitle: string,
+  pubDate: Date,
+  sourceName: string
+): Promise<ScrapedArticle | null> {
+  try {
+    const { finalUrl, html } = await fetchFollowingRedirects(googleUrl);
+
+    // If the redirect didn't escape Google, skip
+    if (new URL(finalUrl).hostname.includes("google.com")) return null;
+
+    const $ = cheerio.load(html);
+
+    // Strip " - Publisher Name" suffix from Google News titles
+    const lastDash = rawTitle.lastIndexOf(" - ");
+    const cleanRawTitle = lastDash > 0 ? rawTitle.slice(0, lastDash).trim() : rawTitle;
+
+    const title = stripHtml(
+      $('meta[property="og:title"]').attr("content") ||
+        $('meta[name="twitter:title"]').attr("content") ||
+        $("h1").first().text() ||
+        cleanRawTitle
+    );
+
+    const description = truncate(
+      $('meta[property="og:description"]').attr("content") ||
+        $('meta[name="description"]').attr("content") ||
+        $('meta[name="twitter:description"]').attr("content") ||
+        $("article p").first().text() ||
+        ""
+    );
+
+    const imageUrl =
+      $('meta[property="og:image"]').attr("content") ||
+      $('meta[name="twitter:image"]').attr("content") ||
+      $('meta[property="og:image:url"]').attr("content") ||
+      null;
+
+    if (!title || !description) return null;
+    if (isFluffArticle(title, description)) return null;
+
+    return {
+      title,
+      description,
+      imageUrl: imageUrl ? resolveUrl(imageUrl, finalUrl) : null,
+      articleUrl: finalUrl,
+      sourceName,
+      publishedAt: pubDate,
+      tags: [],
+    };
+  } catch {
+    return null;
+  }
+}
+
 // Try to find and parse an RSS feed for a given source URL
 async function scrapeViaRSS(
   sourceUrl: string,
   sourceName: string
 ): Promise<ScrapedArticle[]> {
+  const isGoogleNews = isGoogleNewsFeed(sourceUrl);
   const parsed = new URL(sourceUrl);
   const base = parsed.origin;
   // Strip trailing slash from the section path (e.g. "/news/illinois")
@@ -158,6 +255,41 @@ async function scrapeViaRSS(
   for (const candidate of candidates) {
     try {
       const feed = await rssParser.parseURL(candidate);
+
+      // --- Google News path: follow each redirect to get real article data ---
+      if (isGoogleNews) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const recentItems = (feed.items ?? []).filter((item: any) => {
+          if (!item.pubDate && !item.isoDate) return false;
+          const d = new Date(item.isoDate ?? item.pubDate ?? "");
+          return !isNaN(d.getTime()) && isRecent(d);
+        });
+
+        if (recentItems.length === 0) continue;
+
+        const enrichResults = await Promise.allSettled(
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          recentItems.map((item: any) => {
+            const pubDate = new Date(item.isoDate ?? item.pubDate ?? "");
+            const itemUrl = item.link ?? item.guid ?? "";
+            if (!itemUrl) return Promise.resolve(null);
+            return enrichGoogleNewsItem(itemUrl, item.title ?? "", pubDate, sourceName);
+          })
+        );
+
+        const articles = (enrichResults as PromiseSettledResult<ScrapedArticle | null>[])
+          .filter(
+            (r): r is PromiseFulfilledResult<ScrapedArticle | null> =>
+              r.status === "fulfilled"
+          )
+          .map((r) => r.value)
+          .filter((a): a is ScrapedArticle => a !== null);
+
+        if (articles.length > 0) return articles;
+        continue;
+      }
+
+      // --- Standard RSS path ---
       const articles: ScrapedArticle[] = [];
 
       for (const item of feed.items ?? []) {
