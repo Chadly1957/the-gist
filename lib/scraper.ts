@@ -138,11 +138,21 @@ async function scrapeViaRSS(
   sourceUrl: string,
   sourceName: string
 ): Promise<ScrapedArticle[]> {
-  const base = new URL(sourceUrl).origin;
+  const parsed = new URL(sourceUrl);
+  const base = parsed.origin;
+  // Strip trailing slash from the section path (e.g. "/news/illinois")
+  const sectionPath = parsed.pathname.replace(/\/+$/, "");
+
+  // Try section-specific feeds before root-level ones so that a source URL
+  // like /news/illinois/ gets its own feed rather than the site-wide feed.
+  const sectionCandidates = sectionPath
+    ? RSS_PATHS.map((p) => `${base}${sectionPath}${p}`)
+    : [];
 
   const candidates = [
-    sourceUrl, // maybe it IS a feed
-    ...RSS_PATHS.map((p) => base + p),
+    sourceUrl,             // maybe it IS a feed
+    ...sectionCandidates,  // e.g. /news/illinois/feed
+    ...RSS_PATHS.map((p) => base + p), // root-level fallback
   ];
 
   for (const candidate of candidates) {
@@ -299,18 +309,31 @@ function extractFirstImage(html: string): string | null {
   return match?.[1] ?? null;
 }
 
-// Main export: scrape a single source URL
+// Main export: scrape a single source URL.
+// Runs RSS and HTML scraping in parallel so section-page articles are never
+// missed when a root-level RSS feed succeeds but doesn't include section content.
+// RSS takes precedence for any URL that appears in both (better pub dates).
 export async function scrapeSource(
   sourceUrl: string,
   sourceName: string,
   keywords = ""
 ): Promise<ScrapedArticle[]> {
-  // Try RSS first (fastest and most reliable)
-  const rssArticles = await scrapeViaRSS(sourceUrl, sourceName);
-  const raw = rssArticles.length > 0 ? rssArticles : await scrapeViaHTML(sourceUrl, sourceName);
+  const [rssResult, htmlResult] = await Promise.allSettled([
+    scrapeViaRSS(sourceUrl, sourceName),
+    scrapeViaHTML(sourceUrl, sourceName),
+  ]);
 
-  // Apply per-source keyword filter (if configured)
-  return raw.filter((a) => passesSourceFilter(a.title, a.description, keywords));
+  const rssArticles = rssResult.status === "fulfilled" ? rssResult.value : [];
+  const htmlArticles = htmlResult.status === "fulfilled" ? htmlResult.value : [];
+
+  // Merge: RSS takes precedence (reliable dates); HTML fills in anything missing
+  const rssUrls = new Set(rssArticles.map((a) => a.articleUrl));
+  const combined = [
+    ...rssArticles,
+    ...htmlArticles.filter((a) => !rssUrls.has(a.articleUrl)),
+  ];
+
+  return combined.filter((a) => passesSourceFilter(a.title, a.description, keywords));
 }
 
 // Scrape all active sources, then tag each article with location keywords
