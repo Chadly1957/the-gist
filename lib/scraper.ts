@@ -143,7 +143,8 @@ function isGoogleNewsFeed(url: string): boolean {
 }
 
 // Follow all redirects and return the final landing URL + page HTML.
-// Used to resolve Google News redirect URLs to the actual article page.
+// Uses native fetch (not axios) because fetch.Response.url is the final URL
+// after all redirects — axios has no equivalent in Node.js.
 async function fetchFollowingRedirects(
   url: string,
   timeoutMs = 10000
@@ -151,19 +152,19 @@ async function fetchFollowingRedirects(
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const res = await axios.get(url, {
-      signal: controller.signal as AbortSignal,
+    const res = await fetch(url, {
+      signal: controller.signal,
       headers: {
         "User-Agent":
           "Mozilla/5.0 (compatible; TheGistBot/1.0; newsletter aggregator)",
         Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*",
       },
-      timeout: timeoutMs,
-      maxRedirects: 10,
+      redirect: "follow",
+      // Bypass Next.js fetch caching — we always want fresh data
+      cache: "no-store",
     });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const finalUrl: string = (res.request as any)?.res?.responseUrl ?? url;
-    return { finalUrl, html: String(res.data) };
+    const html = await res.text();
+    return { finalUrl: res.url, html };
   } finally {
     clearTimeout(timer);
   }
@@ -267,23 +268,56 @@ async function scrapeViaRSS(
 
         if (recentItems.length === 0) continue;
 
-        const enrichResults = await Promise.allSettled(
+        const articles: ScrapedArticle[] = [];
+
+        await Promise.allSettled(
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          recentItems.map((item: any) => {
+          recentItems.map(async (item: any) => {
             const pubDate = new Date(item.isoDate ?? item.pubDate ?? "");
             const itemUrl = item.link ?? item.guid ?? "";
-            if (!itemUrl) return Promise.resolve(null);
-            return enrichGoogleNewsItem(itemUrl, item.title ?? "", pubDate, sourceName);
+            if (!itemUrl) return;
+
+            const rawTitle: string = item.title ?? "";
+            // Google News titles end with " - Publisher Name" — strip that
+            const lastDash = rawTitle.lastIndexOf(" - ");
+            const cleanTitle = stripHtml(
+              lastDash > 0 ? rawTitle.slice(0, lastDash).trim() : rawTitle
+            );
+            if (!cleanTitle) return;
+
+            // Attempt to follow the redirect and scrape real OG metadata
+            const enriched = await enrichGoogleNewsItem(
+              itemUrl,
+              rawTitle,
+              pubDate,
+              sourceName
+            );
+            if (enriched) {
+              articles.push(enriched);
+              return;
+            }
+
+            // Fallback: use RSS data with cleaned title + user-assigned source name.
+            // The image will be absent but the article is not silently dropped.
+            const description = truncate(
+              item.contentSnippet ||
+                stripHtml(item.content ?? item["content:encoded"] ?? "") ||
+                item.summary ||
+                ""
+            );
+            if (!description || isFluffArticle(cleanTitle, description)) return;
+
+            articles.push({
+              title: cleanTitle,
+              description,
+              imageUrl: null,
+              articleUrl: itemUrl,
+              sourceName,
+              publishedAt: pubDate,
+              tags: [],
+            });
           })
         );
-
-        const articles = (enrichResults as PromiseSettledResult<ScrapedArticle | null>[])
-          .filter(
-            (r): r is PromiseFulfilledResult<ScrapedArticle | null> =>
-              r.status === "fulfilled"
-          )
-          .map((r) => r.value)
-          .filter((a): a is ScrapedArticle => a !== null);
 
         if (articles.length > 0) return articles;
         continue;
