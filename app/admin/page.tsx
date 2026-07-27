@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
+import { SendToMissedButton } from "@/app/admin/components/SendToMissedButton";
 
 // Always render at request time — requires DB access, not available at build
 export const dynamic = "force-dynamic";
@@ -226,12 +227,35 @@ export default async function AdminDashboard() {
 }
 
 async function RecentSends() {
-  const sends = await prisma.newsletterSend.findMany({
-    orderBy: { sentAt: "desc" },
-    take: 5,
-  });
+  const [sends, activeSubscribers] = await Promise.all([
+    prisma.newsletterSend.findMany({ orderBy: { sentAt: "desc" }, take: 5 }),
+    prisma.subscriber.findMany({ where: { active: true }, select: { email: true } }),
+  ]);
 
   if (sends.length === 0) return null;
+
+  const activeEmails = new Set(activeSubscribers.map((s) => s.email));
+
+  // Fetch all recipient emails for recent sends in one query
+  const recipientRows = await prisma.newsletterRecipient.findMany({
+    where: { newsletterSendId: { in: sends.map((s) => s.id) } },
+    select: { newsletterSendId: true, email: true },
+  });
+
+  // Build a map of sendId → Set of recipient emails
+  const recipientsBySend = new Map<string, Set<string>>();
+  for (const r of recipientRows) {
+    if (!recipientsBySend.has(r.newsletterSendId)) {
+      recipientsBySend.set(r.newsletterSendId, new Set());
+    }
+    recipientsBySend.get(r.newsletterSendId)!.add(r.email);
+  }
+
+  // Missed = active subscribers whose email isn't in the send's recipient list
+  const missedBySend = sends.map((send) => {
+    const recipients = recipientsBySend.get(send.id) ?? new Set<string>();
+    return Array.from(activeEmails).filter((email) => !recipients.has(email)).length;
+  });
 
   return (
     <div>
@@ -255,15 +279,18 @@ async function RecentSends() {
               <th className="text-left px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wide">
                 Status
               </th>
+              <th className="text-left px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wide">
+                Missed
+              </th>
             </tr>
           </thead>
           <tbody>
-            {sends.map((send) => (
+            {sends.map((send, i) => (
               <tr key={send.id} className="border-b border-gray-100 last:border-0">
                 <td className="px-5 py-3 font-medium text-gray-800">
                   {send.subject}
                 </td>
-                <td className="px-5 py-3 text-gray-500">
+                <td className="px-5 py-3 text-gray-500 whitespace-nowrap">
                   {new Date(send.sentAt).toLocaleDateString("en-US", {
                     month: "short",
                     day: "numeric",
@@ -279,6 +306,13 @@ async function RecentSends() {
                     <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
                     {send.status}
                   </span>
+                </td>
+                <td className="px-5 py-3">
+                  {missedBySend[i] > 0 ? (
+                    <SendToMissedButton sendId={send.id} missedCount={missedBySend[i]} />
+                  ) : (
+                    <span className="text-xs text-gray-300">—</span>
+                  )}
                 </td>
               </tr>
             ))}
