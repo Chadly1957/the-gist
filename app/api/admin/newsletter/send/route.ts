@@ -9,6 +9,10 @@ import { blurbToHtml } from "@/lib/url";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = prisma as any;
 
+// Allow up to 5 minutes — sending to large lists via SMTP takes longer than
+// Vercel's default serverless function timeout (10-30s depending on plan).
+export const maxDuration = 300;
+
 function generateRefCode(): string {
   return Math.random().toString(36).slice(2, 10).toUpperCase();
 }
@@ -240,13 +244,18 @@ export async function POST(req: NextRequest) {
   }
 
   if (willSend) {
-    const recipients = await Promise.all(
-      activeSubscribers.map((s) =>
-        prisma.newsletterRecipient.create({
-          data: { newsletterSendId: newsletterSend.id, subscriberId: s.id, email: s.email },
-        })
-      )
-    );
+    // Single bulk INSERT instead of one round-trip per subscriber
+    await prisma.newsletterRecipient.createMany({
+      data: activeSubscribers.map((s) => ({
+        newsletterSendId: newsletterSend.id,
+        subscriberId: s.id,
+        email: s.email,
+      })),
+    });
+    const recipients = await prisma.newsletterRecipient.findMany({
+      where: { newsletterSendId: newsletterSend.id },
+      select: { id: true, email: true },
+    });
 
     const personalized = recipients.map((r) => {
       const sub = activeSubscribers.find((s) => s.email === r.email);

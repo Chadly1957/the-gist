@@ -6,6 +6,8 @@ import { getEmailClient, htmlToText } from "@/lib/email";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = prisma as any;
 
+export const maxDuration = 300;
+
 function generateRefCode(): string {
   return Math.random().toString(36).slice(2, 10).toUpperCase();
 }
@@ -56,13 +58,17 @@ export async function POST(
     },
   });
 
-  const recipients = await Promise.all(
-    activeSubscribers.map((s) =>
-      prisma.newsletterRecipient.create({
-        data: { newsletterSendId: newSend.id, subscriberId: s.id, email: s.email },
-      })
-    )
-  );
+  await prisma.newsletterRecipient.createMany({
+    data: activeSubscribers.map((s) => ({
+      newsletterSendId: newSend.id,
+      subscriberId: s.id,
+      email: s.email,
+    })),
+  });
+  const recipients = await prisma.newsletterRecipient.findMany({
+    where: { newsletterSendId: newSend.id },
+    select: { id: true, email: true },
+  });
 
   const hasReferral = existingSend.htmlBody.includes("REFCODEPLACEHOLDER");
   const refCodeMap = new Map<string, string>();

@@ -259,7 +259,9 @@ export class SmtpEmailClient {
   private createTransport(pool = false) {
     return nodemailer.createTransport({
       ...this.transportOpts,
-      ...(pool ? { pool: true, maxConnections: 5 } : {}),
+      // rateLimit: max messages per second across all pooled connections.
+      // AWS SES SMTP allows 14/s; we target 10/s to leave headroom.
+      ...(pool ? { pool: true, maxConnections: 5, rateLimit: 10 } : {}),
     });
   }
 
@@ -284,15 +286,35 @@ export class SmtpEmailClient {
 
   async sendBatch(emails: EmailPayload[]): Promise<SendResult> {
     const t = this.createTransport(true);
+    const results: Array<{ id?: string }> = [];
+    let failures = 0;
     try {
-      const results = await Promise.all(
-        emails.map(({ to, subject, htmlBody, textBody, headers }) =>
-          t
-            .sendMail({ from: this.from, to, subject, html: htmlBody, text: textBody, headers })
-            .then((info) => ({ id: info.messageId as string | undefined }))
-            .catch(() => ({ id: undefined as string | undefined }))
-        )
-      );
+      // Process in chunks of 10. Combined with the pool's rateLimit: 10 this
+      // keeps us well under SES's 14 messages/second ceiling. Firing all emails
+      // in a single Promise.all would overrun the rate limit and silently drop
+      // the overflow while consuming the entire serverless function timeout.
+      for (let i = 0; i < emails.length; i += 10) {
+        const chunk = emails.slice(i, i + 10);
+        const chunkResults = await Promise.all(
+          chunk.map(({ to, subject, htmlBody, textBody, headers }) =>
+            t
+              .sendMail({ from: this.from, to, subject, html: htmlBody, text: textBody, headers })
+              .then((info) => ({ id: info.messageId as string | undefined }))
+              .catch(() => {
+                failures++;
+                return { id: undefined as string | undefined };
+              })
+          )
+        );
+        results.push(...chunkResults);
+        if (i + 10 < emails.length) {
+          // 800 ms between chunks → ~12.5 emails/second, safely under 14/s
+          await new Promise((res) => setTimeout(res, 800));
+        }
+      }
+      if (failures > 0) {
+        console.error(`[smtp] sendBatch: ${failures}/${emails.length} sends failed`);
+      }
       return { success: true, data: results };
     } catch (err) {
       return { success: false, error: String(err) };
