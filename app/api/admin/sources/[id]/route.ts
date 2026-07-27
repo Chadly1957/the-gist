@@ -18,6 +18,7 @@ export async function PATCH(
       ...(typeof body.active === "boolean" && { active: body.active }),
       ...(body.name && { name: body.name }),
       ...(body.url && { url: body.url }),
+      ...(typeof body.keywords === "string" && { keywords: body.keywords.trim() }),
     },
   });
   return NextResponse.json({ source });

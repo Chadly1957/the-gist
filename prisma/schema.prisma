@@ -19,6 +19,7 @@ model Source {
   name      String
   url       String   @unique
   active    Boolean  @default(true)
+  keywords  String   @default("")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -33,6 +34,7 @@ model Article {
   publishedAt DateTime
   scrapedAt   DateTime @default(now())
   selected    Boolean  @default(false)
+  tags        String[] @default([])
 }
 
 model Template {

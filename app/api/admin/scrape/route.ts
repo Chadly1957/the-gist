@@ -7,7 +7,10 @@ export async function POST() {
   const session = await getAdminSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const sources = await prisma.source.findMany({ where: { active: true } });
+  const sources = await prisma.source.findMany({
+    where: { active: true },
+    select: { url: true, name: true, keywords: true },
+  });
 
   if (sources.length === 0) {
     return NextResponse.json(
@@ -36,6 +39,7 @@ export async function POST() {
           imageUrl: a.imageUrl,
           sourceName: a.sourceName,
           publishedAt: a.publishedAt,
+          tags: a.tags,
         },
         create: {
           title: a.title,
@@ -45,6 +49,7 @@ export async function POST() {
           sourceName: a.sourceName,
           publishedAt: a.publishedAt,
           selected: false,
+          tags: a.tags,
         },
       })
     )

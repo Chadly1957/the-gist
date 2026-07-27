@@ -1,6 +1,7 @@
 import axios from "axios";
 import * as cheerio from "cheerio";
 import RSSParser from "rss-parser";
+import { detectLocationTags, isFluffArticle, passesSourceFilter } from "@/lib/article-filter";
 
 const rssParser = new RSSParser({
   customFields: {
@@ -15,6 +16,7 @@ export interface ScrapedArticle {
   articleUrl: string;
   sourceName: string;
   publishedAt: Date;
+  tags: string[];
 }
 
 // Paths that are almost never real articles (nav, auth, utility pages)
@@ -175,6 +177,7 @@ async function scrapeViaRSS(
         );
 
         if (!title || !description) continue;
+        if (isFluffArticle(title, description)) continue;
 
         articles.push({
           title,
@@ -183,6 +186,7 @@ async function scrapeViaRSS(
           articleUrl: itemUrl,
           sourceName: feed.title || sourceName,
           publishedAt: pubDate,
+          tags: [],
         });
       }
 
@@ -273,8 +277,8 @@ async function scrapeViaHTML(
     for (const result of results) {
       if (result.status === "fulfilled" && result.value) {
         const article = result.value;
-        if (isRecent(article.publishedAt)) {
-          articles.push(article);
+        if (isRecent(article.publishedAt) && !isFluffArticle(article.title, article.description)) {
+          articles.push({ ...article, tags: [] });
         }
       }
     }
@@ -297,22 +301,23 @@ function extractFirstImage(html: string): string | null {
 // Main export: scrape a single source URL
 export async function scrapeSource(
   sourceUrl: string,
-  sourceName: string
+  sourceName: string,
+  keywords = ""
 ): Promise<ScrapedArticle[]> {
   // Try RSS first (fastest and most reliable)
   const rssArticles = await scrapeViaRSS(sourceUrl, sourceName);
-  if (rssArticles.length > 0) return rssArticles;
+  const raw = rssArticles.length > 0 ? rssArticles : await scrapeViaHTML(sourceUrl, sourceName);
 
-  // Fall back to HTML scraping
-  return scrapeViaHTML(sourceUrl, sourceName);
+  // Apply per-source keyword filter (if configured)
+  return raw.filter((a) => passesSourceFilter(a.title, a.description, keywords));
 }
 
-// Scrape all active sources
+// Scrape all active sources, then tag each article with location keywords
 export async function scrapeAllSources(
-  sources: { url: string; name: string }[]
+  sources: { url: string; name: string; keywords?: string }[]
 ): Promise<ScrapedArticle[]> {
   const results = await Promise.allSettled(
-    sources.map((s) => scrapeSource(s.url, s.name))
+    sources.map((s) => scrapeSource(s.url, s.name, s.keywords ?? ""))
   );
 
   const all: ScrapedArticle[] = [];
@@ -322,7 +327,7 @@ export async function scrapeAllSources(
     }
   }
 
-  // Deduplicate by URL, sort newest first
+  // Deduplicate by URL, sort newest first, then apply location tags
   const seen = new Set<string>();
   return all
     .filter((a) => {
@@ -330,5 +335,6 @@ export async function scrapeAllSources(
       seen.add(a.articleUrl);
       return true;
     })
-    .sort((a, b) => b.publishedAt.getTime() - a.publishedAt.getTime());
+    .sort((a, b) => b.publishedAt.getTime() - a.publishedAt.getTime())
+    .map((a) => ({ ...a, tags: detectLocationTags(a.title, a.description) }));
 }

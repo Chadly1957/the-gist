@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
   const session = await getAdminSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { name, url } = await req.json();
+  const { name, url, keywords } = await req.json();
   if (!name || !url) {
     return NextResponse.json({ error: "Name and URL required." }, { status: 400 });
   }
@@ -60,7 +60,9 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const source = await prisma.source.create({ data: { name, url } });
+    const source = await prisma.source.create({
+      data: { name, url, keywords: keywords?.trim() ?? "" },
+    });
     return NextResponse.json({ source }, { status: 201 });
   } catch {
     return NextResponse.json(

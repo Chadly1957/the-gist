@@ -13,6 +13,7 @@ interface Article {
   sourceName: string;
   publishedAt: string;
   selected: boolean;
+  tags: string[];
 }
 
 interface Template {
@@ -52,6 +53,7 @@ export default function ComposePage() {
   const [savedKeywords, setSavedKeywords] = useState<string[]>([]);
   const [activeKeyword, setActiveKeyword] = useState("");
   const [newKeyword, setNewKeyword] = useState("");
+  const [localFirst, setLocalFirst] = useState(true);
   const [clearingPool, setClearingPool] = useState(false);
   const [mobileTab, setMobileTab] = useState<"articles" | "compose">("articles");
 
@@ -92,17 +94,19 @@ export default function ComposePage() {
   useEffect(() => {
     const saved = localStorage.getItem("gist_keyword_filters");
     if (saved) {
-      try {
-        setSavedKeywords(JSON.parse(saved));
-      } catch {
-        // ignore malformed local storage value
-      }
+      try { setSavedKeywords(JSON.parse(saved)); } catch { /* ignore */ }
     }
+    const savedLocal = localStorage.getItem("gist_local_first");
+    if (savedLocal !== null) setLocalFirst(savedLocal !== "false");
   }, []);
 
   useEffect(() => {
     localStorage.setItem("gist_keyword_filters", JSON.stringify(savedKeywords));
   }, [savedKeywords]);
+
+  useEffect(() => {
+    localStorage.setItem("gist_local_first", String(localFirst));
+  }, [localFirst]);
 
   useEffect(() => {
     // Load templates
@@ -154,11 +158,20 @@ export default function ComposePage() {
     );
   }
 
+  const sortedArticles = localFirst
+    ? [
+        ...articles.filter((a) => (a.tags?.length ?? 0) > 0),
+        ...articles.filter((a) => (a.tags?.length ?? 0) === 0),
+      ]
+    : articles;
+
   const filteredArticles = activeKeyword
-    ? articles.filter((a) =>
+    ? sortedArticles.filter((a) =>
         `${a.title} ${a.description}`.toLowerCase().includes(activeKeyword.toLowerCase())
       )
-    : articles;
+    : sortedArticles;
+
+  const localCount = articles.filter((a) => (a.tags?.length ?? 0) > 0).length;
 
   function selectAll() {
     const ids = new Set(filteredArticles.map((a) => a.id));
@@ -375,6 +388,28 @@ export default function ComposePage() {
 
         {/* Keyword filters */}
         <div className="px-5 py-3 border-b border-gray-100 space-y-2">
+          {/* Local-first toggle */}
+          <button
+            onClick={() => setLocalFirst((v) => !v)}
+            className={`flex items-center gap-1.5 text-xs font-medium px-2 py-1 rounded-md transition-colors ${
+              localFirst
+                ? "bg-green-50 text-green-700"
+                : "text-gray-400 hover:text-gray-600"
+            }`}
+            title="Sort local articles to the top"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+            Local first
+            {localFirst && localCount > 0 && (
+              <span className="ml-0.5 bg-green-100 text-green-800 text-xs px-1.5 py-0.5 rounded-full font-semibold">
+                {localCount}
+              </span>
+            )}
+          </button>
+
           <div className="flex items-center gap-2">
             <select
               value={activeKeyword}
@@ -471,9 +506,16 @@ export default function ComposePage() {
                         onError={(e) => (e.currentTarget.style.display = "none")}
                       />
                     )}
-                    <p className="text-xs font-semibold text-green-700 uppercase tracking-wide mb-0.5">
-                      {article.sourceName}
-                    </p>
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <p className="text-xs font-semibold text-green-700 uppercase tracking-wide">
+                        {article.sourceName}
+                      </p>
+                      {(article.tags?.length ?? 0) > 0 && (
+                        <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-medium leading-none">
+                          Local
+                        </span>
+                      )}
+                    </div>
                     <p className="text-sm font-semibold text-gray-800 leading-snug mb-1">
                       {article.title}
                     </p>
