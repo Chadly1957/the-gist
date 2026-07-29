@@ -19,6 +19,16 @@ const games: Game[] = [
       </svg>
     ),
   },
+  {
+    name: "Gist Match",
+    description: "Daily match-3 puzzle · one shared board a day, race the leaderboard",
+    href: "/match",
+    icon: (
+      <svg className="w-5 h-5 text-green-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 3l2.5 5.5L20 11l-5.5 2.5L12 19l-2.5-5.5L4 11l5.5-2.5L12 3z" />
+      </svg>
+    ),
+  },
 ];
 
 export default function GamesPage() {
