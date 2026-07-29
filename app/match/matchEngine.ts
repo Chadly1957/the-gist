@@ -183,12 +183,12 @@ export class MatchEngine {
     const id = this.nextTileId++;
     const el = document.createElement("div");
     el.className = this.styles.tile;
-    const gem = document.createElement("span");
-    gem.className = `${this.styles.gem} ${this.styles["gemType" + type]}`;
+    const item = document.createElement("span");
+    item.className = `${this.styles.item} ${this.styles["itemType" + type]}`;
     const wiggleSeed = (id * 2654435761) % 4294967296;
-    gem.style.animationDelay = "-" + ((wiggleSeed % 1700) / 100).toFixed(2) + "s";
-    gem.style.animationDuration = (3.1 + ((wiggleSeed >>> 8) % 240) / 100).toFixed(2) + "s";
-    el.appendChild(gem);
+    item.style.animationDelay = "-" + ((wiggleSeed % 1700) / 100).toFixed(2) + "s";
+    item.style.animationDuration = (3.1 + ((wiggleSeed >>> 8) % 240) / 100).toFixed(2) + "s";
+    el.appendChild(item);
     this.boardEl.appendChild(el);
 
     const tile: Tile = { id, type, row: spawnRow === undefined ? row : spawnRow, col, el };
@@ -493,9 +493,9 @@ export class MatchEngine {
   private createGhost(tile: Tile): HTMLDivElement {
     const ghost = document.createElement("div");
     ghost.className = `${this.styles.tile} ${this.styles.tileGhost}`;
-    const gem = document.createElement("span");
-    gem.className = `${this.styles.gem} ${this.styles["gemType" + tile.type]}`;
-    ghost.appendChild(gem);
+    const item = document.createElement("span");
+    item.className = `${this.styles.item} ${this.styles["itemType" + tile.type]}`;
+    ghost.appendChild(item);
     this.boardEl.insertBefore(ghost, tile.el);
     const size = this.cellSize * 0.86;
     const offset = (this.cellSize - size) / 2;
@@ -506,7 +506,7 @@ export class MatchEngine {
   }
 
   // Resolve the drop target by board math (which cell the pointer is over),
-  // not DOM hit-testing -- gems render at 86% of a cell for visual spacing,
+  // not DOM hit-testing -- items render at 86% of a cell for visual spacing,
   // so elementFromPoint would miss in the gap and silently treat a
   // well-aimed drop as "nowhere". This makes the whole cell count.
   private tileFromClientPoint(clientX: number, clientY: number): Tile | null {

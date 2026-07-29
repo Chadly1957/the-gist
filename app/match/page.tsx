@@ -195,7 +195,7 @@ export default function MatchPage() {
                 </div>
 
                 <div className={styles.boardWrap}>
-                  <div ref={boardRef} className={styles.board} aria-label="Match three board, 6 by 6 gems" />
+                  <div ref={boardRef} className={styles.board} aria-label="Match three board, 6 by 6 items" />
                   <div ref={toastRef} className={styles.toast} aria-hidden="true" />
 
                   {gameOver && (
@@ -235,7 +235,7 @@ export default function MatchPage() {
                   )}
                 </div>
 
-                <p className={styles.hint}>Drag any gem onto another to swap them. It only sticks if it makes a match.</p>
+                <p className={styles.hint}>Drag any item onto another to swap them. It only sticks if it makes a match.</p>
               </div>
               {leaderboardPanel}
             </>

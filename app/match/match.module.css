@@ -11,12 +11,12 @@
   --danger: #c1503f;
   --shadow-card: 0 24px 48px -24px rgba(20, 37, 33, 0.28), 0 2px 6px rgba(20, 37, 33, 0.06);
 
-  --gem-0: #1f9c8a;
-  --gem-1: #e2673f;
-  --gem-2: #5b63c4;
-  --gem-3: #e3a63d;
-  --gem-4: #d1547e;
-  --gem-5: #3f9bd1;
+  --item-0: #1f9c8a;
+  --item-1: #e2673f;
+  --item-2: #5b63c4;
+  --item-3: #e3a63d;
+  --item-4: #d1547e;
+  --item-5: #3f9bd1;
 
   --dur-fall: 280ms;
   --dur-clear: 180ms;
@@ -128,7 +128,7 @@
   z-index: 6;
 }
 
-.isDragging .gem {
+.isDragging .item {
   filter: brightness(1.1) drop-shadow(0 10px 16px rgba(10, 20, 16, 0.4));
 }
 
@@ -143,12 +143,12 @@
   z-index: 1;
 }
 
-.tileGhost .gem {
+.tileGhost .item {
   filter: grayscale(1);
   opacity: 0.32;
 }
 
-.isClearing .gem {
+.isClearing .item {
   transition: transform var(--dur-clear) ease-in, opacity var(--dur-clear) ease-in;
   transform: scale(0.15) rotate(12deg);
   opacity: 0;
@@ -158,32 +158,30 @@
   animation: shake var(--dur-shake) ease;
 }
 
-.gem {
+.item {
   width: 82%;
   height: 82%;
   filter: drop-shadow(0 2px 3px rgba(20, 20, 10, 0.28));
   transition: filter 120ms ease, transform 120ms ease;
 }
 
-.tile:not(.tileGhost):not(.isDragging):not(.isClearing):not(.isShaking) .gem {
-  animation-name: gemWiggle;
+.tile:not(.tileGhost):not(.isDragging):not(.isClearing):not(.isShaking) .item {
+  animation-name: itemWiggle;
   animation-timing-function: ease-in-out;
   animation-iteration-count: infinite;
   animation-duration: 3.6s;
 }
 
-/* Each type layers a custom icon (match_item_N.png, in /public) over the
-   current placeholder shape/color. Until those files are added, the image
-   layer simply fails to paint and the placeholder shows through unchanged.
-   If the real art gets clipped oddly by a type's shape (the diamond/hex/
-   star/triangle types below all clip-path their box), that's the one thing
-   to revisit once real art is in. */
-.gemType0 { border-radius: 50%; background: url("/match_item_1.png") center/70% no-repeat, radial-gradient(circle at 32% 26%, rgba(255,255,255,.6), rgba(255,255,255,0) 46%), var(--gem-0); }
-.gemType1 { border-radius: 24%; background: url("/match_item_2.png") center/70% no-repeat, radial-gradient(circle at 32% 26%, rgba(255,255,255,.55), rgba(255,255,255,0) 46%), var(--gem-1); }
-.gemType2 { clip-path: polygon(25% 4%, 75% 4%, 100% 50%, 75% 96%, 25% 96%, 0% 50%); background: url("/match_item_3.png") center/70% no-repeat, radial-gradient(circle at 32% 22%, rgba(255,255,255,.55), rgba(255,255,255,0) 46%), var(--gem-2); }
-.gemType3 { clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%); background: url("/match_item_4.png") center/70% no-repeat, radial-gradient(circle at 40% 24%, rgba(255,255,255,.55), rgba(255,255,255,0) 46%), var(--gem-3); }
-.gemType4 { clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%); background: url("/match_item_5.png") center/70% no-repeat, var(--gem-4); }
-.gemType5 { clip-path: polygon(50% 6%, 95% 92%, 5% 92%); background: url("/match_item_6.png") center/70% no-repeat, radial-gradient(circle at 38% 40%, rgba(255,255,255,.5), rgba(255,255,255,0) 46%), var(--gem-5); }
+/* Each type layers a custom icon (match_item_N.png, in /public) over a
+   rounded-square placeholder color. No clip-path here on purpose -- custom
+   art defines its own shape via transparency, and clipping it into an
+   arbitrary polygon would crop it unpredictably. */
+.itemType0 { border-radius: 22%; background: url("/match_item_1.png") center/70% no-repeat, radial-gradient(circle at 32% 26%, rgba(255,255,255,.6), rgba(255,255,255,0) 46%), var(--item-0); }
+.itemType1 { border-radius: 22%; background: url("/match_item_2.png") center/70% no-repeat, radial-gradient(circle at 32% 26%, rgba(255,255,255,.55), rgba(255,255,255,0) 46%), var(--item-1); }
+.itemType2 { border-radius: 22%; background: url("/match_item_3.png") center/70% no-repeat, radial-gradient(circle at 32% 22%, rgba(255,255,255,.55), rgba(255,255,255,0) 46%), var(--item-2); }
+.itemType3 { border-radius: 22%; background: url("/match_item_4.png") center/70% no-repeat, radial-gradient(circle at 40% 24%, rgba(255,255,255,.55), rgba(255,255,255,0) 46%), var(--item-3); }
+.itemType4 { border-radius: 22%; background: url("/match_item_5.png") center/70% no-repeat, var(--item-4); }
+.itemType5 { border-radius: 22%; background: url("/match_item_6.png") center/70% no-repeat, radial-gradient(circle at 38% 40%, rgba(255,255,255,.5), rgba(255,255,255,0) 46%), var(--item-5); }
 
 @keyframes shake {
   0%, 100% { transform: translate(var(--tx), var(--ty)); }
@@ -193,7 +191,7 @@
   80% { transform: translate(calc(var(--tx) + 4px), var(--ty)); }
 }
 
-@keyframes gemWiggle {
+@keyframes itemWiggle {
   0%, 100% { transform: scale(1) rotate(0deg); }
   22% { transform: scale(1.02) rotate(-2.5deg); }
   45% { transform: scale(1.035) rotate(0.5deg); }
@@ -475,7 +473,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .tile, .gem, .toast {
+  .tile, .item, .toast {
     transition-duration: 1ms !important;
     animation-duration: 1ms !important;
   }
