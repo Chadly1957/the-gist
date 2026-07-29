@@ -152,8 +152,8 @@
 }
 
 .item {
-  width: 82%;
-  height: 82%;
+  width: 100%;
+  height: 100%;
   filter: drop-shadow(0 2px 3px rgba(20, 20, 10, 0.28));
   transition: filter 120ms ease, transform 120ms ease;
 }
@@ -167,12 +167,12 @@
 
 /* Each type is a custom icon (match_item_N.png, in /public) with no fill
    behind it -- the tile stays transparent so only the artwork shows. */
-.itemType0 { background: url("/match_item_1.png") center/70% no-repeat; }
-.itemType1 { background: url("/match_item_2.png") center/70% no-repeat; }
-.itemType2 { background: url("/match_item_3.png") center/70% no-repeat; }
-.itemType3 { background: url("/match_item_4.png") center/70% no-repeat; }
-.itemType4 { background: url("/match_item_5.png") center/70% no-repeat; }
-.itemType5 { background: url("/match_item_6.png") center/70% no-repeat; }
+.itemType0 { background: url("/match_item_1.png") center/100% no-repeat; }
+.itemType1 { background: url("/match_item_2.png") center/100% no-repeat; }
+.itemType2 { background: url("/match_item_3.png") center/100% no-repeat; }
+.itemType3 { background: url("/match_item_4.png") center/100% no-repeat; }
+.itemType4 { background: url("/match_item_5.png") center/100% no-repeat; }
+.itemType5 { background: url("/match_item_6.png") center/100% no-repeat; }
 
 @keyframes shake {
   0%, 100% { transform: translate(var(--tx), var(--ty)); }
