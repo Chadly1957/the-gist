@@ -270,6 +270,18 @@ model WordyPlay {
   @@index([date])
 }
 
+model MatchScore {
+  id        String   @id @default(cuid())
+  date      String
+  deviceId  String
+  name      String
+  score     Int
+  createdAt DateTime @default(now())
+
+  @@unique([date, deviceId])
+  @@index([date])
+}
+
 model Poll {
   id               String         @id @default(cuid())
   question         String
