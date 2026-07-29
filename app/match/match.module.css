@@ -11,13 +11,6 @@
   --danger: #c1503f;
   --shadow-card: 0 24px 48px -24px rgba(20, 37, 33, 0.28), 0 2px 6px rgba(20, 37, 33, 0.06);
 
-  --item-0: #1f9c8a;
-  --item-1: #e2673f;
-  --item-2: #5b63c4;
-  --item-3: #e3a63d;
-  --item-4: #d1547e;
-  --item-5: #3f9bd1;
-
   --dur-fall: 280ms;
   --dur-clear: 180ms;
   --dur-swap: 200ms;
@@ -172,16 +165,14 @@
   animation-duration: 3.6s;
 }
 
-/* Each type layers a custom icon (match_item_N.png, in /public) over a
-   rounded-square placeholder color. No clip-path here on purpose -- custom
-   art defines its own shape via transparency, and clipping it into an
-   arbitrary polygon would crop it unpredictably. */
-.itemType0 { border-radius: 22%; background: url("/match_item_1.png") center/70% no-repeat, radial-gradient(circle at 32% 26%, rgba(255,255,255,.6), rgba(255,255,255,0) 46%), var(--item-0); }
-.itemType1 { border-radius: 22%; background: url("/match_item_2.png") center/70% no-repeat, radial-gradient(circle at 32% 26%, rgba(255,255,255,.55), rgba(255,255,255,0) 46%), var(--item-1); }
-.itemType2 { border-radius: 22%; background: url("/match_item_3.png") center/70% no-repeat, radial-gradient(circle at 32% 22%, rgba(255,255,255,.55), rgba(255,255,255,0) 46%), var(--item-2); }
-.itemType3 { border-radius: 22%; background: url("/match_item_4.png") center/70% no-repeat, radial-gradient(circle at 40% 24%, rgba(255,255,255,.55), rgba(255,255,255,0) 46%), var(--item-3); }
-.itemType4 { border-radius: 22%; background: url("/match_item_5.png") center/70% no-repeat, var(--item-4); }
-.itemType5 { border-radius: 22%; background: url("/match_item_6.png") center/70% no-repeat, radial-gradient(circle at 38% 40%, rgba(255,255,255,.5), rgba(255,255,255,0) 46%), var(--item-5); }
+/* Each type is a custom icon (match_item_N.png, in /public) with no fill
+   behind it -- the tile stays transparent so only the artwork shows. */
+.itemType0 { background: url("/match_item_1.png") center/70% no-repeat; }
+.itemType1 { background: url("/match_item_2.png") center/70% no-repeat; }
+.itemType2 { background: url("/match_item_3.png") center/70% no-repeat; }
+.itemType3 { background: url("/match_item_4.png") center/70% no-repeat; }
+.itemType4 { background: url("/match_item_5.png") center/70% no-repeat; }
+.itemType5 { background: url("/match_item_6.png") center/70% no-repeat; }
 
 @keyframes shake {
   0%, 100% { transform: translate(var(--tx), var(--ty)); }
