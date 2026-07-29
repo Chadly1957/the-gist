@@ -9,7 +9,7 @@ interface Availability {
 }
 
 interface Props {
-  bookingType: "in_article" | "presenting" | "wordy";
+  bookingType: "in_article" | "presenting";
   selectedDates: string[];
   onChange: (dates: string[]) => void;
   pricePerDay?: number; // display only, in dollars

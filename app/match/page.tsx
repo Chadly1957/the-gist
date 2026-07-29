@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Logo from "@/components/Logo";
+import GamePresentingSponsor from "@/components/GamePresentingSponsor";
 import styles from "./match.module.css";
 import { MatchEngine, START_MOVES } from "./matchEngine";
 
@@ -157,7 +158,10 @@ export default function MatchPage() {
         </div>
       </header>
 
-      <main className="flex-1 max-w-lg mx-auto w-full px-4 pt-6 pb-10">
+      <main className="flex-1 max-w-lg mx-auto w-full px-4 pt-4 pb-10">
+        <div className="max-w-[460px] mx-auto mb-4">
+          <GamePresentingSponsor game="match" />
+        </div>
         <div className={styles.wrap}>
           {phase === "loading" && (
             <div className={styles.stage}>

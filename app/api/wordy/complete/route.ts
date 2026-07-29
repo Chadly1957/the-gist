@@ -4,7 +4,7 @@ import { prisma } from "@/lib/db";
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
-  const { date, won, guesses, maxGuesses, wordLength, recipientId, sponsorViewed } = await req.json();
+  const { date, won, guesses, maxGuesses, wordLength, recipientId } = await req.json();
   if (!date) return NextResponse.json({ error: "Missing date." }, { status: 400 });
 
   await prisma.wordyPlay.create({
@@ -15,7 +15,6 @@ export async function POST(req: NextRequest) {
       maxGuesses: Number(maxGuesses) || 0,
       wordLength: Number(wordLength) || 0,
       recipientId: recipientId || null,
-      sponsorViewed: Boolean(sponsorViewed),
     },
   });
 

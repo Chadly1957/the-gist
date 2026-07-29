@@ -9,20 +9,18 @@ const TIER_DEFAULTS = {
   spotlight: "Free",
   in_article: "$15/day",
   presenting: "$25/day",
-  wordy: "$20/day",
 };
 
 async function getPrices() {
   try {
     const rows = await prisma.setting.findMany({
-      where: { key: { in: ["sponsorship_price_spotlight", "sponsorship_price_in_article", "sponsorship_price_presenting", "sponsorship_price_wordy"] } },
+      where: { key: { in: ["sponsorship_price_spotlight", "sponsorship_price_in_article", "sponsorship_price_presenting"] } },
     });
     const map = Object.fromEntries(rows.map((r) => [r.key, r.value]));
     return {
       spotlight: map["sponsorship_price_spotlight"] || TIER_DEFAULTS.spotlight,
       in_article: map["sponsorship_price_in_article"] || TIER_DEFAULTS.in_article,
       presenting: map["sponsorship_price_presenting"] || TIER_DEFAULTS.presenting,
-      wordy: map["sponsorship_price_wordy"] || TIER_DEFAULTS.wordy,
     };
   } catch {
     return TIER_DEFAULTS;
@@ -33,22 +31,6 @@ export default async function SponsorPage() {
   const prices = await getPrices();
 
   const TIERS = [
-    {
-      key: "wordy",
-      name: "Decatur Wordy Sponsor",
-      price: prices.wordy,
-      description:
-        "Sponsor the daily Decatur Wordy puzzle. Your business is featured on the end screen that every player sees when they finish — win or lose.",
-      includes: [
-        "\"Today's Wordy is brought to you by [Your Business]\" end-screen placement",
-        "Custom headline, description, image, and call-to-action link",
-        "Every player who completes the puzzle sees your ad",
-        "Exclusive: one sponsor per day",
-      ],
-      cta: "Reserve Dates",
-      highlight: false,
-      badge: "New!",
-    },
     {
       key: "spotlight",
       name: "Community Partners",
@@ -82,10 +64,11 @@ export default async function SponsorPage() {
       name: "Presenting Sponsor",
       price: prices.presenting,
       description:
-        "The top sponsorship slot. You're featured as the day's presenting sponsor with a mention in the opening, plus a full standard ad placement, outside the 2-slot limit.",
+        "The top sponsorship slot. You're featured as the day's presenting sponsor with a mention in the opening, plus a full standard ad placement, outside the 2-slot limit — and the same placement carries over to Decatur Wordy and Gist Match.",
       includes: [
         "\"Today's Gist is brought to you by [Your Business]\" opening mention",
         "Full standard ad placement (does not count against the 2-slot cap)",
+        "Featured at the top of Decatur Wordy and Gist Match, every day you're booked",
         "Exclusive: only 1 presenting sponsor per day",
       ],
       cta: "Reserve Dates",
@@ -127,11 +110,6 @@ export default async function SponsorPage() {
                   : "border-gray-200"
               }`}
             >
-              {"badge" in tier && tier.badge && (
-                <span className="text-xs font-bold text-blue-600 uppercase tracking-widest mb-2">
-                  {tier.badge}
-                </span>
-              )}
               {tier.highlight && (
                 <span className="text-xs font-bold text-green-700 uppercase tracking-widest mb-2">
                   Most Impactful

@@ -9,7 +9,7 @@ import MultiDateCalendar from "@/components/MultiDateCalendar";
 import { normalizeUrl } from "@/lib/url";
 
 type Step = "apply" | "listing" | "booking" | "done";
-type Tier = "spotlight" | "in_article" | "presenting" | "wordy";
+type Tier = "spotlight" | "in_article" | "presenting";
 
 const TIER_META: Record<Tier, { label: string; step2Heading: string; step2Sub: string }> = {
   spotlight: {
@@ -26,11 +26,6 @@ const TIER_META: Record<Tier, { label: string; step2Heading: string; step2Sub: s
     label: "Presenting Sponsor",
     step2Heading: "Reserve your presenting dates",
     step2Sub: "Enter your ad details and pick your date. We'll confirm within 1–2 business days.",
-  },
-  wordy: {
-    label: "Decatur Wordy Sponsor",
-    step2Heading: "Reserve your Wordy date",
-    step2Sub: "Pick your preferred date and enter your ad details. We'll confirm availability within 24 hours.",
   },
 };
 
@@ -60,7 +55,7 @@ function ApplyContent() {
   const [lSubmitting, setLSubmitting] = useState(false);
   const [lError, setLError] = useState("");
 
-  // Step 2b — booking (in_article / presenting / wordy)
+  // Step 2b — booking (in_article / presenting)
   const [bDates, setBDates] = useState<string[]>([]);
   const [bForm, setBForm] = useState({
     type: "in_article" as "in_article" | "presenting",
@@ -172,13 +167,11 @@ function ApplyContent() {
 
   async function submitBooking(e: React.FormEvent) {
     e.preventDefault();
-    if (tier === "wordy" && bDates.length === 0) { setBError("Please select a date."); return; }
-    if (tier !== "wordy" && bDates.length === 0) { setBError("Please select at least one date."); return; }
+    if (bDates.length === 0) { setBError("Please select at least one date."); return; }
     setBSubmitting(true);
     setBError("");
-    const endpoint = tier === "wordy" ? "/api/sponsor/wordy-booking" : "/api/sponsor/booking";
     try {
-      const res = await fetch(endpoint, {
+      const res = await fetch("/api/sponsor/booking", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token, dates: bDates, date: bDates[0], ...bForm }),
@@ -189,11 +182,7 @@ function ApplyContent() {
         const subNote = subs.length > 0
           ? ` Note: ${subs.length} date${subs.length !== 1 ? "s were" : " was"} unavailable and substituted with the next available slot${subs.length !== 1 ? "s" : ""} — your discount is preserved.`
           : "";
-        setDoneMessage(
-          tier === "wordy"
-            ? "Your Wordy sponsorship request is in — we'll reach out within 24 hours to confirm your date and collect payment."
-            : `Your booking request has been submitted — we'll confirm within 1–2 business days and collect payment then.${subNote}`
-        );
+        setDoneMessage(`Your booking request has been submitted — we'll confirm within 1–2 business days and collect payment then.${subNote}`);
         setStep("done");
       } else {
         setBError(data.error || "Submission failed.");
@@ -378,43 +367,27 @@ function ApplyContent() {
             <p className="text-xs text-green-600 font-medium mb-6">Step 2 of 2 — {meta.label}</p>
 
             <form onSubmit={submitBooking} className="space-y-4">
-              {/* Ad type switcher for newsletter ads (not wordy) */}
-              {tier !== "wordy" && (
-                <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-2">Ad Type</label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {(["in_article", "presenting"] as const).map((t) => (
-                      <button key={t} type="button" onClick={() => setBForm((f) => ({ ...f, type: t }))}
-                        className={`p-3 rounded-xl border text-left transition-colors ${bForm.type === t ? "border-green-500 bg-green-50" : "border-gray-200 hover:border-gray-300"}`}>
-                        <p className="text-xs font-semibold text-gray-800">{t === "in_article" ? "Standard" : "Presenting"}</p>
-                        <p className="text-xs text-gray-400 mt-0.5">{t === "in_article" ? "$15/day" : "$25/day"}</p>
-                      </button>
-                    ))}
-                  </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-2">Ad Type</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {(["in_article", "presenting"] as const).map((t) => (
+                    <button key={t} type="button" onClick={() => setBForm((f) => ({ ...f, type: t }))}
+                      className={`p-3 rounded-xl border text-left transition-colors ${bForm.type === t ? "border-green-500 bg-green-50" : "border-gray-200 hover:border-gray-300"}`}>
+                      <p className="text-xs font-semibold text-gray-800">{t === "in_article" ? "Standard" : "Presenting"}</p>
+                      <p className="text-xs text-gray-400 mt-0.5">{t === "in_article" ? "$15/day" : "$25/day"}</p>
+                    </button>
+                  ))}
                 </div>
-              )}
+              </div>
 
               <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-2">
-                  {tier === "wordy" ? "Preferred Date *" : "Newsletter Date(s) *"}
-                </label>
-                {tier === "wordy" ? (
-                  <>
-                    <MultiDateCalendar
-                      bookingType="wordy"
-                      selectedDates={bDates}
-                      onChange={(d) => setBDates(d.slice(0, 1))}
-                    />
-                    <p className="text-xs text-gray-400 mt-1">We&apos;ll confirm availability and follow up within 24 hours.</p>
-                  </>
-                ) : (
-                  <MultiDateCalendar
-                    bookingType={bForm.type as "in_article" | "presenting"}
-                    selectedDates={bDates}
-                    onChange={setBDates}
-                    pricePerDay={bForm.type === "presenting" ? 25 : 15}
-                  />
-                )}
+                <label className="block text-xs font-semibold text-gray-600 mb-2">Newsletter Date(s) *</label>
+                <MultiDateCalendar
+                  bookingType={bForm.type as "in_article" | "presenting"}
+                  selectedDates={bDates}
+                  onChange={setBDates}
+                  pricePerDay={bForm.type === "presenting" ? 25 : 15}
+                />
               </div>
 
               <div>
@@ -445,7 +418,7 @@ function ApplyContent() {
                 </div>
               </div>
 
-              {bForm.type === "presenting" && tier !== "wordy" && (
+              {bForm.type === "presenting" && (
                 <div>
                   <label className="block text-xs font-semibold text-gray-600 mb-1">
                     Custom Intro Blurb <span className="font-normal text-gray-400">(optional)</span>
@@ -460,7 +433,7 @@ function ApplyContent() {
 
               <button type="submit" disabled={bSubmitting}
                 className="w-full bg-green-700 hover:bg-green-800 disabled:opacity-50 text-white font-semibold py-3 rounded-xl text-sm transition-colors">
-                {bSubmitting ? "Submitting…" : tier === "wordy" ? "Submit Wordy Request" : "Submit Booking Request"}
+                {bSubmitting ? "Submitting…" : "Submit Booking Request"}
               </button>
               <button type="button" onClick={() => { setStep("done"); setDoneMessage(""); }}
                 className="w-full text-center text-xs text-gray-400 hover:text-gray-600 py-1">

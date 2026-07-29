@@ -84,6 +84,32 @@ export async function GET(req: NextRequest) {
 
   const adImpressions = Object.values(bookingImpressions).reduce((s, n) => s + n, 0);
 
+  // Game (Decatur Wordy / Gist Match) impressions & clicks for presenting-sponsor bookings
+  const presentingBookingIds = profile.bookings.filter((b) => b.type === "presenting").map((b) => b.id);
+  const bookingGameStats: Record<
+    string,
+    { wordyImpressions: number; wordyClicks: number; matchImpressions: number; matchClicks: number }
+  > = {};
+
+  if (presentingBookingIds.length > 0) {
+    const gameGroups = await prisma.gameSponsorEvent.groupBy({
+      by: ["bookingId", "game", "eventType"],
+      where: { bookingId: { in: presentingBookingIds } },
+      _count: true,
+    });
+    for (const id of presentingBookingIds) {
+      bookingGameStats[id] = { wordyImpressions: 0, wordyClicks: 0, matchImpressions: 0, matchClicks: 0 };
+    }
+    for (const g of gameGroups) {
+      const stats = bookingGameStats[g.bookingId];
+      const n = g._count as unknown as number;
+      if (g.game === "wordy" && g.eventType === "impression") stats.wordyImpressions += n;
+      else if (g.game === "wordy" && g.eventType === "click") stats.wordyClicks += n;
+      else if (g.game === "match" && g.eventType === "impression") stats.matchImpressions += n;
+      else if (g.game === "match" && g.eventType === "click") stats.matchClicks += n;
+    }
+  }
+
   return NextResponse.json({
     profile,
     analytics: {
@@ -93,6 +119,7 @@ export async function GET(req: NextRequest) {
       adImpressions,
       bookingClicks,
       bookingImpressions,
+      bookingGameStats,
     },
   });
 }

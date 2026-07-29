@@ -166,8 +166,23 @@ model AdBooking {
   adminNotes      String?
   createdAt       DateTime       @default(now())
   approvedAt      DateTime?
+  gameSponsorEvents GameSponsorEvent[]
 
   @@index([stripeSessionId])
+}
+
+model GameSponsorEvent {
+  id        String    @id @default(cuid())
+  date      String
+  game      String    // "wordy" | "match"
+  eventType String    // "impression" | "click"
+  bookingId String
+  booking   AdBooking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  createdAt DateTime  @default(now())
+
+  @@index([date])
+  @@index([bookingId])
+  @@index([game])
 }
 
 model Event {
@@ -264,7 +279,6 @@ model WordyPlay {
   guesses       Int
   maxGuesses    Int
   wordLength    Int
-  sponsorViewed Boolean  @default(false)
   createdAt     DateTime @default(now())
 
   @@index([date])

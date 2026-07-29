@@ -2,6 +2,17 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getAdminSession } from "@/lib/auth";
 
+function emptySponsorCounts() {
+  return { wordyImpressions: 0, wordyClicks: 0, matchImpressions: 0, matchClicks: 0 };
+}
+
+function addEvent(counts: ReturnType<typeof emptySponsorCounts>, game: string, eventType: string, n = 1) {
+  if (game === "wordy" && eventType === "impression") counts.wordyImpressions += n;
+  else if (game === "wordy" && eventType === "click") counts.wordyClicks += n;
+  else if (game === "match" && eventType === "impression") counts.matchImpressions += n;
+  else if (game === "match" && eventType === "click") counts.matchClicks += n;
+}
+
 export async function GET() {
   const session = await getAdminSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -15,59 +26,71 @@ export async function GET() {
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 29);
     const thirtyDaysAgoStr = thirtyDaysAgo.toLocaleDateString("en-CA");
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const db = prisma as any;
-    if (!db.wordyPlay) {
-      return NextResponse.json({ allTime: null, today: null, thisWeek: null, byDay: [] });
-    }
-
-    const [totalPlays, totalWins, totalSponsorViews, recentPlays] = await Promise.all([
-      db.wordyPlay.count(),
-      db.wordyPlay.count({ where: { won: true } }),
-      db.wordyPlay.count({ where: { sponsorViewed: true } }),
-      db.wordyPlay.findMany({
+    const [totalPlays, totalWins, recentPlays, sponsorGroups, recentEvents] = await Promise.all([
+      prisma.wordyPlay.count(),
+      prisma.wordyPlay.count({ where: { won: true } }),
+      prisma.wordyPlay.findMany({
         where: { date: { gte: thirtyDaysAgoStr } },
-        select: { date: true, won: true, sponsorViewed: true },
+        select: { date: true, won: true },
+        orderBy: { date: "desc" },
+      }),
+      prisma.gameSponsorEvent.groupBy({ by: ["game", "eventType"], _count: true }),
+      prisma.gameSponsorEvent.findMany({
+        where: { date: { gte: thirtyDaysAgoStr } },
+        select: { date: true, game: true, eventType: true },
         orderBy: { date: "desc" },
       }),
     ]);
 
-    // Aggregate by day
-    const dayMap = new Map<string, { plays: number; wins: number; sponsorViews: number }>();
+    // Wordy play stats
+    const dayMap = new Map<string, { plays: number; wins: number }>();
     for (const p of recentPlays) {
-      const row = dayMap.get(p.date) ?? { plays: 0, wins: 0, sponsorViews: 0 };
+      const row = dayMap.get(p.date) ?? { plays: 0, wins: 0 };
       row.plays++;
       if (p.won) row.wins++;
-      if (p.sponsorViewed) row.sponsorViews++;
       dayMap.set(p.date, row);
     }
-
-    const todayPlays = recentPlays.filter((p: { date: string }) => p.date === todayStr);
-    const weekPlays = recentPlays.filter((p: { date: string }) => p.date >= weekAgoStr);
-
-    const byDay = Array.from(dayMap.entries())
+    const todayPlays = recentPlays.filter((p) => p.date === todayStr);
+    const weekPlays = recentPlays.filter((p) => p.date >= weekAgoStr);
+    const wordyByDay = Array.from(dayMap.entries())
       .map(([date, stats]) => ({ date, ...stats }))
       .sort((a, b) => b.date.localeCompare(a.date));
 
+    // Sponsor impression/click stats (Wordy + Match presenting sponsor)
+    const sponsorAllTime = emptySponsorCounts();
+    for (const g of sponsorGroups) {
+      addEvent(sponsorAllTime, g.game, g.eventType, g._count as unknown as number);
+    }
+
+    const sponsorToday = emptySponsorCounts();
+    const sponsorWeek = emptySponsorCounts();
+    const sponsorDayMap = new Map<string, ReturnType<typeof emptySponsorCounts>>();
+    for (const e of recentEvents) {
+      if (e.date === todayStr) addEvent(sponsorToday, e.game, e.eventType);
+      if (e.date >= weekAgoStr) addEvent(sponsorWeek, e.game, e.eventType);
+      const row = sponsorDayMap.get(e.date) ?? emptySponsorCounts();
+      addEvent(row, e.game, e.eventType);
+      sponsorDayMap.set(e.date, row);
+    }
+    const sponsorByDay = Array.from(sponsorDayMap.entries())
+      .map(([date, counts]) => ({ date, ...counts }))
+      .sort((a, b) => b.date.localeCompare(a.date));
+
     return NextResponse.json({
-      allTime: {
-        plays: totalPlays,
-        wins: totalWins,
-        sponsorViews: totalSponsorViews,
+      wordy: {
+        allTime: { plays: totalPlays, wins: totalWins },
+        today: { plays: todayPlays.length, wins: todayPlays.filter((p) => p.won).length },
+        thisWeek: { plays: weekPlays.length, wins: weekPlays.filter((p) => p.won).length },
+        byDay: wordyByDay,
       },
-      today: {
-        plays: todayPlays.length,
-        wins: todayPlays.filter((p: { won: boolean }) => p.won).length,
-        sponsorViews: todayPlays.filter((p: { sponsorViewed: boolean }) => p.sponsorViewed).length,
+      sponsor: {
+        allTime: sponsorAllTime,
+        today: sponsorToday,
+        thisWeek: sponsorWeek,
+        byDay: sponsorByDay,
       },
-      thisWeek: {
-        plays: weekPlays.length,
-        wins: weekPlays.filter((p: { won: boolean }) => p.won).length,
-        sponsorViews: weekPlays.filter((p: { sponsorViewed: boolean }) => p.sponsorViewed).length,
-      },
-      byDay,
     });
   } catch {
-    return NextResponse.json({ allTime: null, today: null, thisWeek: null, byDay: [] });
+    return NextResponse.json({ wordy: null, sponsor: null });
   }
 }

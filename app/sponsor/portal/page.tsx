@@ -48,9 +48,10 @@ interface Analytics {
   adImpressions: number;
   bookingClicks: Record<string, number>;
   bookingImpressions: Record<string, number>;
+  bookingGameStats: Record<string, { wordyImpressions: number; wordyClicks: number; matchImpressions: number; matchClicks: number }>;
 }
 
-type View = "overview" | "spotlight" | "booking" | "wordy" | "profile" | "event";
+type View = "overview" | "spotlight" | "booking" | "profile" | "event";
 
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
   pending: { label: "Pending Review", color: "bg-yellow-50 text-yellow-700" },
@@ -259,15 +260,6 @@ function PortalContent() {
   const [bAutoFilled, setBAutoFilled] = useState(false);
   const bFileRef = useRef<HTMLInputElement>(null);
 
-  // Wordy booking form
-  const [wDate, setWDate] = useState("");
-  const [wForm, setWForm] = useState({ headline: "", body: "", ctaUrl: "", ctaLabel: "Learn More", imageUrl: "" });
-  const [wUploading, setWUploading] = useState(false);
-  const [wSubmitting, setWSubmitting] = useState(false);
-  const [wError, setWError] = useState("");
-  const [wSuccess, setWSuccess] = useState(false);
-  const wFileRef = useRef<HTMLInputElement>(null);
-
   // Callout bubble on "Book Ad Date" — shown after listing creation
   const [showBookingCallout, setShowBookingCallout] = useState(false);
   // Stripe return banners
@@ -408,26 +400,6 @@ function PortalContent() {
     }
   }
 
-  async function submitWordyBooking(e: React.FormEvent) {
-    e.preventDefault();
-    if (!wDate) { setWError("Please select a date."); return; }
-    setWSubmitting(true); setWError("");
-    try {
-      const res = await fetch("/api/sponsor/checkout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, bookingType: "wordy", dates: [wDate], ...wForm }),
-      });
-      const data = await res.json();
-      if (res.ok && data.url) {
-        window.location.href = data.url;
-      } else {
-        setWError(data.error || "Submission failed.");
-        setWSubmitting(false);
-      }
-    } catch { setWError("Connection error."); setWSubmitting(false); }
-  }
-
   async function submitEvent(e: React.FormEvent) {
     e.preventDefault();
     setESubmitting(true); setEError("");
@@ -478,7 +450,7 @@ function PortalContent() {
       <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         {/* Navigation */}
         {view !== "overview" && (
-          <button onClick={() => { if (sSuccess) setShowBookingCallout(true); setView("overview"); setSSuccess(false); setBSuccess(false); setWSuccess(false); setEditingSpotlight(null); }} className="text-sm text-green-700 hover:underline mb-6 inline-block">
+          <button onClick={() => { if (sSuccess) setShowBookingCallout(true); setView("overview"); setSSuccess(false); setBSuccess(false); setEditingSpotlight(null); }} className="text-sm text-green-700 hover:underline mb-6 inline-block">
             ← Back to overview
           </button>
         )}
@@ -621,33 +593,6 @@ function PortalContent() {
                 </div>
               </button>
               <button
-                onClick={() => {
-                  const approved = profile?.spotlights.find(s => s.status === "approved");
-                  setWForm({
-                    headline: approved ? `Visit ${approved.businessName}` : `Visit ${profile?.businessName || ""}`,
-                    body: approved?.description || "",
-                    ctaUrl: approved?.ctaUrl || "",
-                    ctaLabel: approved?.ctaLabel || "Learn More",
-                    imageUrl: approved?.logoUrl || "",
-                  });
-                  setWDate("");
-                  setWSuccess(false);
-                  setWError("");
-                  setView("wordy");
-                }}
-                className="flex items-center gap-3 p-4 bg-white rounded-xl border border-gray-200 hover:border-green-400 hover:shadow-sm transition-all text-left"
-              >
-                <div className="w-9 h-9 rounded-lg bg-yellow-50 flex items-center justify-center shrink-0">
-                  <svg className="w-5 h-5 text-yellow-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-gray-800">Sponsor The Decatur Wordy</p>
-                  <p className="text-xs text-gray-400">Have your business be the word of the day</p>
-                </div>
-              </button>
-              <button
                 onClick={() => { setView("event"); setESuccess(false); setEError(""); }}
                 className="flex items-center gap-3 p-4 bg-white rounded-xl border border-gray-200 hover:border-green-400 hover:shadow-sm transition-all text-left"
               >
@@ -708,6 +653,9 @@ function PortalContent() {
                   {profile.bookings.map((b) => {
                     const clicks = analytics?.bookingClicks?.[b.id] ?? 0;
                     const impressions = analytics?.bookingImpressions?.[b.id] ?? 0;
+                    const gameStats = b.type === "presenting" ? analytics?.bookingGameStats?.[b.id] : undefined;
+                    const gameImpressions = gameStats ? gameStats.wordyImpressions + gameStats.matchImpressions : 0;
+                    const gameClicks = gameStats ? gameStats.wordyClicks + gameStats.matchClicks : 0;
                     return (
                       <div key={b.id} className="bg-white rounded-xl border border-gray-200 p-4 flex items-center gap-4">
                         <div className="flex-1 min-w-0">
@@ -721,12 +669,22 @@ function PortalContent() {
                           <StatusBadge status={b.status} />
                           {impressions > 0 && (
                             <span className="text-xs text-green-700 font-medium">
-                              {impressions.toLocaleString()} impressions
+                              {impressions.toLocaleString()} newsletter impressions
                             </span>
                           )}
                           {clicks > 0 && (
                             <span className="text-xs text-green-700 font-medium">
-                              {clicks} click{clicks !== 1 ? "s" : ""}
+                              {clicks} newsletter click{clicks !== 1 ? "s" : ""}
+                            </span>
+                          )}
+                          {gameImpressions > 0 && (
+                            <span className="text-xs text-blue-700 font-medium">
+                              {gameImpressions.toLocaleString()} game impressions
+                            </span>
+                          )}
+                          {gameClicks > 0 && (
+                            <span className="text-xs text-blue-700 font-medium">
+                              {gameClicks} game click{gameClicks !== 1 ? "s" : ""}
                             </span>
                           )}
                           {!b.isPaid && b.status !== "rejected" && (
@@ -999,81 +957,6 @@ function PortalContent() {
                 {pSaved && <span className="text-sm text-green-600 font-medium">Saved!</span>}
               </div>
             </form>
-          </div>
-        )}
-
-        {/* WORDY BOOKING FORM */}
-        {view === "wordy" && (
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-1">Sponsor The Decatur Wordy</h1>
-            <p className="text-sm text-gray-500 mb-6">Pick your date and fill in your ad details. You&apos;ll pay securely at checkout — your sponsorship is confirmed instantly.</p>
-
-            {wSuccess ? (
-              <div className="bg-green-50 border border-green-100 rounded-xl p-6 text-center">
-                <p className="text-green-800 font-semibold mb-1">Request submitted!</p>
-                <p className="text-sm text-green-600">We&apos;ll confirm your date and reach out within 24 hours.</p>
-                <div className="flex gap-3 justify-center mt-4">
-                  <button onClick={() => { setWSuccess(false); setWDate(""); setWForm({ headline: "", body: "", ctaUrl: "", ctaLabel: "Learn More", imageUrl: "" }); }} className="text-sm text-green-700 underline">Request another date</button>
-                  <button onClick={() => { setWSuccess(false); setView("overview"); }} className="text-sm text-gray-500 underline">Back to portal</button>
-                </div>
-              </div>
-            ) : (
-              <form onSubmit={submitWordyBooking} className="space-y-5 bg-white rounded-xl border border-gray-200 p-6">
-                <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-1">Preferred Date *</label>
-                  <input type="date" value={wDate} onChange={(e) => setWDate(e.target.value)} required min={new Date().toLocaleDateString("en-CA")}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
-                  <p className="text-xs text-gray-400 mt-1">We&apos;ll confirm this date is available and follow up within 24 hours.</p>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-1">Ad Image</label>
-                  <div className="flex gap-2">
-                    <UrlInput value={wForm.imageUrl} onChange={(val) => setWForm((f) => ({ ...f, imageUrl: val }))} placeholder="https://... or upload"
-                      className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
-                    <input ref={wFileRef} type="file" accept="image/*" className="hidden"
-                      onChange={(e) => { const f = e.target.files?.[0]; if (f) handleImageUpload(f, setWUploading, (url) => setWForm((fm) => ({ ...fm, imageUrl: url })), setWError); }} />
-                    <label onClick={() => wFileRef.current?.click()}
-                      className={`cursor-pointer flex items-center gap-1 px-3 py-2 border border-gray-200 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-50 whitespace-nowrap ${wUploading ? "opacity-60 pointer-events-none" : ""}`}>
-                      {wUploading ? "Uploading…" : "Upload"}
-                    </label>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-1">Headline *</label>
-                  <input type="text" value={wForm.headline} onChange={(e) => setWForm((f) => ({ ...f, headline: e.target.value }))} required placeholder="Grab players' attention"
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-1">Body Copy * <span className="font-normal text-gray-400">({wForm.body.length}/400)</span></label>
-                  <textarea value={wForm.body} onChange={(e) => setWForm((f) => ({ ...f, body: e.target.value }))} required rows={4} maxLength={400}
-                    placeholder="Tell players what you offer — shown on the end screen after they finish the puzzle."
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none" />
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">CTA Label</label>
-                    <input type="text" value={wForm.ctaLabel} onChange={(e) => setWForm((f) => ({ ...f, ctaLabel: e.target.value }))}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">CTA Link *</label>
-                    <UrlInput value={wForm.ctaUrl} onChange={(val) => setWForm((f) => ({ ...f, ctaUrl: val }))} required placeholder="https://"
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
-                  </div>
-                </div>
-
-                {wError && <p className="text-sm text-red-600">{wError}</p>}
-
-                <button type="submit" disabled={wSubmitting}
-                  className="w-full bg-green-700 hover:bg-green-800 disabled:opacity-50 text-white font-semibold py-2.5 rounded-xl text-sm transition-colors">
-                  {wSubmitting ? "Redirecting to checkout…" : "Pay & Book Wordy Sponsorship →"}
-                </button>
-              </form>
-            )}
           </div>
         )}
 

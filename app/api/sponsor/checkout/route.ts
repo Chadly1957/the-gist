@@ -5,25 +5,19 @@ import { getDayDiscount, applyDiscount } from "@/lib/discount";
 
 export const dynamic = "force-dynamic";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const db = prisma as any;
-
 const PLACEMENT_NAMES: Record<string, string> = {
   in_article: "Standard Ad",
   presenting: "Presenting Sponsorship",
-  wordy: "Decatur Wordy Sponsorship",
 };
 
 const DEFAULT_PRICES_CENTS: Record<string, number> = {
   in_article: 1500,
   presenting: 2500,
-  wordy: 2000,
 };
 
 const PRICE_SETTING_KEYS: Record<string, string> = {
   in_article: "stripe_price_in_article_cents",
   presenting: "stripe_price_presenting_cents",
-  wordy: "stripe_price_wordy_cents",
 };
 
 function formatDate(dateStr: string): string {
@@ -87,23 +81,13 @@ export async function POST(req: NextRequest) {
   let searchAnchor = lastRequested;
 
   for (const date of requestedDates) {
-    if (bookingType === "wordy") {
-      const existing = await db.wordyBooking.findFirst({
-        where: { date, status: { in: takenStatuses } },
-      });
-      if (!existing) {
-        confirmedDates.push(date);
-        continue;
-      }
-    } else {
-      const existing = await prisma.adBooking.findMany({
-        where: { date, type: bookingType, status: { in: takenStatuses } },
-      });
-      const limit = bookingType === "in_article" ? inArticleLimit : 1;
-      if (existing.length < limit) {
-        confirmedDates.push(date);
-        continue;
-      }
+    const existing = await prisma.adBooking.findMany({
+      where: { date, type: bookingType, status: { in: takenStatuses } },
+    });
+    const limit = bookingType === "in_article" ? inArticleLimit : 1;
+    if (existing.length < limit) {
+      confirmedDates.push(date);
+      continue;
     }
 
     // Conflict — find next available after the window
@@ -114,17 +98,11 @@ export async function POST(req: NextRequest) {
         confirmedDates.includes(candidate) || substitutions.some((s) => s.replacement === candidate);
 
       if (!alreadyChosen) {
-        let available = false;
-        if (bookingType === "wordy") {
-          const ex = await db.wordyBooking.findFirst({ where: { date: candidate, status: { in: takenStatuses } } });
-          available = !ex;
-        } else {
-          const ex = await prisma.adBooking.findMany({
-            where: { date: candidate, type: bookingType, status: { in: takenStatuses } },
-          });
-          const limit = bookingType === "in_article" ? inArticleLimit : 1;
-          available = ex.length < limit;
-        }
+        const ex = await prisma.adBooking.findMany({
+          where: { date: candidate, type: bookingType, status: { in: takenStatuses } },
+        });
+        const limit2 = bookingType === "in_article" ? inArticleLimit : 1;
+        const available = ex.length < limit2;
 
         if (available) {
           substitutions.push({ original: date, replacement: candidate });
@@ -140,8 +118,8 @@ export async function POST(req: NextRequest) {
   }
 
   const totalDays = confirmedDates.length;
-  const discountPct = bookingType === "wordy" ? 0 : getDayDiscount(totalDays);
-  const unitPriceCents = bookingType === "wordy" ? basePriceCents : applyDiscount(basePriceCents, totalDays);
+  const discountPct = getDayDiscount(totalDays);
+  const unitPriceCents = applyDiscount(basePriceCents, totalDays);
 
   const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
   const placementName = PLACEMENT_NAMES[bookingType] ?? bookingType;
@@ -166,45 +144,29 @@ export async function POST(req: NextRequest) {
     cancel_url: `${appUrl}/sponsor/portal?token=${token}&booking=cancelled`,
     customer_email: profile.email,
     metadata: {
-      bookingModel: bookingType === "wordy" ? "wordy" : "ad",
+      bookingModel: "ad",
       token,
     },
   });
 
   // Create bookings with pending_payment status so dates are reserved
   for (const date of confirmedDates) {
-    if (bookingType === "wordy") {
-      await db.wordyBooking.create({
-        data: {
-          sponsorId: profile.id,
-          date,
-          headline: headline.trim(),
-          body: body?.trim() || "",
-          ctaUrl: ctaUrl.trim(),
-          ctaLabel: ctaLabel?.trim() || "Learn More",
-          imageUrl: imageUrl?.trim() || null,
-          status: "pending_payment",
-          stripeSessionId: session.id,
-        },
-      });
-    } else {
-      await prisma.adBooking.create({
-        data: {
-          sponsorId: profile.id,
-          type: bookingType,
-          date,
-          discountPct,
-          headline: headline.trim(),
-          body: body?.trim() || "",
-          ctaUrl: ctaUrl.trim(),
-          ctaLabel: ctaLabel?.trim() || "Learn More",
-          imageUrl: imageUrl?.trim() || null,
-          presentingBlurb: presentingBlurb?.trim() || null,
-          status: "pending_payment",
-          stripeSessionId: session.id,
-        },
-      });
-    }
+    await prisma.adBooking.create({
+      data: {
+        sponsorId: profile.id,
+        type: bookingType,
+        date,
+        discountPct,
+        headline: headline.trim(),
+        body: body?.trim() || "",
+        ctaUrl: ctaUrl.trim(),
+        ctaLabel: ctaLabel?.trim() || "Learn More",
+        imageUrl: imageUrl?.trim() || null,
+        presentingBlurb: presentingBlurb?.trim() || null,
+        status: "pending_payment",
+        stripeSessionId: session.id,
+      },
+    });
   }
 
   return NextResponse.json({ url: session.url, substitutions, discountPct });

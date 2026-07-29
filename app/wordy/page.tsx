@@ -4,12 +4,12 @@ import { useState, useEffect, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Logo from "@/components/Logo";
+import GamePresentingSponsor from "@/components/GamePresentingSponsor";
 
 type LetterState = "correct" | "present" | "absent";
 type GamePhase = "loading" | "no-word" | "playing" | "won" | "lost";
 
 interface GameMeta { wordLength: number; maxGuesses: number; puzzleNum: number; date: string; }
-interface SponsorData { businessName: string; headline: string; body: string; ctaUrl: string; ctaLabel: string; imageUrl: string | null; presentingBlurb: string | null; }
 
 const KEYBOARD_ROWS = [
   ["Q","W","E","R","T","Y","U","I","O","P"],
@@ -43,7 +43,6 @@ function WordyGame() {
   const [current, setCurrent]           = useState("");
   const [letterStates, setLetterStates] = useState<Record<string, LetterState>>({});
   const [answer, setAnswer]             = useState<string | null>(null);
-  const [sponsor, setSponsor]           = useState<SponsorData | null>(null);
   const [errorMsg, setErrorMsg]         = useState("");
   const [shaking, setShaking]           = useState(false);
   const [copied, setCopied]             = useState(false);
@@ -69,12 +68,10 @@ function WordyGame() {
   async function finishGame(newPhase: "won" | "lost", revealedAnswer: string, finalGuesses: string[], finalResults: LetterState[][], m: GameMeta) {
     setPhase(newPhase);
     setAnswer(revealedAnswer);
-    const sponsorData = await fetch(`/api/wordy/sponsor?date=${m.date}`).then(r => r.json()).catch(() => ({}));
-    if (sponsorData.sponsor) setSponsor(sponsorData.sponsor);
     fetch("/api/wordy/complete", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ date: m.date, won: newPhase === "won", guesses: finalGuesses.length, maxGuesses: m.maxGuesses, wordLength: m.wordLength, recipientId, sponsorViewed: !!sponsorData.sponsor }),
+      body: JSON.stringify({ date: m.date, won: newPhase === "won", guesses: finalGuesses.length, maxGuesses: m.maxGuesses, wordLength: m.wordLength, recipientId }),
     }).catch(() => {});
     const lsKey = `decatur_wordy_${m.date}`;
     localStorage.setItem(lsKey, JSON.stringify({ guesses: finalGuesses, results: finalResults, phase: newPhase, answer: revealedAnswer }));
@@ -102,9 +99,6 @@ function WordyGame() {
             });
           });
           setLetterStates(ls);
-          if (s.phase === "won" || s.phase === "lost") {
-            fetch(`/api/wordy/sponsor?date=${d.date}`).then(r => r.json()).then(sd => { if (sd.sponsor) setSponsor(sd.sponsor); }).catch(() => {});
-          }
           return;
         } catch { /* fall through to fresh game */ }
       }
@@ -137,18 +131,14 @@ function WordyGame() {
     if (data.won) {
       finishGame("won", data.answer, newGuesses, newResults, meta);
     } else if (newGuesses.length >= meta.maxGuesses) {
-      const [revealData, sponsorData] = await Promise.all([
-        fetch(`/api/wordy/reveal?date=${meta.date}`).then(r => r.json()).catch(() => ({})),
-        fetch(`/api/wordy/sponsor?date=${meta.date}`).then(r => r.json()).catch(() => ({})),
-      ]);
+      const revealData = await fetch(`/api/wordy/reveal?date=${meta.date}`).then(r => r.json()).catch(() => ({}));
       const finalAnswer = revealData.answer || "?";
-      if (sponsorData.sponsor) setSponsor(sponsorData.sponsor);
       setPhase("lost");
       setAnswer(finalAnswer);
       fetch("/api/wordy/complete", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ date: meta.date, won: false, guesses: newGuesses.length, maxGuesses: meta.maxGuesses, wordLength: meta.wordLength, recipientId, sponsorViewed: !!sponsorData.sponsor }),
+        body: JSON.stringify({ date: meta.date, won: false, guesses: newGuesses.length, maxGuesses: meta.maxGuesses, wordLength: meta.wordLength, recipientId }),
       }).catch(() => {});
       localStorage.setItem(`decatur_wordy_${meta.date}`, JSON.stringify({ guesses: newGuesses, results: newResults, phase: "lost", answer: finalAnswer }));
     } else {
@@ -266,30 +256,6 @@ function WordyGame() {
         </div>
       )}
 
-      {/* Sponsor card */}
-      {(phase === "won" || phase === "lost") && sponsor && (
-        <div className="w-full max-w-xs border border-yellow-200 rounded-xl overflow-hidden shadow-sm">
-          <div className="px-4 py-2 bg-yellow-50 border-b border-yellow-100">
-            <p className="text-xs font-bold text-yellow-800 uppercase tracking-wider">
-              Today&apos;s Decatur Wordy is brought to you by {sponsor.businessName}
-            </p>
-            {sponsor.presentingBlurb && <p className="text-xs text-yellow-700 mt-0.5">{sponsor.presentingBlurb}</p>}
-          </div>
-          {sponsor.imageUrl && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={sponsor.imageUrl} alt="" className="w-full h-36 object-cover" />
-          )}
-          <div className="p-4">
-            <p className="font-bold text-gray-900 text-sm mb-1">{sponsor.headline}</p>
-            <p className="text-xs text-gray-600 leading-relaxed mb-3">{sponsor.body}</p>
-            <a href={sponsor.ctaUrl} target="_blank" rel="noopener noreferrer"
-              className="inline-block bg-green-700 text-white text-xs font-bold px-4 py-2 rounded-lg hover:bg-green-800 transition-colors">
-              {sponsor.ctaLabel}
-            </a>
-          </div>
-        </div>
-      )}
-
       {/* Share + back buttons */}
       {(phase === "won" || phase === "lost") && (
         <div className="flex flex-col items-center gap-2 w-full max-w-xs">
@@ -337,10 +303,13 @@ export default function WordyPage() {
           </div>
         </div>
       </header>
-      <main className="flex-1 max-w-lg mx-auto w-full px-4 pt-6">
-        <Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-8 w-8 border-2 border-green-600 border-t-transparent" /></div>}>
-          <WordyGame />
-        </Suspense>
+      <main className="flex-1 max-w-lg mx-auto w-full px-4 pt-4">
+        <GamePresentingSponsor game="wordy" />
+        <div className="pt-2">
+          <Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-8 w-8 border-2 border-green-600 border-t-transparent" /></div>}>
+            <WordyGame />
+          </Suspense>
+        </div>
       </main>
     </div>
   );
