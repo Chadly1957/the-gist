@@ -183,7 +183,7 @@ export default function MatchPage() {
                   <div className={styles.hudTitle}>
                     <p className={styles.hudTitleName}>The Gist Decatur Match</p>
                     <p className={styles.hudTitleSub}>
-                      {dateLabel ? `Today's puzzle · ${dateLabel}` : "Today's puzzle"}
+                      {dateLabel ? `Today's Puzzle | ${dateLabel}` : "Today's Puzzle"}
                     </p>
                   </div>
                   <div className={styles.stats}>
