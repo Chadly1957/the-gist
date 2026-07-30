@@ -147,14 +147,8 @@ export default function MatchPage() {
   return (
     <div className="min-h-screen bg-white flex flex-col">
       <header className="border-b border-gray-100 py-3">
-        <div className="max-w-lg mx-auto px-6 flex items-center justify-between">
+        <div className="max-w-lg mx-auto px-6 flex items-center">
           <Link href="/"><Logo className="h-10 w-auto" /></Link>
-          <div className="text-right">
-            <p className="text-sm font-bold text-gray-900">Gist Match</p>
-            <p className="text-xs text-gray-400">
-              {dateLabel ? `Daily puzzle · ${dateLabel}` : "Daily puzzle"}
-            </p>
-          </div>
         </div>
       </header>
 
@@ -186,6 +180,12 @@ export default function MatchPage() {
             <>
               <div className={styles.stage}>
                 <div className={styles.hud}>
+                  <div className={styles.hudTitle}>
+                    <p className={styles.hudTitleName}>The Gist Decatur Match</p>
+                    <p className={styles.hudTitleSub}>
+                      {dateLabel ? `Today's puzzle · ${dateLabel}` : "Today's puzzle"}
+                    </p>
+                  </div>
                   <div className={styles.stats}>
                     <div className={styles.stat}>
                       <span className={styles.statLabel}>Score</span>
