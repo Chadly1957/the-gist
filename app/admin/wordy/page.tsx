@@ -6,10 +6,13 @@ interface WordEntry { id: string; date: string; word: string; puzzleNum: number;
 interface PlayStats { plays: number; wins: number; }
 interface WordyDayStats { date: string; plays: number; wins: number; }
 interface WordyAnalytics { allTime: PlayStats | null; today: PlayStats | null; thisWeek: PlayStats | null; byDay: WordyDayStats[]; }
+interface MatchPlayStats { plays: number; avgScore: number; }
+interface MatchDayStats { date: string; plays: number; avgScore: number; }
+interface MatchAnalytics { allTime: MatchPlayStats | null; today: MatchPlayStats | null; thisWeek: MatchPlayStats | null; byDay: MatchDayStats[]; }
 interface SponsorCounts { wordyImpressions: number; wordyClicks: number; matchImpressions: number; matchClicks: number; }
 interface SponsorDayStats extends SponsorCounts { date: string; }
 interface SponsorAnalytics { allTime: SponsorCounts; today: SponsorCounts; thisWeek: SponsorCounts; byDay: SponsorDayStats[]; }
-interface Analytics { wordy: WordyAnalytics | null; sponsor: SponsorAnalytics | null; }
+interface Analytics { wordy: WordyAnalytics | null; match: MatchAnalytics | null; sponsor: SponsorAnalytics | null; }
 
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
@@ -268,6 +271,34 @@ export default function WordyAdminPage() {
                 </div>
               </div>
 
+              {/* Gist Match play stats */}
+              {analytics.match?.allTime && (
+                <div>
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Gist Match — Plays</p>
+                  <div className="space-y-3">
+                    {[
+                      { label: "Today", stats: analytics.match.today },
+                      { label: "Last 7 Days", stats: analytics.match.thisWeek },
+                      { label: "All Time", stats: analytics.match.allTime },
+                    ].map(({ label, stats }) => stats && (
+                      <div key={label} className="flex items-center gap-3">
+                        <span className="text-xs text-gray-400 w-24 shrink-0">{label}</span>
+                        <div className="grid grid-cols-2 gap-3 flex-1">
+                          <div className="bg-white border border-gray-200 rounded-xl p-3 text-center">
+                            <p className="text-xl font-bold text-gray-900">{stats.plays.toLocaleString()}</p>
+                            <p className="text-xs text-gray-500 mt-0.5">Games Played</p>
+                          </div>
+                          <div className="bg-white border border-gray-200 rounded-xl p-3 text-center">
+                            <p className="text-xl font-bold text-green-700">{stats.avgScore.toLocaleString()}</p>
+                            <p className="text-xs text-gray-500 mt-0.5">Avg Score</p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Presenting sponsor impressions/clicks */}
               {analytics.sponsor && (
                 <div>
@@ -315,6 +346,7 @@ export default function WordyAdminPage() {
                           <th className="text-left text-xs font-semibold text-gray-500 px-4 py-2.5">Date</th>
                           <th className="text-center text-xs font-semibold text-gray-500 px-4 py-2.5">Wordy Plays</th>
                           <th className="text-center text-xs font-semibold text-gray-500 px-4 py-2.5">Win %</th>
+                          <th className="text-center text-xs font-semibold text-gray-500 px-4 py-2.5">Match Plays</th>
                           <th className="text-center text-xs font-semibold text-gray-500 px-4 py-2.5">Sponsor Impr.</th>
                           <th className="text-center text-xs font-semibold text-gray-500 px-4 py-2.5">Sponsor Clicks</th>
                         </tr>
@@ -324,12 +356,16 @@ export default function WordyAdminPage() {
                           const sponsorRow = analytics.sponsor?.byDay.find(s => s.date === row.date);
                           const impressions = (sponsorRow?.wordyImpressions ?? 0) + (sponsorRow?.matchImpressions ?? 0);
                           const clicks = (sponsorRow?.wordyClicks ?? 0) + (sponsorRow?.matchClicks ?? 0);
+                          const matchRow = analytics.match?.byDay.find(m => m.date === row.date);
                           return (
                             <tr key={row.date} className={i % 2 === 0 ? "" : "bg-gray-50/50"}>
                               <td className="px-4 py-2.5 text-xs text-gray-700 font-medium">{fmt(row.date)}</td>
                               <td className="px-4 py-2.5 text-xs text-gray-900 text-center font-semibold">{row.plays}</td>
                               <td className="px-4 py-2.5 text-xs text-green-700 text-center font-medium">
                                 {row.plays > 0 ? Math.round((row.wins / row.plays) * 100) : 0}%
+                              </td>
+                              <td className="px-4 py-2.5 text-xs text-center">
+                                <span className={matchRow && matchRow.plays > 0 ? "text-gray-700 font-medium" : "text-gray-300"}>{matchRow?.plays ?? 0}</span>
                               </td>
                               <td className="px-4 py-2.5 text-xs text-center">
                                 <span className={impressions > 0 ? "text-gray-700 font-medium" : "text-gray-300"}>{impressions}</span>

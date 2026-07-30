@@ -26,7 +26,16 @@ export async function GET() {
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 29);
     const thirtyDaysAgoStr = thirtyDaysAgo.toLocaleDateString("en-CA");
 
-    const [totalPlays, totalWins, recentPlays, sponsorGroups, recentEvents] = await Promise.all([
+    const [
+      totalPlays,
+      totalWins,
+      recentPlays,
+      sponsorGroups,
+      recentEvents,
+      matchTotalPlays,
+      matchTotalScore,
+      recentMatchScores,
+    ] = await Promise.all([
       prisma.wordyPlay.count(),
       prisma.wordyPlay.count({ where: { won: true } }),
       prisma.wordyPlay.findMany({
@@ -38,6 +47,13 @@ export async function GET() {
       prisma.gameSponsorEvent.findMany({
         where: { date: { gte: thirtyDaysAgoStr } },
         select: { date: true, game: true, eventType: true },
+        orderBy: { date: "desc" },
+      }),
+      prisma.matchScore.count(),
+      prisma.matchScore.aggregate({ _sum: { score: true } }),
+      prisma.matchScore.findMany({
+        where: { date: { gte: thirtyDaysAgoStr } },
+        select: { date: true, score: true },
         orderBy: { date: "desc" },
       }),
     ]);
@@ -54,6 +70,22 @@ export async function GET() {
     const weekPlays = recentPlays.filter((p) => p.date >= weekAgoStr);
     const wordyByDay = Array.from(dayMap.entries())
       .map(([date, stats]) => ({ date, ...stats }))
+      .sort((a, b) => b.date.localeCompare(a.date));
+
+    // Match play stats (score-based, no win/loss)
+    const matchDayMap = new Map<string, { plays: number; totalScore: number }>();
+    for (const s of recentMatchScores) {
+      const row = matchDayMap.get(s.date) ?? { plays: 0, totalScore: 0 };
+      row.plays++;
+      row.totalScore += s.score;
+      matchDayMap.set(s.date, row);
+    }
+    const todayMatchScores = recentMatchScores.filter((s) => s.date === todayStr);
+    const weekMatchScores = recentMatchScores.filter((s) => s.date >= weekAgoStr);
+    const avgOf = (scores: { score: number }[]) =>
+      scores.length > 0 ? Math.round(scores.reduce((sum, s) => sum + s.score, 0) / scores.length) : 0;
+    const matchByDay = Array.from(matchDayMap.entries())
+      .map(([date, { plays, totalScore }]) => ({ date, plays, avgScore: Math.round(totalScore / plays) }))
       .sort((a, b) => b.date.localeCompare(a.date));
 
     // Sponsor impression/click stats (Wordy + Match presenting sponsor)
@@ -83,6 +115,12 @@ export async function GET() {
         thisWeek: { plays: weekPlays.length, wins: weekPlays.filter((p) => p.won).length },
         byDay: wordyByDay,
       },
+      match: {
+        allTime: { plays: matchTotalPlays, avgScore: matchTotalPlays > 0 ? Math.round((matchTotalScore._sum.score ?? 0) / matchTotalPlays) : 0 },
+        today: { plays: todayMatchScores.length, avgScore: avgOf(todayMatchScores) },
+        thisWeek: { plays: weekMatchScores.length, avgScore: avgOf(weekMatchScores) },
+        byDay: matchByDay,
+      },
       sponsor: {
         allTime: sponsorAllTime,
         today: sponsorToday,
@@ -91,6 +129,6 @@ export async function GET() {
       },
     });
   } catch {
-    return NextResponse.json({ wordy: null, sponsor: null });
+    return NextResponse.json({ wordy: null, match: null, sponsor: null });
   }
 }
