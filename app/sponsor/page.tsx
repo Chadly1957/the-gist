@@ -100,7 +100,7 @@ export default async function SponsorPage() {
 
       {/* Tiers */}
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-10 sm:py-16">
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid md:grid-cols-3 gap-6">
           {TIERS.map((tier) => (
             <div
               key={tier.key}
