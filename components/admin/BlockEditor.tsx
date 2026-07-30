@@ -5,7 +5,7 @@ import UrlInput from "@/components/UrlInput";
 
 export interface Block {
   id: string;
-  type: "header" | "text" | "image" | "articles" | "divider" | "button" | "footer" | "spotlight" | "presenting_sponsor" | "events" | "referral" | "poll" | "wordy" | "match" | "games";
+  type: "header" | "text" | "image" | "articles" | "divider" | "button" | "footer" | "spotlight" | "presenting_sponsor" | "events" | "referral" | "poll" | "wordy" | "match" | "games" | "tip_jar";
   content: Record<string, string>;
 }
 
@@ -31,6 +31,7 @@ const BLOCK_TYPES: { type: Block["type"]; label: string; icon: string }[] = [
   { type: "wordy", label: "Decatur Wordy", icon: "🟩" },
   { type: "match", label: "Gist Match", icon: "🧩" },
   { type: "games", label: "Games (Wordy + Match)", icon: "🎮" },
+  { type: "tip_jar", label: "Tip Jar", icon: "☕" },
 ];
 
 export default function BlockEditor({ blocks, onChange }: BlockEditorProps) {
@@ -67,6 +68,11 @@ export default function BlockEditor({ blocks, onChange }: BlockEditorProps) {
       wordy: { buttonLabel: "Play Today's Wordy →" },
       match: { buttonLabel: "Play Today's Match →" },
       games: { wordyButtonLabel: "Play Decatur Wordy →", matchButtonLabel: "Play Gist Match →" },
+      tip_jar: {
+        headline: "Like what The Gist Decatur is doing?",
+        body: "Support the newsletter with a cup of coffee!",
+        buttonLabel: "Tip $3",
+      },
     };
     const newBlock: Block = { id: generateId(), type, content: { ...defaults[type], blockId: "" } };
     if (type === "poll") newBlock.content.blockId = newBlock.id;
@@ -364,6 +370,17 @@ function BlockPreview({ block }: { block: Block }) {
           </div>
         </div>
       );
+    case "tip_jar":
+      return (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-center">
+          <div className="text-xs font-semibold text-amber-700 uppercase tracking-wide mb-1">Tip Jar</div>
+          <p className="text-sm font-bold text-gray-900 mb-1">☕ {block.content.headline || "Like what The Gist Decatur is doing?"}</p>
+          <p className="text-xs text-gray-500 mb-2">{block.content.body || "Support the newsletter with a cup of coffee!"}</p>
+          <span className="inline-block bg-amber-500 text-white text-xs font-semibold px-3 py-1.5 rounded-lg">
+            {block.content.buttonLabel || "Tip $3"}
+          </span>
+        </div>
+      );
     default:
       return null;
   }
@@ -631,6 +648,15 @@ function BlockFields({
           {field("wordyButtonLabel", "Wordy Button Label", { placeholder: "Play Decatur Wordy →" })}
           {field("matchButtonLabel", "Match Button Label", { placeholder: "Play Gist Match →" })}
           <p className="text-xs text-gray-400">Combines Decatur Wordy and Gist Match side by side in one block — use this instead of adding both games separately.</p>
+        </div>
+      );
+    case "tip_jar":
+      return (
+        <div className="space-y-3">
+          {field("headline", "Headline", { placeholder: "Like what The Gist Decatur is doing?" })}
+          {field("body", "Body", { placeholder: "Support the newsletter with a cup of coffee!" })}
+          {field("buttonLabel", "Button Label", { placeholder: "Tip $3" })}
+          <p className="text-xs text-gray-400">Links to thegistdecatur.com/tip with $3 pre-selected — readers can still enter their own amount.</p>
         </div>
       );
     default:

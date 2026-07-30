@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Logo from "@/components/Logo";
 import GamePresentingSponsor from "@/components/GamePresentingSponsor";
+import TipJarCTA from "@/components/TipJarCTA";
 
 type LetterState = "correct" | "present" | "absent";
 type GamePhase = "loading" | "no-word" | "playing" | "won" | "lost";
@@ -269,6 +270,9 @@ function WordyGame() {
           <Link href="/" className="text-xs text-gray-400 hover:text-gray-600 transition-colors">← Back to thegistdecatur.com</Link>
         </div>
       )}
+
+      {/* Tip jar */}
+      {(phase === "won" || phase === "lost") && <TipJarCTA source="wordy" />}
 
       {/* Keyboard */}
       <div className="flex flex-col gap-1.5 items-center w-full max-w-sm mt-1">

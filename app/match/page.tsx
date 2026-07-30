@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Logo from "@/components/Logo";
 import GamePresentingSponsor from "@/components/GamePresentingSponsor";
+import TipJarCTA from "@/components/TipJarCTA";
 import styles from "./match.module.css";
 import { MatchEngine, START_MOVES } from "./matchEngine";
 
@@ -171,6 +172,9 @@ export default function MatchPage() {
                   <p className={styles.playedScore}>{(playedScore ?? 0).toLocaleString()} pts</p>
                   <p className={styles.playedNote}>Come back after midnight for a new board.</p>
                 </div>
+                <div className="mt-4 flex justify-center">
+                  <TipJarCTA source="match" />
+                </div>
               </div>
               {leaderboardPanel}
             </>
@@ -208,7 +212,12 @@ export default function MatchPage() {
                         <p className={styles.overlayKicker}>Out of moves</p>
                         <p className={styles.overlayScore}>{finalScore.toLocaleString()} pts</p>
                         {submitted ? (
-                          <p className={styles.overlayConfirm}>You&apos;re on today&apos;s board. Come back tomorrow!</p>
+                          <>
+                            <p className={styles.overlayConfirm}>You&apos;re on today&apos;s board. Come back tomorrow!</p>
+                            <div className="mt-3">
+                              <TipJarCTA source="match" variant="compact" />
+                            </div>
+                          </>
                         ) : (
                           <div className={styles.overlaySubmit}>
                             <label className={styles.srOnly} htmlFor="matchNameInput">Your name</label>

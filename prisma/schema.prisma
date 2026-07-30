@@ -329,3 +329,16 @@ model PollVote {
   @@index([pollId])
   @@index([optionId])
 }
+
+model Tip {
+  id              String    @id @default(cuid())
+  amountCents     Int
+  source          String    @default("web") // "web" | "newsletter" | "wordy" | "match"
+  status          String    @default("pending_payment") // pending_payment | paid
+  stripeSessionId String?
+  createdAt       DateTime  @default(now())
+  paidAt          DateTime?
+
+  @@index([stripeSessionId])
+  @@index([status])
+}

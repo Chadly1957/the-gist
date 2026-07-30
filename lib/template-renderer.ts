@@ -2,7 +2,7 @@
 
 export interface Block {
   id: string;
-  type: "header" | "text" | "image" | "articles" | "divider" | "footer" | "button" | "spotlight" | "presenting_sponsor" | "events" | "referral" | "poll" | "wordy" | "match" | "games";
+  type: "header" | "text" | "image" | "articles" | "divider" | "footer" | "button" | "spotlight" | "presenting_sponsor" | "events" | "referral" | "poll" | "wordy" | "match" | "games" | "tip_jar";
   content: Record<string, unknown>;
 }
 
@@ -448,6 +448,29 @@ function renderGames(content: Record<string, unknown>, wordyData?: WordyData): s
     </div>`;
 }
 
+function renderTipJar(content: Record<string, unknown>): string {
+  const headline = String(content.headline || "Like what The Gist Decatur is doing?");
+  const body = String(content.body || "Support the newsletter with a cup of coffee!");
+  const buttonLabel = String(content.buttonLabel || "Tip $3");
+  const tipUrl = "{{APP_URL}}/tip?amount=3&source=newsletter";
+
+  return `
+    <div style="padding:20px 40px;">
+      <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:24px;text-align:center;">
+        <div style="font-size:28px;margin-bottom:8px;">☕</div>
+        <div style="font-size:17px;font-weight:700;color:#78350f;font-family:Georgia,serif;line-height:1.4;margin-bottom:6px;">
+          ${headline}
+        </div>
+        <div style="font-size:13px;color:#92400e;font-family:sans-serif;margin-bottom:18px;">
+          ${body}
+        </div>
+        <a href="${tipUrl}" style="display:inline-block;background:#f59e0b;color:#ffffff;padding:12px 28px;border-radius:6px;text-decoration:none;font-size:14px;font-family:sans-serif;font-weight:700;">
+          ${buttonLabel}
+        </a>
+      </div>
+    </div>`;
+}
+
 function renderDivider(): string {
   return `<div class="block" style="padding:8px 40px;"><hr class="divider" style="border:none;border-top:1px solid #e5e7eb;margin:0;" /></div>`;
 }
@@ -521,6 +544,8 @@ export function renderTemplate(
           return renderMatch(block.content);
         case "games":
           return renderGames(block.content, wordyData);
+        case "tip_jar":
+          return renderTipJar(block.content);
         default:
           return "";
       }
