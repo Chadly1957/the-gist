@@ -5,7 +5,7 @@ import UrlInput from "@/components/UrlInput";
 
 export interface Block {
   id: string;
-  type: "header" | "text" | "image" | "articles" | "divider" | "button" | "footer" | "spotlight" | "presenting_sponsor" | "events" | "referral" | "poll" | "wordy";
+  type: "header" | "text" | "image" | "articles" | "divider" | "button" | "footer" | "spotlight" | "presenting_sponsor" | "events" | "referral" | "poll" | "wordy" | "match" | "games";
   content: Record<string, string>;
 }
 
@@ -29,6 +29,8 @@ const BLOCK_TYPES: { type: Block["type"]; label: string; icon: string }[] = [
   { type: "referral", label: "Refer a Friend", icon: "🔗" },
   { type: "poll", label: "Poll", icon: "📊" },
   { type: "wordy", label: "Decatur Wordy", icon: "🟩" },
+  { type: "match", label: "Gist Match", icon: "🧩" },
+  { type: "games", label: "Games (Wordy + Match)", icon: "🎮" },
 ];
 
 export default function BlockEditor({ blocks, onChange }: BlockEditorProps) {
@@ -63,6 +65,8 @@ export default function BlockEditor({ blocks, onChange }: BlockEditorProps) {
         option3: "",
       },
       wordy: { buttonLabel: "Play Today's Wordy →" },
+      match: { buttonLabel: "Play Today's Match →" },
+      games: { wordyButtonLabel: "Play Decatur Wordy →", matchButtonLabel: "Play Gist Match →" },
     };
     const newBlock: Block = { id: generateId(), type, content: { ...defaults[type], blockId: "" } };
     if (type === "poll") newBlock.content.blockId = newBlock.id;
@@ -326,6 +330,40 @@ function BlockPreview({ block }: { block: Block }) {
           </span>
         </div>
       );
+    case "match":
+      return (
+        <div className="bg-green-50 border border-green-200 rounded-xl p-4">
+          <div className="text-xs font-semibold text-green-700 uppercase tracking-wide mb-1">Gist Match</div>
+          <div className="text-lg mb-1">🟨🟩🟦🟪🟥</div>
+          <p className="text-sm font-bold text-gray-900 mb-1">Today&apos;s daily match-3 puzzle</p>
+          <p className="text-xs text-gray-500 mb-2">Score points and climb today&apos;s shared leaderboard</p>
+          <span className="inline-block bg-green-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg">
+            {block.content.buttonLabel || "Play Today's Match →"}
+          </span>
+        </div>
+      );
+    case "games":
+      return (
+        <div className="bg-green-50 border border-green-200 rounded-xl p-4">
+          <div className="text-xs font-semibold text-green-700 uppercase tracking-wide mb-2 text-center">Today&apos;s Games</div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="text-center">
+              <div className="text-base mb-1">🟩🟨⬛</div>
+              <p className="text-xs font-bold text-gray-900 mb-1.5">Decatur Wordy</p>
+              <span className="inline-block bg-green-700 text-white text-[10px] font-semibold px-2 py-1 rounded-lg">
+                {block.content.wordyButtonLabel || "Play →"}
+              </span>
+            </div>
+            <div className="text-center border-l border-green-200">
+              <div className="text-base mb-1">🟨🟩🟦</div>
+              <p className="text-xs font-bold text-gray-900 mb-1.5">Gist Match</p>
+              <span className="inline-block bg-green-700 text-white text-[10px] font-semibold px-2 py-1 rounded-lg">
+                {block.content.matchButtonLabel || "Play →"}
+              </span>
+            </div>
+          </div>
+        </div>
+      );
     default:
       return null;
   }
@@ -578,6 +616,21 @@ function BlockFields({
         <div className="space-y-3">
           {field("buttonLabel", "Button Label", { placeholder: "Play Today's Wordy →" })}
           <p className="text-xs text-gray-400">Links to thegistdecatur.com/wordy. Word length and puzzle number are pulled from the Wordy schedule at send time.</p>
+        </div>
+      );
+    case "match":
+      return (
+        <div className="space-y-3">
+          {field("buttonLabel", "Button Label", { placeholder: "Play Today's Match →" })}
+          <p className="text-xs text-gray-400">Links to thegistdecatur.com/match. A new shared puzzle and leaderboard unlock every day at midnight.</p>
+        </div>
+      );
+    case "games":
+      return (
+        <div className="space-y-3">
+          {field("wordyButtonLabel", "Wordy Button Label", { placeholder: "Play Decatur Wordy →" })}
+          {field("matchButtonLabel", "Match Button Label", { placeholder: "Play Gist Match →" })}
+          <p className="text-xs text-gray-400">Combines Decatur Wordy and Gist Match side by side in one block — use this instead of adding both games separately.</p>
         </div>
       );
     default:

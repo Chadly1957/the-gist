@@ -2,7 +2,7 @@
 
 export interface Block {
   id: string;
-  type: "header" | "text" | "image" | "articles" | "divider" | "footer" | "button" | "spotlight" | "presenting_sponsor" | "events" | "referral" | "poll" | "wordy";
+  type: "header" | "text" | "image" | "articles" | "divider" | "footer" | "button" | "spotlight" | "presenting_sponsor" | "events" | "referral" | "poll" | "wordy" | "match" | "games";
   content: Record<string, unknown>;
 }
 
@@ -378,6 +378,76 @@ function renderWordy(content: Record<string, unknown>, wordyData?: WordyData): s
     </div>`;
 }
 
+function renderMatch(content: Record<string, unknown>): string {
+  const buttonLabel = String(content.buttonLabel || "Play Today's Match →");
+  const playUrl = `{{APP_URL}}/match?r=${RECIPIENT_PLACEHOLDER}`;
+
+  return `
+    <div style="padding:20px 40px;">
+      <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:24px;text-align:center;">
+        <div style="font-family:sans-serif;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#166534;margin-bottom:10px;">
+          Gist Match
+        </div>
+        <div style="font-size:22px;letter-spacing:4px;margin-bottom:12px;">🟨🟩🟦🟪🟥</div>
+        <div style="font-size:17px;font-weight:700;color:#111827;font-family:Georgia,serif;line-height:1.4;margin-bottom:6px;">
+          Today's daily match-3 puzzle is live.
+        </div>
+        <div style="font-size:13px;color:#4b5563;font-family:sans-serif;margin-bottom:20px;">
+          Match items to score points and climb today's shared leaderboard before it resets at midnight.
+        </div>
+        <a href="${playUrl}" style="display:inline-block;background:#166534;color:#ffffff;padding:12px 28px;border-radius:6px;text-decoration:none;font-size:14px;font-family:sans-serif;font-weight:700;">
+          ${buttonLabel}
+        </a>
+      </div>
+    </div>`;
+}
+
+function renderGames(content: Record<string, unknown>, wordyData?: WordyData): string {
+  const wordyButtonLabel = String(content.wordyButtonLabel || "Play Decatur Wordy →");
+  const matchButtonLabel = String(content.matchButtonLabel || "Play Gist Match →");
+  const wordyUrl = `{{APP_URL}}/wordy?r=${RECIPIENT_PLACEHOLDER}`;
+  const matchUrl = `{{APP_URL}}/match?r=${RECIPIENT_PLACEHOLDER}`;
+  const puzzleNum = wordyData?.puzzleNum;
+  const wordLength = wordyData?.wordLength;
+
+  return `
+    <div style="padding:20px 40px;">
+      <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:24px;">
+        <div style="font-family:sans-serif;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#166534;margin-bottom:16px;text-align:center;">
+          Today's Games
+        </div>
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+          <tr>
+            <td width="50%" valign="top" style="padding-right:10px;text-align:center;">
+              <div style="font-size:20px;letter-spacing:3px;margin-bottom:8px;">🟩🟨⬛</div>
+              <div style="font-size:14px;font-weight:700;color:#111827;font-family:Georgia,serif;margin-bottom:4px;">
+                Decatur Wordy${puzzleNum ? ` #${puzzleNum}` : ""}
+              </div>
+              <div style="font-size:12px;color:#4b5563;font-family:sans-serif;margin-bottom:14px;">
+                ${wordLength ? `${wordLength}-letter word` : "Daily word puzzle"}
+              </div>
+              <a href="${wordyUrl}" style="display:inline-block;background:#166534;color:#ffffff;padding:9px 16px;border-radius:6px;text-decoration:none;font-size:12px;font-family:sans-serif;font-weight:700;">
+                ${wordyButtonLabel}
+              </a>
+            </td>
+            <td width="50%" valign="top" style="padding-left:10px;text-align:center;border-left:1px solid #bbf7d0;">
+              <div style="font-size:20px;letter-spacing:3px;margin-bottom:8px;">🟨🟩🟦</div>
+              <div style="font-size:14px;font-weight:700;color:#111827;font-family:Georgia,serif;margin-bottom:4px;">
+                Gist Match
+              </div>
+              <div style="font-size:12px;color:#4b5563;font-family:sans-serif;margin-bottom:14px;">
+                Daily match-3 puzzle
+              </div>
+              <a href="${matchUrl}" style="display:inline-block;background:#166534;color:#ffffff;padding:9px 16px;border-radius:6px;text-decoration:none;font-size:12px;font-family:sans-serif;font-weight:700;">
+                ${matchButtonLabel}
+              </a>
+            </td>
+          </tr>
+        </table>
+      </div>
+    </div>`;
+}
+
 function renderDivider(): string {
   return `<div class="block" style="padding:8px 40px;"><hr class="divider" style="border:none;border-top:1px solid #e5e7eb;margin:0;" /></div>`;
 }
@@ -447,6 +517,10 @@ export function renderTemplate(
           return renderPoll(block.content, polls);
         case "wordy":
           return renderWordy(block.content, wordyData);
+        case "match":
+          return renderMatch(block.content);
+        case "games":
+          return renderGames(block.content, wordyData);
         default:
           return "";
       }

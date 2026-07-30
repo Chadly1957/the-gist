@@ -152,8 +152,8 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Look up Wordy data for the newsletter date (if the template has a wordy block)
-  const hasWordyBlock = blocks.some((b) => b.type === "wordy");
+  // Look up Wordy data for the newsletter date (if the template has a wordy or games block)
+  const hasWordyBlock = blocks.some((b) => b.type === "wordy" || b.type === "games");
   let wordyData: WordyData | undefined;
   if (hasWordyBlock) {
     try {
