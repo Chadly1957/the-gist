@@ -64,7 +64,7 @@ function analyticsEmailHtml({
               <td style="padding:20px 22px;">
                 <p style="margin:0 0 8px;font-size:12px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:#b45309;">You got this with a free listing</p>
                 <p style="margin:0 0 18px;font-size:14px;color:#78350f;line-height:1.6;">
-                  Paid sponsors get <strong>guaranteed placement</strong> in every newsletter — not a rotating spot shared with other free listings — plus premium visibility at the top of the send, in-article, and now on Decatur Wordy and Gist Match too. That typically means significantly more impressions and clicks than what you're seeing here.
+                  Paid sponsors get <strong>guaranteed placement</strong> in every newsletter, not a rotating spot shared with other free listings, plus premium visibility at the top of the send, in-article, and now on Decatur Wordy and Gist Match too. That typically means significantly more impressions and clicks than what you're seeing here.
                 </p>
                 <a href="${sponsorUrl}" style="background:#166534;color:#ffffff;padding:13px 26px;border-radius:10px;text-decoration:none;font-weight:700;font-size:14px;display:inline-block;">
                   Reserve a Paid Placement →
@@ -159,7 +159,7 @@ function analyticsEmailHtml({
           <tr>
             <td style="padding:20px 32px;border-top:1px solid #f3f4f6;">
               <p style="margin:0;font-size:11px;color:#9ca3af;line-height:1.5;">
-                These numbers reflect opens and clicks captured so far — they may increase as more readers open today&apos;s newsletter throughout the day.
+                These numbers reflect opens and clicks captured so far. They may increase as more readers open today&apos;s newsletter throughout the day.
                 To manage your sponsorships, visit your portal at ${portalUrl}
               </p>
             </td>
