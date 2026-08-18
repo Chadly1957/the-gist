@@ -272,6 +272,32 @@ export default function AdminSponsorsPage() {
   const [editBookingUploading, setEditBookingUploading] = useState(false);
   const [editBookingUploadError, setEditBookingUploadError] = useState<string | null>(null);
   const editBookingFileRef = useRef<HTMLInputElement>(null);
+  const [editSpotlightUploading, setEditSpotlightUploading] = useState(false);
+  const [editSpotlightUploadError, setEditSpotlightUploadError] = useState<string | null>(null);
+  const editSpotlightFileRef = useRef<HTMLInputElement>(null);
+
+  async function handleEditSpotlightImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setEditSpotlightUploading(true);
+    setEditSpotlightUploadError(null);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/admin/upload", { method: "POST", body: fd });
+      const data = await res.json();
+      if (!res.ok) {
+        setEditSpotlightUploadError(data.error || "Upload failed.");
+      } else {
+        setSpotlightForm((f) => ({ ...f, logoUrl: data.url }));
+      }
+    } catch {
+      setEditSpotlightUploadError("Upload failed. Check your connection.");
+    } finally {
+      setEditSpotlightUploading(false);
+      if (editSpotlightFileRef.current) editSpotlightFileRef.current.value = "";
+    }
+  }
 
   async function handleEditBookingImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -566,9 +592,29 @@ export default function AdminSponsorsPage() {
                           </div>
                           <div>
                             <label className="block text-xs font-semibold text-gray-600 mb-1">Logo URL</label>
-                            <UrlInput value={spotlightForm.logoUrl}
-                              onChange={(val) => setSpotlightForm((f) => ({ ...f, logoUrl: val }))}
-                              className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+                            <div className="flex gap-2">
+                              <UrlInput value={spotlightForm.logoUrl}
+                                onChange={(val) => setSpotlightForm((f) => ({ ...f, logoUrl: val }))}
+                                className="flex-1 px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+                              <input
+                                ref={editSpotlightFileRef}
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                id="edit-spotlight-image-upload"
+                                onChange={handleEditSpotlightImageUpload}
+                              />
+                              <label
+                                htmlFor="edit-spotlight-image-upload"
+                                className={`cursor-pointer flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors whitespace-nowrap ${editSpotlightUploading ? "opacity-60 pointer-events-none" : ""}`}
+                              >
+                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                                </svg>
+                                {editSpotlightUploading ? "Uploading…" : "Upload"}
+                              </label>
+                            </div>
+                            {editSpotlightUploadError && <p className="text-xs text-red-500 mt-1">{editSpotlightUploadError}</p>}
                           </div>
                           <div>
                             <label className="block text-xs font-semibold text-gray-600 mb-1">Description</label>
