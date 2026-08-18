@@ -60,3 +60,10 @@ jobs:
             FROM pg_stat_user_tables
             WHERE schemaname = 'public'
             ORDER BY relname;"
+
+      - name: Exact COUNT(*) check on LinkClick (n_live_tup is only an estimate)
+        run: |
+          echo "Neon:"
+          psql "${{ secrets.NEON_DB_URL }}" -c 'SELECT COUNT(*) FROM "LinkClick";'
+          echo "Supabase:"
+          psql "${{ secrets.SUPABASE_DB_URL }}" -c 'SELECT COUNT(*) FROM "LinkClick";'
