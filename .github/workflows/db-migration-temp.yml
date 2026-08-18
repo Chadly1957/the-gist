@@ -23,14 +23,22 @@ jobs:
           sudo apt-get install -y postgresql-client-17
           echo "/usr/lib/postgresql/17/bin" >> "$GITHUB_PATH"
 
-      - name: Reset Neon public schema (clean slate for a repeatable run)
-        run: |
-          psql "${{ secrets.NEON_DB_URL }}" -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
-
       - name: Push Prisma schema to Neon
         env:
           DATABASE_URL: ${{ secrets.NEON_DB_URL }}
         run: npx --yes prisma@5.22.0 db push --schema=./prisma/schema.prisma --skip-generate --accept-data-loss
+
+      - name: Clear existing data on Neon (data only, keep schema/grants intact)
+        run: |
+          psql "${{ secrets.NEON_DB_URL }}" -c "
+            DO \$\$
+            DECLARE r RECORD;
+            BEGIN
+              FOR r IN (SELECT tablename FROM pg_tables WHERE schemaname = 'public') LOOP
+                EXECUTE 'TRUNCATE TABLE public.' || quote_ident(r.tablename) || ' CASCADE';
+              END LOOP;
+            END \$\$;
+          "
 
       - name: Dump data from Supabase (public schema, data only)
         run: |
