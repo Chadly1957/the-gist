@@ -67,3 +67,21 @@ jobs:
           psql "${{ secrets.NEON_DB_URL }}" -t -A -c "
             SELECT blocks FROM public.\"Template\" LIMIT 1;
           " | head -c 6000
+
+      - name: Fix blurb bug - insert a dedicated intro text block after the top image
+        run: |
+          echo "=== Before ==="
+          psql "${{ secrets.NEON_DB_URL }}" -t -A -c "SELECT blocks FROM public.\"Template\" WHERE id = 'cmqfijrqt0001vnpbfu4gzzj4';"
+          psql "${{ secrets.NEON_DB_URL }}" -c "
+            UPDATE public.\"Template\"
+            SET blocks = jsonb_insert(
+              blocks::jsonb,
+              '{1}',
+              '{\"id\":\"intro-blurb\",\"type\":\"text\",\"content\":{\"html\":\"\"}}'::jsonb,
+              false
+            )::text
+            WHERE id = 'cmqfijrqt0001vnpbfu4gzzj4'
+              AND NOT (blocks::jsonb @> '[{\"id\":\"intro-blurb\"}]');
+          "
+          echo "=== After ==="
+          psql "${{ secrets.NEON_DB_URL }}" -t -A -c "SELECT blocks FROM public.\"Template\" WHERE id = 'cmqfijrqt0001vnpbfu4gzzj4';"
