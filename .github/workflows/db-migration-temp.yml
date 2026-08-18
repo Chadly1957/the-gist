@@ -6,14 +6,10 @@ on:
     branches: [db-migration-temp]
 
 jobs:
-  migrate:
+  diagnose:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
 
       - name: Install Postgres 17 client tools (match Supabase server version)
         run: |
@@ -23,55 +19,47 @@ jobs:
           sudo apt-get install -y postgresql-client-17
           echo "/usr/lib/postgresql/17/bin" >> "$GITHUB_PATH"
 
-      - name: Push Prisma schema to Neon
-        env:
-          DATABASE_URL: ${{ secrets.NEON_DB_URL }}
-        run: npx --yes prisma@5.22.0 db push --schema=./prisma/schema.prisma --skip-generate --accept-data-loss
-
-      - name: Clear existing data on Neon (data only, keep schema/grants intact)
-        run: |
-          psql "${{ secrets.NEON_DB_URL }}" -c "
-            DO \$\$
-            DECLARE r RECORD;
-            BEGIN
-              FOR r IN (SELECT tablename FROM pg_tables WHERE schemaname = 'public') LOOP
-                EXECUTE 'TRUNCATE TABLE public.' || quote_ident(r.tablename) || ' CASCADE';
-              END LOOP;
-            END \$\$;
-          "
-
-      - name: Dump data from Supabase (public schema, data only)
-        run: |
-          pg_dump "${{ secrets.SUPABASE_DB_URL }}" \
-            --schema=public \
-            --data-only \
-            --no-owner \
-            --no-privileges \
-            -Fc -f supabase_data.dump
-
-      - name: Restore data into Neon
-        run: |
-          pg_restore --data-only --no-owner --no-privileges \
-            -d "${{ secrets.NEON_DB_URL }}" supabase_data.dump
-
-      - name: Verify row counts on Neon
+      - name: Row counts on Neon (read-only, confirms migration is intact)
         run: |
           psql "${{ secrets.NEON_DB_URL }}" -c "
             SELECT relname AS table_name, n_live_tup AS row_count
             FROM pg_stat_user_tables
-            ORDER BY relname;"
-
-      - name: Verify row counts on Supabase (source, for comparison)
-        run: |
-          psql "${{ secrets.SUPABASE_DB_URL }}" -c "
-            SELECT relname AS table_name, n_live_tup AS row_count
-            FROM pg_stat_user_tables
-            WHERE schemaname = 'public'
             ORDER BY relname;"
 
       - name: Exact COUNT(*) check on LinkClick (n_live_tup is only an estimate)
         run: |
-          echo "Neon:"
           psql "${{ secrets.NEON_DB_URL }}" -c 'SELECT COUNT(*) FROM public."LinkClick";'
-          echo "Supabase:"
-          psql "${{ secrets.SUPABASE_DB_URL }}" -c 'SELECT COUNT(*) FROM public."LinkClick";'
+
+      - name: Diagnose reported bug - templates missing a text block, and sample image URLs
+        run: |
+          echo "=== Templates: does each have a text-type block? ==="
+          psql "${{ secrets.NEON_DB_URL }}" -c "
+            SELECT id, name, \"isDefault\",
+                   (SELECT COUNT(*) FROM jsonb_array_elements(blocks::jsonb) el WHERE el->>'type' = 'text') AS text_block_count,
+                   jsonb_array_length(blocks::jsonb) AS total_blocks
+            FROM public.\"Template\"
+            ORDER BY \"isDefault\" DESC, name;
+          "
+          echo "=== Sample article image URLs (10 most recent) ==="
+          psql "${{ secrets.NEON_DB_URL }}" -c "
+            SELECT id, \"sourceName\", \"imageUrl\"
+            FROM public.\"Article\"
+            ORDER BY \"publishedAt\" DESC
+            LIMIT 10;
+          "
+          echo "=== Sample spotlight/sponsor logo/image URLs ==="
+          psql "${{ secrets.NEON_DB_URL }}" -c "
+            SELECT id, \"businessName\", \"logoUrl\" FROM public.\"SpotlightListing\" LIMIT 5;
+          "
+          psql "${{ secrets.NEON_DB_URL }}" -c "
+            SELECT id, \"businessName\", \"imageUrl\" FROM public.\"AdBooking\" LIMIT 5;
+          "
+          echo "=== Distinct image URL hosts in Article table (to spot a broken domain pattern) ==="
+          psql "${{ secrets.NEON_DB_URL }}" -c "
+            SELECT regexp_replace(\"imageUrl\", '^(https?://[^/]+)/.*\$', '\1') AS host, COUNT(*)
+            FROM public.\"Article\"
+            WHERE \"imageUrl\" IS NOT NULL
+            GROUP BY 1
+            ORDER BY 2 DESC
+            LIMIT 20;
+          "
