@@ -72,6 +72,6 @@ jobs:
       - name: Exact COUNT(*) check on LinkClick (n_live_tup is only an estimate)
         run: |
           echo "Neon:"
-          psql "${{ secrets.NEON_DB_URL }}" -c 'SELECT COUNT(*) FROM "LinkClick";'
+          psql "${{ secrets.NEON_DB_URL }}" -c 'SELECT COUNT(*) FROM public."LinkClick";'
           echo "Supabase:"
-          psql "${{ secrets.SUPABASE_DB_URL }}" -c 'SELECT COUNT(*) FROM "LinkClick";'
+          psql "${{ secrets.SUPABASE_DB_URL }}" -c 'SELECT COUNT(*) FROM public."LinkClick";'
