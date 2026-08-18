@@ -2,6 +2,8 @@ name: Temporary DB Migration (Supabase -> Neon)
 
 on:
   workflow_dispatch:
+  push:
+    branches: [db-migration-temp]
 
 jobs:
   migrate:
