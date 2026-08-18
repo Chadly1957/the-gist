@@ -15,11 +15,6 @@ jobs:
         with:
           node-version: 20
 
-      - name: Push Prisma schema to Neon
-        env:
-          DATABASE_URL: ${{ secrets.NEON_DB_URL }}
-        run: npx --yes prisma@5.22.0 db push --schema=./prisma/schema.prisma --skip-generate --accept-data-loss
-
       - name: Install Postgres 17 client tools (match Supabase server version)
         run: |
           sudo apt-get update
@@ -28,19 +23,27 @@ jobs:
           sudo apt-get install -y postgresql-client-17
           echo "/usr/lib/postgresql/17/bin" >> "$GITHUB_PATH"
 
+      - name: Reset Neon public schema (clean slate for a repeatable run)
+        run: |
+          psql "${{ secrets.NEON_DB_URL }}" -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
+
+      - name: Push Prisma schema to Neon
+        env:
+          DATABASE_URL: ${{ secrets.NEON_DB_URL }}
+        run: npx --yes prisma@5.22.0 db push --schema=./prisma/schema.prisma --skip-generate --accept-data-loss
+
       - name: Dump data from Supabase (public schema, data only)
         run: |
           pg_dump "${{ secrets.SUPABASE_DB_URL }}" \
             --schema=public \
             --data-only \
-            --disable-triggers \
             --no-owner \
             --no-privileges \
             -Fc -f supabase_data.dump
 
       - name: Restore data into Neon
         run: |
-          pg_restore --data-only --disable-triggers --no-owner --no-privileges \
+          pg_restore --data-only --no-owner --no-privileges \
             -d "${{ secrets.NEON_DB_URL }}" supabase_data.dump
 
       - name: Verify row counts on Neon
