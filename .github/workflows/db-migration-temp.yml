@@ -11,14 +11,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Postgres 17 client tools (match Supabase server version)
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y postgresql-common
-          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
-          sudo apt-get install -y postgresql-client-17
-          echo "/usr/lib/postgresql/17/bin" >> "$GITHUB_PATH"
-
       - name: Row counts on Neon (read-only, confirms migration is intact)
         run: |
           psql "${{ secrets.NEON_DB_URL }}" -c "
