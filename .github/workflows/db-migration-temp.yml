@@ -1,0 +1,52 @@
+name: Temporary DB Migration (Supabase -> Neon)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Push Prisma schema to Neon
+        env:
+          DATABASE_URL: ${{ secrets.NEON_DB_URL }}
+        run: npx prisma db push --skip-generate --accept-data-loss
+
+      - name: Dump data from Supabase (public schema, data only)
+        run: |
+          pg_dump "${{ secrets.SUPABASE_DB_URL }}" \
+            --schema=public \
+            --data-only \
+            --disable-triggers \
+            --no-owner \
+            --no-privileges \
+            -Fc -f supabase_data.dump
+
+      - name: Restore data into Neon
+        run: |
+          pg_restore --data-only --disable-triggers --no-owner --no-privileges \
+            -d "${{ secrets.NEON_DB_URL }}" supabase_data.dump
+
+      - name: Verify row counts on Neon
+        run: |
+          psql "${{ secrets.NEON_DB_URL }}" -c "
+            SELECT relname AS table_name, n_live_tup AS row_count
+            FROM pg_stat_user_tables
+            ORDER BY relname;"
+
+      - name: Verify row counts on Supabase (source, for comparison)
+        run: |
+          psql "${{ secrets.SUPABASE_DB_URL }}" -c "
+            SELECT relname AS table_name, n_live_tup AS row_count
+            FROM pg_stat_user_tables
+            WHERE schemaname = 'public'
+            ORDER BY relname;"
