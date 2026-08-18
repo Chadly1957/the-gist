@@ -85,3 +85,22 @@ jobs:
           "
           echo "=== After ==="
           psql "${{ secrets.NEON_DB_URL }}" -t -A -c "SELECT blocks FROM public.\"Template\" WHERE id = 'cmqfijrqt0001vnpbfu4gzzj4';"
+
+      - name: List exactly which sponsors/bookings have broken (Supabase-hosted) images
+        run: |
+          echo "=== Broken SpotlightListing logos, with sponsor contact info ==="
+          psql "${{ secrets.NEON_DB_URL }}" -c "
+            SELECT sl.id, sl.\"businessName\", sl.status, sp.email, sp.\"contactName\"
+            FROM public.\"SpotlightListing\" sl
+            JOIN public.\"SponsorProfile\" sp ON sp.id = sl.\"sponsorId\"
+            WHERE sl.\"logoUrl\" LIKE '%supabase.co%'
+            ORDER BY sl.status, sl.\"businessName\";
+          "
+          echo "=== Broken AdBooking images, with sponsor contact info ==="
+          psql "${{ secrets.NEON_DB_URL }}" -c "
+            SELECT ab.id, sp.\"businessName\", ab.type, ab.date, ab.status, sp.email, sp.\"contactName\"
+            FROM public.\"AdBooking\" ab
+            JOIN public.\"SponsorProfile\" sp ON sp.id = ab.\"sponsorId\"
+            WHERE ab.\"imageUrl\" LIKE '%supabase.co%'
+            ORDER BY ab.date DESC;
+          "
