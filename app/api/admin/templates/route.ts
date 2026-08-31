@@ -47,13 +47,13 @@ export async function POST(req: NextRequest) {
   const session = await getAdminSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { name } = await req.json();
+  const { name, blocks } = await req.json();
   if (!name) {
     return NextResponse.json({ error: "Name required." }, { status: 400 });
   }
 
   const template = await prisma.template.create({
-    data: { name, blocks: DEFAULT_BLOCKS },
+    data: { name, blocks: typeof blocks === "string" && blocks ? blocks : DEFAULT_BLOCKS },
   });
   return NextResponse.json({ template }, { status: 201 });
 }

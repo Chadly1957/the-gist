@@ -36,7 +36,8 @@ const BLOCK_TYPES: { type: Block["type"]; label: string; icon: string }[] = [
 
 export default function BlockEditor({ blocks, onChange }: BlockEditorProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
-  const dragRef = useRef<number | null>(null);
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
   function addBlock(type: Block["type"]) {
     const defaults: Record<Block["type"], Record<string, string>> = {
@@ -96,16 +97,58 @@ export default function BlockEditor({ blocks, onChange }: BlockEditorProps) {
     onChange(arr);
   }
 
+  function reorderBlock(from: number, to: number) {
+    if (from === to) return;
+    const arr = [...blocks];
+    const [moved] = arr.splice(from, 1);
+    arr.splice(to, 0, moved);
+    onChange(arr);
+  }
+
   return (
     <div className="space-y-2">
       {blocks.map((block, index) => (
         <div
           key={block.id}
-          className="group relative border border-gray-200 rounded-xl bg-white"
+          onDragOver={(e) => {
+            if (draggedIndex === null || draggedIndex === index) return;
+            e.preventDefault();
+            e.dataTransfer.dropEffect = "move";
+            setDragOverIndex(index);
+          }}
+          onDragLeave={() => setDragOverIndex((cur) => (cur === index ? null : cur))}
+          onDrop={(e) => {
+            e.preventDefault();
+            if (draggedIndex !== null) reorderBlock(draggedIndex, index);
+            setDraggedIndex(null);
+            setDragOverIndex(null);
+          }}
+          className={`group relative border rounded-xl bg-white transition-colors ${
+            dragOverIndex === index ? "border-green-400 ring-2 ring-green-200" : "border-gray-200"
+          } ${draggedIndex === index ? "opacity-40" : ""}`}
         >
           {/* Block controls */}
           <div className="flex items-center justify-between px-4 py-2 border-b border-gray-100 bg-gray-50 rounded-t-xl">
             <div className="flex items-center gap-2">
+              <span
+                draggable
+                onDragStart={(e) => {
+                  setDraggedIndex(index);
+                  e.dataTransfer.effectAllowed = "move";
+                }}
+                onDragEnd={() => {
+                  setDraggedIndex(null);
+                  setDragOverIndex(null);
+                }}
+                className="cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-500 -ml-1 mr-1 touch-none"
+                title="Drag to reorder"
+              >
+                <svg className="w-3.5 h-3.5" viewBox="0 0 16 16" fill="currentColor">
+                  <circle cx="5" cy="3" r="1.2" /><circle cx="11" cy="3" r="1.2" />
+                  <circle cx="5" cy="8" r="1.2" /><circle cx="11" cy="8" r="1.2" />
+                  <circle cx="5" cy="13" r="1.2" /><circle cx="11" cy="13" r="1.2" />
+                </svg>
+              </span>
               <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
                 {block.type === "articles" ? "Article List Block" : block.type}
               </span>
