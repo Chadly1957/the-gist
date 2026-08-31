@@ -42,8 +42,8 @@ export async function POST(req: NextRequest) {
       <td align="center" style="padding:32px 16px;">
         <table width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:480px;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e5e7eb;">
           <tr>
-            <td style="background:#166534;padding:20px 32px;">
-              <p style="margin:0;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#86efac;">Sponsor Portal</p>
+            <td style="background:#146763;padding:20px 32px;">
+              <p style="margin:0;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#8fe5c1;">Sponsor Portal</p>
               <p style="margin:4px 0 0;font-size:20px;font-weight:700;color:#ffffff;">The Gist Decatur</p>
             </td>
           </tr>
@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
               <p style="margin:0 0 24px;font-size:14px;color:#4b5563;line-height:1.6;">
                 Here&apos;s your link to access the ${profile.businessName} sponsor portal. Click below to view your listings, bookings, and analytics.
               </p>
-              <a href="${portalUrl}" style="background:#166534;color:#ffffff;padding:12px 24px;border-radius:10px;text-decoration:none;font-weight:600;font-size:14px;display:inline-block;">
+              <a href="${portalUrl}" style="background:#146763;color:#ffffff;padding:12px 24px;border-radius:10px;text-decoration:none;font-weight:600;font-size:14px;display:inline-block;">
                 Open My Sponsor Portal →
               </a>
             </td>

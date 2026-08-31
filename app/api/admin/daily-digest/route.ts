@@ -36,17 +36,17 @@ function digestHtml(data: {
           <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:12px;">
             <tr>
               <td style="padding:10px 12px;background:#f9fafb;border-radius:8px 0 0 8px;border:1px solid #e5e7eb;border-right:none;text-align:center;">
-                <p style="margin:0;font-size:22px;font-weight:700;color:#166534;">${(data.send.openRate * 100).toFixed(1)}%</p>
+                <p style="margin:0;font-size:22px;font-weight:700;color:#146763;">${(data.send.openRate * 100).toFixed(1)}%</p>
                 <p style="margin:2px 0 0;font-size:11px;color:#6b7280;">Open rate</p>
                 <p style="margin:1px 0 0;font-size:10px;color:#9ca3af;">${data.send.uniqueOpens} of ${data.send.recipientCount}</p>
               </td>
               <td style="padding:10px 12px;background:#f9fafb;border:1px solid #e5e7eb;border-left:none;border-right:none;text-align:center;">
-                <p style="margin:0;font-size:22px;font-weight:700;color:#166534;">${(data.send.clickRate * 100).toFixed(1)}%</p>
+                <p style="margin:0;font-size:22px;font-weight:700;color:#146763;">${(data.send.clickRate * 100).toFixed(1)}%</p>
                 <p style="margin:2px 0 0;font-size:11px;color:#6b7280;">Click rate</p>
                 <p style="margin:1px 0 0;font-size:10px;color:#9ca3af;">${data.send.uniqueClicks} unique</p>
               </td>
               <td style="padding:10px 12px;background:#f9fafb;border-radius:0 8px 8px 0;border:1px solid #e5e7eb;border-left:none;text-align:center;">
-                <p style="margin:0;font-size:22px;font-weight:700;color:${data.send.unsubscribes > 0 ? "#dc2626" : "#166534"};">${data.send.unsubscribes}</p>
+                <p style="margin:0;font-size:22px;font-weight:700;color:${data.send.unsubscribes > 0 ? "#dc2626" : "#146763"};">${data.send.unsubscribes}</p>
                 <p style="margin:2px 0 0;font-size:11px;color:#6b7280;">Unsubs</p>
               </td>
             </tr>
@@ -63,7 +63,7 @@ function digestHtml(data: {
                 <span style="font-size:11px;color:#9ca3af;margin-left:6px;">${SPONSOR_TYPE_LABELS[s.type] || s.type}</span>
               </td>
               <td style="padding:6px 0;border-bottom:1px solid #f3f4f6;text-align:right;">
-                <span style="font-size:13px;font-weight:700;color:#166534;">${s.clicks} click${s.clicks !== 1 ? "s" : ""}</span>
+                <span style="font-size:13px;font-weight:700;color:#146763;">${s.clicks} click${s.clicks !== 1 ? "s" : ""}</span>
               </td>
             </tr>`).join("")}
           </table>` : ""}
@@ -86,10 +86,10 @@ function digestHtml(data: {
         <table width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:520px;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e5e7eb;">
           <!-- Header -->
           <tr>
-            <td style="background:#166534;padding:20px 32px;">
-              <p style="margin:0;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#86efac;">Daily Digest</p>
+            <td style="background:#146763;padding:20px 32px;">
+              <p style="margin:0;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#8fe5c1;">Daily Digest</p>
               <p style="margin:4px 0 0;font-size:20px;font-weight:700;color:#ffffff;">The Gist Decatur</p>
-              <p style="margin:4px 0 0;font-size:13px;color:#bbf7d0;">${data.date}</p>
+              <p style="margin:4px 0 0;font-size:13px;color:#c4eedb;">${data.date}</p>
             </td>
           </tr>
 
@@ -102,11 +102,11 @@ function digestHtml(data: {
               <table width="100%" cellpadding="0" cellspacing="0" border="0">
                 <tr>
                   <td style="padding:10px 12px;background:#f9fafb;border-radius:8px 0 0 8px;border:1px solid #e5e7eb;border-right:none;text-align:center;">
-                    <p style="margin:0;font-size:22px;font-weight:700;color:#166534;">${data.activeSubscribers.toLocaleString()}</p>
+                    <p style="margin:0;font-size:22px;font-weight:700;color:#146763;">${data.activeSubscribers.toLocaleString()}</p>
                     <p style="margin:2px 0 0;font-size:11px;color:#6b7280;">Active</p>
                   </td>
                   <td style="padding:10px 12px;background:#f9fafb;border-radius:0 8px 8px 0;border:1px solid #e5e7eb;border-left:none;text-align:center;">
-                    <p style="margin:0;font-size:22px;font-weight:700;color:${data.newSubscribers > 0 ? "#166534" : "#6b7280"};">+${data.newSubscribers}</p>
+                    <p style="margin:0;font-size:22px;font-weight:700;color:${data.newSubscribers > 0 ? "#146763" : "#6b7280"};">+${data.newSubscribers}</p>
                     <p style="margin:2px 0 0;font-size:11px;color:#6b7280;">New today</p>
                   </td>
                 </tr>

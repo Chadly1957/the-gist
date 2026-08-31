@@ -55,7 +55,7 @@ function SpotlightCard({ data }: { data: SpotlightPreviewData }) {
               <div style={{ fontSize: 13, color: "#4b5563", lineHeight: 1.5, fontFamily: "sans-serif", marginBottom: 10 }}>
                 {data.description || <span style={{ color: "#9ca3af" }}>Description will appear here.</span>}
               </div>
-              <span style={{ display: "inline-block", background: "#166534", color: "#ffffff", padding: "7px 14px", borderRadius: 4, fontSize: 12, fontFamily: "sans-serif", fontWeight: 600, whiteSpace: "nowrap" }}>
+              <span style={{ display: "inline-block", background: "#146763", color: "#ffffff", padding: "7px 14px", borderRadius: 4, fontSize: 12, fontFamily: "sans-serif", fontWeight: 600, whiteSpace: "nowrap" }}>
                 {data.ctaLabel || "Visit Website"}
               </span>
             </td>
@@ -86,7 +86,7 @@ function InArticleCard({ data }: { data: InArticlePreviewData }) {
         <div style={{ fontSize: 14, color: data.body ? "#4b5563" : "#9ca3af", lineHeight: 1.6, margin: "0 0 14px", fontFamily: "sans-serif" }}>
           {data.body || "Your body copy will appear here."}
         </div>
-        <span style={{ display: "inline-block", background: "#166534", color: "#ffffff", padding: "8px 18px", borderRadius: 4, fontSize: 13, fontFamily: "sans-serif", fontWeight: 600 }}>
+        <span style={{ display: "inline-block", background: "#146763", color: "#ffffff", padding: "8px 18px", borderRadius: 4, fontSize: 13, fontFamily: "sans-serif", fontWeight: 600 }}>
           {data.ctaLabel || "Learn More"}
         </span>
       </div>
@@ -120,7 +120,7 @@ function PresentingCard({ data }: { data: PresentingPreviewData }) {
       <div style={{ fontSize: 14, color: data.body ? "#4b5563" : "#9ca3af", lineHeight: 1.6, margin: "0 0 14px", fontFamily: "sans-serif" }}>
         {data.body || "Your body copy will appear here."}
       </div>
-      <span style={{ display: "inline-block", background: "#166534", color: "#ffffff", padding: "10px 20px", borderRadius: 4, fontSize: 13, fontFamily: "sans-serif", fontWeight: 600 }}>
+      <span style={{ display: "inline-block", background: "#146763", color: "#ffffff", padding: "10px 20px", borderRadius: 4, fontSize: 13, fontFamily: "sans-serif", fontWeight: 600 }}>
         {data.ctaLabel || "Learn More"}
       </span>
     </div>

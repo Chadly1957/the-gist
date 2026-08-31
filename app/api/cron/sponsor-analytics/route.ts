@@ -66,7 +66,7 @@ function analyticsEmailHtml({
                 <p style="margin:0 0 18px;font-size:14px;color:#78350f;line-height:1.6;">
                   Paid sponsors get <strong>guaranteed placement</strong> in every newsletter, not a rotating spot shared with other free listings, plus premium visibility at the top of the send, in-article, and now on Decatur Wordy and Gist Match too. That typically means significantly more impressions and clicks than what you're seeing here.
                 </p>
-                <a href="${sponsorUrl}" style="background:#166534;color:#ffffff;padding:13px 26px;border-radius:10px;text-decoration:none;font-weight:700;font-size:14px;display:inline-block;">
+                <a href="${sponsorUrl}" style="background:#146763;color:#ffffff;padding:13px 26px;border-radius:10px;text-decoration:none;font-weight:700;font-size:14px;display:inline-block;">
                   Reserve a Paid Placement →
                 </a>
               </td>
@@ -91,7 +91,7 @@ function analyticsEmailHtml({
           <p style="margin:0 0 16px;font-size:14px;color:#4b5563;line-height:1.6;">
             See your full analytics history and manage your upcoming placements in your sponsor portal.
           </p>
-          <a href="${portalUrl}" style="background:#166534;color:#ffffff;padding:12px 24px;border-radius:10px;text-decoration:none;font-weight:600;font-size:14px;display:inline-block;">
+          <a href="${portalUrl}" style="background:#146763;color:#ffffff;padding:12px 24px;border-radius:10px;text-decoration:none;font-weight:600;font-size:14px;display:inline-block;">
             View My Sponsor Portal →
           </a>
         </td>
@@ -107,10 +107,10 @@ function analyticsEmailHtml({
         <table width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:520px;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e5e7eb;">
 
           <tr>
-            <td style="background:#166534;padding:20px 32px;">
-              <p style="margin:0;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#86efac;">Sponsor Update</p>
+            <td style="background:#146763;padding:20px 32px;">
+              <p style="margin:0;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#8fe5c1;">Sponsor Update</p>
               <p style="margin:4px 0 0;font-size:20px;font-weight:700;color:#ffffff;">The Gist Decatur</p>
-              <p style="margin:4px 0 0;font-size:13px;color:#bbf7d0;">${dateStr}</p>
+              <p style="margin:4px 0 0;font-size:13px;color:#c4eedb;">${dateStr}</p>
             </td>
           </tr>
 
@@ -124,13 +124,13 @@ function analyticsEmailHtml({
             <td style="padding:0 32px 24px;">
               <table width="100%" cellpadding="0" cellspacing="0" border="0">
                 <tr>
-                  <td style="width:50%;padding:16px 12px;background:#f0fdf4;border-radius:10px 0 0 10px;border:1px solid #bbf7d0;border-right:none;text-align:center;">
-                    <p style="margin:0;font-size:32px;font-weight:700;color:#166534;">${impressions.toLocaleString()}</p>
+                  <td style="width:50%;padding:16px 12px;background:#f4fbf7;border-radius:10px 0 0 10px;border:1px solid #c4eedb;border-right:none;text-align:center;">
+                    <p style="margin:0;font-size:32px;font-weight:700;color:#146763;">${impressions.toLocaleString()}</p>
                     <p style="margin:4px 0 0;font-size:12px;color:#4b5563;font-weight:600;">Impressions</p>
                     <p style="margin:2px 0 0;font-size:11px;color:#6b7280;">readers saw your ad</p>
                   </td>
-                  <td style="width:50%;padding:16px 12px;background:#f0fdf4;border-radius:0 10px 10px 0;border:1px solid #bbf7d0;border-left:none;text-align:center;">
-                    <p style="margin:0;font-size:32px;font-weight:700;color:#166534;">${totalClicks.toLocaleString()}</p>
+                  <td style="width:50%;padding:16px 12px;background:#f4fbf7;border-radius:0 10px 10px 0;border:1px solid #c4eedb;border-left:none;text-align:center;">
+                    <p style="margin:0;font-size:32px;font-weight:700;color:#146763;">${totalClicks.toLocaleString()}</p>
                     <p style="margin:4px 0 0;font-size:12px;color:#4b5563;font-weight:600;">Clicks</p>
                     <p style="margin:2px 0 0;font-size:11px;color:#6b7280;">visits to your website</p>
                   </td>
@@ -147,7 +147,7 @@ function analyticsEmailHtml({
                 ${placements.map((p, i) => `
                 <tr style="${i > 0 ? "border-top:1px solid #f3f4f6;" : ""}">
                   <td style="padding:10px 14px;font-size:13px;color:#374151;">${p.label}</td>
-                  <td style="padding:10px 14px;font-size:13px;font-weight:700;color:#166534;text-align:right;">${p.clicks} click${p.clicks !== 1 ? "s" : ""}</td>
+                  <td style="padding:10px 14px;font-size:13px;font-weight:700;color:#146763;text-align:right;">${p.clicks} click${p.clicks !== 1 ? "s" : ""}</td>
                 </tr>`).join("")}
               </table>
             </td>

@@ -26,9 +26,9 @@ export default async function PollResultsPage({ params }: { params: { pollId: st
   const total = voteCounts.reduce((sum, v) => sum + v._count.id, 0);
 
   return (
-    <div style={{ minHeight: "100vh", background: "#f0fdf4", display: "flex", alignItems: "center", justifyContent: "center", padding: "24px" }}>
+    <div style={{ minHeight: "100vh", background: "#f4fbf7", display: "flex", alignItems: "center", justifyContent: "center", padding: "24px" }}>
       <div style={{ maxWidth: 520, width: "100%", background: "#ffffff", borderRadius: 16, padding: "36px 32px", boxShadow: "0 4px 24px rgba(0,0,0,0.08)" }}>
-        <div style={{ fontFamily: "sans-serif", fontSize: 11, fontWeight: 700, letterSpacing: "1.5px", textTransform: "uppercase", color: "#166534", marginBottom: 12 }}>
+        <div style={{ fontFamily: "sans-serif", fontSize: 11, fontWeight: 700, letterSpacing: "1.5px", textTransform: "uppercase", color: "#146763", marginBottom: 12 }}>
           Poll Results
         </div>
         <h1 style={{ fontFamily: "Georgia, serif", fontSize: 22, fontWeight: 700, color: "#111827", marginBottom: 24, lineHeight: 1.4 }}>
@@ -46,7 +46,7 @@ export default async function PollResultsPage({ params }: { params: { pollId: st
                   <span style={{ fontFamily: "sans-serif", fontSize: 13, color: "#6b7280" }}>{pct}% ({votes})</span>
                 </div>
                 <div style={{ height: 10, background: "#e5e7eb", borderRadius: 6, overflow: "hidden" }}>
-                  <div style={{ height: "100%", width: `${pct}%`, background: "#166534", borderRadius: 6, transition: "width 0.6s ease" }} />
+                  <div style={{ height: "100%", width: `${pct}%`, background: "#146763", borderRadius: 6, transition: "width 0.6s ease" }} />
                 </div>
               </div>
             );
@@ -58,7 +58,7 @@ export default async function PollResultsPage({ params }: { params: { pollId: st
         </p>
 
         <div style={{ marginTop: 24, textAlign: "center" }}>
-          <a href="/" style={{ fontFamily: "sans-serif", fontSize: 13, color: "#166534", fontWeight: 600, textDecoration: "none" }}>
+          <a href="/" style={{ fontFamily: "sans-serif", fontSize: 13, color: "#146763", fontWeight: 600, textDecoration: "none" }}>
             ← Back to The Gist Decatur
           </a>
         </div>

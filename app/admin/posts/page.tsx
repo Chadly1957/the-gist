@@ -15,7 +15,7 @@ interface Article {
 
 type Format = "square" | "landscape";
 
-const GREEN = "#166534";
+const GREEN = "#146763";
 const PREVIEW_W = 460;
 
 function formatDate(iso: string) {

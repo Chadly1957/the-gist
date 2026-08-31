@@ -9,7 +9,7 @@ function portalEmailHtml(contactName: string, portalUrl: string): string {
         Hi ${contactName}, here's your personal link to The Gist Decatur sponsor portal. Use it to submit listings, book ad dates, and check your status.
       </p>
       <p style="margin: 24px 0;">
-        <a href="${portalUrl}" style="background: #24726f; color: #ffffff; padding: 12px 22px; border-radius: 10px; text-decoration: none; font-weight: 600; font-size: 14px; display: inline-block;">
+        <a href="${portalUrl}" style="background: #146763; color: #ffffff; padding: 12px 22px; border-radius: 10px; text-decoration: none; font-weight: 600; font-size: 14px; display: inline-block;">
           Go to My Sponsor Portal
         </a>
       </p>

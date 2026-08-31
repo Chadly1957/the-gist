@@ -4,7 +4,7 @@ import { getAdminSession } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
-const GREEN = "#166534";
+const GREEN = "#146763";
 
 export async function GET(req: NextRequest) {
   const session = await getAdminSession();

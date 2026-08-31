@@ -103,10 +103,10 @@ function trackedUrl(
 const EMAIL_STYLES = `
   body { margin: 0; padding: 0; background: #f5f5f5; font-family: Georgia, serif; }
   .wrapper { max-width: 600px; margin: 0 auto; background: #ffffff; }
-  .header { background: #166534; padding: 32px 40px; text-align: center; }
+  .header { background: #146763; padding: 32px 40px; text-align: center; }
   .header h1 { color: #ffffff; margin: 0; font-size: 28px; font-family: Georgia, serif; letter-spacing: -0.5px; }
-  .header .subtitle { color: #bbf7d0; margin: 6px 0 0; font-size: 14px; font-family: sans-serif; }
-  .header .date { color: #86efac; margin: 4px 0 0; font-size: 12px; font-family: sans-serif; }
+  .header .subtitle { color: #c4eedb; margin: 6px 0 0; font-size: 14px; font-family: sans-serif; }
+  .header .date { color: #8fe5c1; margin: 4px 0 0; font-size: 12px; font-family: sans-serif; }
   .block { padding: 24px 40px; }
   .text-block p { color: #1f2937; font-size: 16px; line-height: 1.7; margin: 0 0 12px; }
   .section-label { font-family: sans-serif; font-size: 11px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: #6b7280; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 2px solid #e5e7eb; }
@@ -114,14 +114,14 @@ const EMAIL_STYLES = `
   .article-img { width: 100%; height: 180px; object-fit: cover; display: block; }
   .article-img-placeholder { width: 100%; height: 120px; background: #f3f4f6; display: block; }
   .article-body { padding: 16px; }
-  .article-source { font-family: sans-serif; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: #16a34a; margin-bottom: 6px; }
+  .article-source { font-family: sans-serif; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: #17a185; margin-bottom: 6px; }
   .article-title { font-size: 18px; font-weight: 700; color: #111827; margin: 0 0 8px; font-family: Georgia, serif; line-height: 1.3; }
   .article-desc { font-size: 14px; color: #4b5563; line-height: 1.6; margin: 0 0 12px; font-family: sans-serif; }
-  .read-more { display: inline-block; background: #166534; color: #ffffff !important; padding: 8px 18px; border-radius: 4px; text-decoration: none; font-size: 13px; font-family: sans-serif; font-weight: 600; }
+  .read-more { display: inline-block; background: #146763; color: #ffffff !important; padding: 8px 18px; border-radius: 4px; text-decoration: none; font-size: 13px; font-family: sans-serif; font-weight: 600; }
   .divider { border: none; border-top: 1px solid #e5e7eb; margin: 8px 0; }
   .image-block img { max-width: 100%; height: auto; border-radius: 6px; display: block; }
   .button-block { text-align: center; padding: 24px 40px; }
-  .cta-button { display: inline-block; background: #166534; color: #ffffff !important; padding: 14px 28px; border-radius: 6px; text-decoration: none; font-size: 16px; font-family: sans-serif; font-weight: 700; }
+  .cta-button { display: inline-block; background: #146763; color: #ffffff !important; padding: 14px 28px; border-radius: 6px; text-decoration: none; font-size: 16px; font-family: sans-serif; font-weight: 700; }
   .footer { background: #f9fafb; padding: 24px 40px; text-align: center; }
   .footer p { color: #9ca3af; font-size: 12px; font-family: sans-serif; margin: 4px 0; }
   .footer a { color: #6b7280; }
@@ -175,10 +175,10 @@ function renderArticles(
       <a href="${cardUrl}" class="article-card" style="display:block;margin-bottom:24px;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;text-decoration:none;">
         ${a.imageUrl ? `<img src="${a.imageUrl}" alt="" class="article-img" style="width:100%;height:180px;object-fit:cover;display:block;" />` : `<div class="article-img-placeholder"></div>`}
         <div class="article-body" style="padding:16px;">
-          <div class="article-source" style="font-family:sans-serif;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:#16a34a;margin-bottom:6px;">${a.sourceName}</div>
+          <div class="article-source" style="font-family:sans-serif;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:#17a185;margin-bottom:6px;">${a.sourceName}</div>
           <div class="article-title" style="font-size:18px;font-weight:700;color:#111827;margin:0 0 8px;font-family:Georgia,serif;line-height:1.3;">${a.title}</div>
           <div class="article-desc" style="font-size:14px;color:#4b5563;line-height:1.6;margin:0 0 12px;font-family:sans-serif;">${a.description}</div>
-          <a href="${cardUrl}" class="read-more" style="display:inline-block;background:#166534;color:#ffffff;padding:8px 18px;border-radius:4px;text-decoration:none;font-size:13px;font-family:sans-serif;font-weight:600;">Read More</a>
+          <a href="${cardUrl}" class="read-more" style="display:inline-block;background:#146763;color:#ffffff;padding:8px 18px;border-radius:4px;text-decoration:none;font-size:13px;font-family:sans-serif;font-weight:600;">Read More</a>
         </div>
       </a>`;
   });
@@ -218,7 +218,7 @@ function renderSpotlight(items: SpotlightItem[], tracking?: TrackingConfig): str
         <td valign="middle" style="padding:14px;">
           <div style="font-size:14px;font-weight:700;color:#111827;font-family:sans-serif;margin-bottom:4px;">${s.businessName}</div>
           <div style="font-size:13px;color:#4b5563;line-height:1.5;font-family:sans-serif;margin-bottom:10px;">${s.description}</div>
-          <a href="${ctaUrl}" style="display:inline-block;background:#166534;color:#ffffff;padding:7px 14px;border-radius:4px;text-decoration:none;font-size:12px;font-family:sans-serif;font-weight:600;white-space:nowrap;">${s.ctaLabel}</a>
+          <a href="${ctaUrl}" style="display:inline-block;background:#146763;color:#ffffff;padding:7px 14px;border-radius:4px;text-decoration:none;font-size:12px;font-family:sans-serif;font-weight:600;white-space:nowrap;">${s.ctaLabel}</a>
         </td>
       </tr>
     </table>`;
@@ -246,7 +246,7 @@ function renderPresentingSponsor(item: PresentingSponsorItem, tracking?: Trackin
       ${item.imageUrl ? `<img src="${item.imageUrl}" alt="" style="max-width:100%;height:auto;display:block;border-radius:6px;margin-bottom:14px;" />` : ""}
       <div style="font-size:18px;font-weight:700;color:#111827;margin:0 0 8px;font-family:Georgia,serif;line-height:1.3;">${item.headline}</div>
       <div style="font-size:14px;color:#4b5563;line-height:1.6;margin:0 0 14px;font-family:sans-serif;">${item.body}</div>
-      <a href="${ctaUrl}" style="display:inline-block;background:#166534;color:#ffffff;padding:10px 20px;border-radius:4px;text-decoration:none;font-size:13px;font-family:sans-serif;font-weight:600;">${item.ctaLabel}</a>
+      <a href="${ctaUrl}" style="display:inline-block;background:#146763;color:#ffffff;padding:10px 20px;border-radius:4px;text-decoration:none;font-size:13px;font-family:sans-serif;font-weight:600;">${item.ctaLabel}</a>
     </div>`;
 }
 
@@ -261,7 +261,7 @@ function renderInArticleAd(ad: InArticleAdItem, tracking?: TrackingConfig): stri
       <div style="padding:16px;">
         <div style="font-size:18px;font-weight:700;color:#111827;margin:0 0 8px;font-family:Georgia,serif;line-height:1.3;">${ad.headline}</div>
         <div style="font-size:14px;color:#4b5563;line-height:1.6;margin:0 0 14px;font-family:sans-serif;">${ad.body}</div>
-        <a href="${ctaUrl}" style="display:inline-block;background:#166534;color:#ffffff;padding:8px 18px;border-radius:4px;text-decoration:none;font-size:13px;font-family:sans-serif;font-weight:600;">${ad.ctaLabel}</a>
+        <a href="${ctaUrl}" style="display:inline-block;background:#146763;color:#ffffff;padding:8px 18px;border-radius:4px;text-decoration:none;font-size:13px;font-family:sans-serif;font-weight:600;">${ad.ctaLabel}</a>
       </div>
     </div>`;
 }
@@ -280,11 +280,11 @@ function renderEvents(events: EventItem[]): string {
     const meta = [timeParts, e.location, e.cost].filter(Boolean).join(" · ");
     return `
       <div style="margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid #f3f4f6;">
-        <div style="font-size:11px;font-weight:700;color:#166534;font-family:sans-serif;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:3px;">${fmtDate(e.eventDate)}</div>
+        <div style="font-size:11px;font-weight:700;color:#146763;font-family:sans-serif;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:3px;">${fmtDate(e.eventDate)}</div>
         <div style="font-size:15px;font-weight:700;color:#111827;font-family:sans-serif;line-height:1.3;margin-bottom:4px;">${e.title}</div>
         ${meta ? `<div style="font-size:12px;color:#6b7280;font-family:sans-serif;margin-bottom:4px;">${meta}</div>` : ""}
         ${e.description ? `<div style="font-size:13px;color:#4b5563;line-height:1.5;font-family:sans-serif;margin-bottom:4px;">${e.description}</div>` : ""}
-        ${e.url ? `<a href="${e.url}" style="font-size:12px;color:#166534;font-family:sans-serif;font-weight:600;text-decoration:none;">More info →</a>` : ""}
+        ${e.url ? `<a href="${e.url}" style="font-size:12px;color:#146763;font-family:sans-serif;font-weight:600;text-decoration:none;">More info →</a>` : ""}
       </div>`;
   }).join("");
   return `
@@ -305,11 +305,11 @@ function renderReferral(content: Record<string, unknown>): string {
   const referUrl = "{{APP_URL}}/refer/REFCODEPLACEHOLDER";
   return `
     <div style="padding:20px 40px;">
-      <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:24px;text-align:center;">
-        <div style="font-family:sans-serif;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#166534;margin-bottom:10px;">Refer a Friend</div>
+      <div style="background:#f4fbf7;border:1px solid #c4eedb;border-radius:10px;padding:24px;text-align:center;">
+        <div style="font-family:sans-serif;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#146763;margin-bottom:10px;">Refer a Friend</div>
         <div style="font-size:18px;font-weight:700;color:#111827;font-family:Georgia,serif;line-height:1.3;margin-bottom:10px;">${title}</div>
         <div style="font-size:14px;color:#4b5563;line-height:1.6;font-family:sans-serif;margin-bottom:20px;">${text}</div>
-        <a href="${referUrl}" style="display:inline-block;background:#166534;color:#ffffff;padding:12px 28px;border-radius:6px;text-decoration:none;font-size:14px;font-family:sans-serif;font-weight:700;">${label}</a>
+        <a href="${referUrl}" style="display:inline-block;background:#146763;color:#ffffff;padding:12px 28px;border-radius:6px;text-decoration:none;font-size:14px;font-family:sans-serif;font-weight:700;">${label}</a>
       </div>
     </div>`;
 }
@@ -325,7 +325,7 @@ function renderPoll(content: Record<string, unknown>, polls?: Map<string, PollDa
       const voteUrl = `${pollData.appUrl}/poll/${pollData.pollId}/${opt.id}?r=${RECIPIENT_PLACEHOLDER}`;
       return `
         <tr><td style="padding:5px 0;">
-          <a href="${voteUrl}" style="display:block;width:100%;box-sizing:border-box;padding:11px 18px;border:2px solid #166534;border-radius:6px;text-decoration:none;font-size:14px;font-family:sans-serif;font-weight:600;color:#166534;text-align:center;">${opt.label}</a>
+          <a href="${voteUrl}" style="display:block;width:100%;box-sizing:border-box;padding:11px 18px;border:2px solid #146763;border-radius:6px;text-decoration:none;font-size:14px;font-family:sans-serif;font-weight:600;color:#146763;text-align:center;">${opt.label}</a>
         </td></tr>`;
     }).join("");
   } else {
@@ -341,8 +341,8 @@ function renderPoll(content: Record<string, unknown>, polls?: Map<string, PollDa
 
   return `
     <div style="padding:20px 40px;">
-      <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:24px;">
-        <div style="font-family:sans-serif;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#166534;margin-bottom:12px;">Quick Poll</div>
+      <div style="background:#f4fbf7;border:1px solid #c4eedb;border-radius:10px;padding:24px;">
+        <div style="font-family:sans-serif;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#146763;margin-bottom:12px;">Quick Poll</div>
         <div style="font-size:17px;font-weight:700;color:#111827;font-family:Georgia,serif;line-height:1.4;margin-bottom:16px;">${question}</div>
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
           ${optionsHtml}
@@ -360,8 +360,8 @@ function renderWordy(content: Record<string, unknown>, wordyData?: WordyData): s
 
   return `
     <div style="padding:20px 40px;">
-      <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:24px;text-align:center;">
-        <div style="font-family:sans-serif;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#166534;margin-bottom:10px;">
+      <div style="background:#f4fbf7;border:1px solid #c4eedb;border-radius:10px;padding:24px;text-align:center;">
+        <div style="font-family:sans-serif;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#146763;margin-bottom:10px;">
           Decatur Wordy${puzzleNum ? ` #${puzzleNum}` : ""}
         </div>
         <div style="font-size:22px;letter-spacing:4px;margin-bottom:12px;">🟩🟨⬛🟩🟨</div>
@@ -371,7 +371,7 @@ function renderWordy(content: Record<string, unknown>, wordyData?: WordyData): s
         <div style="font-size:13px;color:#4b5563;font-family:sans-serif;margin-bottom:20px;">
           All answers are Decatur area related. Can you guess it in ${wordLength ? wordLength + 1 : "??"} tries?
         </div>
-        <a href="${playUrl}" style="display:inline-block;background:#166534;color:#ffffff;padding:12px 28px;border-radius:6px;text-decoration:none;font-size:14px;font-family:sans-serif;font-weight:700;">
+        <a href="${playUrl}" style="display:inline-block;background:#146763;color:#ffffff;padding:12px 28px;border-radius:6px;text-decoration:none;font-size:14px;font-family:sans-serif;font-weight:700;">
           ${buttonLabel}
         </a>
       </div>
@@ -384,8 +384,8 @@ function renderMatch(content: Record<string, unknown>): string {
 
   return `
     <div style="padding:20px 40px;">
-      <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:24px;text-align:center;">
-        <div style="font-family:sans-serif;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#166534;margin-bottom:10px;">
+      <div style="background:#f4fbf7;border:1px solid #c4eedb;border-radius:10px;padding:24px;text-align:center;">
+        <div style="font-family:sans-serif;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#146763;margin-bottom:10px;">
           Gist Match
         </div>
         <div style="font-size:22px;letter-spacing:4px;margin-bottom:12px;">🟨🟩🟦🟪🟥</div>
@@ -395,7 +395,7 @@ function renderMatch(content: Record<string, unknown>): string {
         <div style="font-size:13px;color:#4b5563;font-family:sans-serif;margin-bottom:20px;">
           Match items to score points and climb today's shared leaderboard before it resets at midnight.
         </div>
-        <a href="${playUrl}" style="display:inline-block;background:#166534;color:#ffffff;padding:12px 28px;border-radius:6px;text-decoration:none;font-size:14px;font-family:sans-serif;font-weight:700;">
+        <a href="${playUrl}" style="display:inline-block;background:#146763;color:#ffffff;padding:12px 28px;border-radius:6px;text-decoration:none;font-size:14px;font-family:sans-serif;font-weight:700;">
           ${buttonLabel}
         </a>
       </div>
@@ -412,8 +412,8 @@ function renderGames(content: Record<string, unknown>, wordyData?: WordyData): s
 
   return `
     <div style="padding:20px 40px;">
-      <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:24px;">
-        <div style="font-family:sans-serif;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#166534;margin-bottom:16px;text-align:center;">
+      <div style="background:#f4fbf7;border:1px solid #c4eedb;border-radius:10px;padding:24px;">
+        <div style="font-family:sans-serif;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#146763;margin-bottom:16px;text-align:center;">
           Today's Games
         </div>
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
@@ -426,11 +426,11 @@ function renderGames(content: Record<string, unknown>, wordyData?: WordyData): s
               <div style="font-size:12px;color:#4b5563;font-family:sans-serif;margin-bottom:14px;">
                 ${wordLength ? `${wordLength}-letter word` : "Daily word puzzle"}
               </div>
-              <a href="${wordyUrl}" style="display:inline-block;background:#166534;color:#ffffff;padding:9px 16px;border-radius:6px;text-decoration:none;font-size:12px;font-family:sans-serif;font-weight:700;">
+              <a href="${wordyUrl}" style="display:inline-block;background:#146763;color:#ffffff;padding:9px 16px;border-radius:6px;text-decoration:none;font-size:12px;font-family:sans-serif;font-weight:700;">
                 ${wordyButtonLabel}
               </a>
             </td>
-            <td width="50%" valign="top" style="padding-left:10px;text-align:center;border-left:1px solid #bbf7d0;">
+            <td width="50%" valign="top" style="padding-left:10px;text-align:center;border-left:1px solid #c4eedb;">
               <div style="font-size:20px;letter-spacing:3px;margin-bottom:8px;">🟨🟩🟦</div>
               <div style="font-size:14px;font-weight:700;color:#111827;font-family:Georgia,serif;margin-bottom:4px;">
                 Gist Match
@@ -438,7 +438,7 @@ function renderGames(content: Record<string, unknown>, wordyData?: WordyData): s
               <div style="font-size:12px;color:#4b5563;font-family:sans-serif;margin-bottom:14px;">
                 Daily match-3 puzzle
               </div>
-              <a href="${matchUrl}" style="display:inline-block;background:#166534;color:#ffffff;padding:9px 16px;border-radius:6px;text-decoration:none;font-size:12px;font-family:sans-serif;font-weight:700;">
+              <a href="${matchUrl}" style="display:inline-block;background:#146763;color:#ffffff;padding:9px 16px;border-radius:6px;text-decoration:none;font-size:12px;font-family:sans-serif;font-weight:700;">
                 ${matchButtonLabel}
               </a>
             </td>
