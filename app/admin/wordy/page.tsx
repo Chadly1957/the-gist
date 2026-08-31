@@ -34,6 +34,8 @@ export default function WordyAdminPage() {
   const [wordInput, setWordInput] = useState("");
   const [wordSaving, setWordSaving] = useState(false);
   const [wordError, setWordError]   = useState("");
+  const [autofilling, setAutofilling] = useState(false);
+  const [autofillMsg, setAutofillMsg] = useState("");
 
   // --- Analytics tab ---
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
@@ -100,11 +102,48 @@ export default function WordyAdminPage() {
 
   const todayStr = today();
 
+  async function autofill() {
+    setAutofilling(true);
+    setAutofillMsg("");
+    try {
+      const res = await fetch("/api/admin/wordy/autofill", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ daysAhead: 30 }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setAutofillMsg(data.error || "Auto-fill failed.");
+      } else {
+        setAutofillMsg(
+          data.filled.length > 0
+            ? `Scheduled ${data.filled.length} Decatur-themed word${data.filled.length === 1 ? "" : "s"} for the next 30 days.`
+            : "Next 30 days are already fully scheduled."
+        );
+        loadWords();
+      }
+    } catch {
+      setAutofillMsg("Auto-fill failed.");
+    }
+    setAutofilling(false);
+  }
+
   return (
     <div className="p-4 sm:p-8 max-w-4xl">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Games</h1>
-        <p className="text-sm text-gray-500 mt-1">Schedule Decatur Wordy's daily word and review game analytics.</p>
+      <div className="mb-6 flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Games</h1>
+          <p className="text-sm text-gray-500 mt-1">Schedule Decatur Wordy's daily word and review game analytics.</p>
+        </div>
+        {tab === "schedule" && (
+          <div className="text-right shrink-0">
+            <button onClick={autofill} disabled={autofilling}
+              className="bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 px-3 py-2 rounded-lg text-xs font-semibold transition-colors disabled:opacity-60">
+              {autofilling ? "Auto-filling…" : "Auto-fill next 30 days"}
+            </button>
+            {autofillMsg && <p className="text-xs text-gray-400 mt-1 max-w-[220px]">{autofillMsg}</p>}
+          </div>
+        )}
       </div>
 
       {/* Tabs */}
