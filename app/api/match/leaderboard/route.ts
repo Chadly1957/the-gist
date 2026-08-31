@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { ensureMatchScoreTable } from "@/lib/matchScores";
 import { getDeviceId, MATCH_LEADERBOARD_SIZE, todayDateKey } from "@/lib/matchGame";
 
 export const dynamic = "force-dynamic";
@@ -7,6 +8,8 @@ export const dynamic = "force-dynamic";
 export async function GET(req: NextRequest) {
   const date = todayDateKey();
   const { deviceId } = getDeviceId(req);
+
+  await ensureMatchScoreTable();
 
   const rows = await prisma.matchScore.findMany({
     where: { date },
