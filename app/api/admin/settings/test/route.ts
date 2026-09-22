@@ -1,3 +1,4 @@
+import { workspaceEnv, getWorkspace } from "@/lib/workspace";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getAdminSession } from "@/lib/auth";
@@ -23,11 +24,11 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const provider = settings["email_provider"] || process.env.EMAIL_PROVIDER || "";
-  const resendKey = settings["resend_api_key"] || process.env.RESEND_API_KEY || "";
-  const unosendKey = settings["unosend_api_key"] || process.env.UNOSEND_API_KEY || "";
-  const smtpHost = settings["smtp_host"] || process.env.SMTP_HOST || "";
-  const smtpUser = settings["smtp_user"] || process.env.SMTP_USER || "";
+  const provider = settings["email_provider"] || (await workspaceEnv("EMAIL_PROVIDER")) || "";
+  const resendKey = settings["resend_api_key"] || (await workspaceEnv("RESEND_API_KEY")) || "";
+  const unosendKey = settings["unosend_api_key"] || (await workspaceEnv("UNOSEND_API_KEY")) || "";
+  const smtpHost = settings["smtp_host"] || (await workspaceEnv("SMTP_HOST")) || "";
+  const smtpUser = settings["smtp_user"] || (await workspaceEnv("SMTP_USER")) || "";
 
   const activeProvider =
     provider === "resend" ? "resend"
@@ -38,7 +39,7 @@ export async function POST(req: NextRequest) {
     : smtpHost ? "smtp"
     : "";
 
-  const client = getEmailClient(settings);
+  const client = await getEmailClient(settings);
   if (!client) {
     return NextResponse.json(
       { message: "No email provider configured. Select and configure a provider in Settings." },

@@ -1,7 +1,10 @@
 "use client";
+import WorkspaceText from "@/components/workspace/WorkspaceText";
+
+import { workspaceFetch } from "@/lib/workspace-client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/workspace/WorkspaceLink";
 import Logo from "@/components/Logo";
 import GamePresentingSponsor from "@/components/GamePresentingSponsor";
 import TipJarCTA from "@/components/TipJarCTA";
@@ -49,7 +52,7 @@ export default function MatchPage() {
 
   const loadLeaderboard = useCallback(async () => {
     try {
-      const res = await fetch("/api/match/leaderboard");
+      const res = await workspaceFetch("/api/match/leaderboard");
       const data = await res.json();
       setLeaderboard(data.entries ?? []);
     } catch {
@@ -61,7 +64,7 @@ export default function MatchPage() {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch("/api/match/today");
+        const res = await workspaceFetch("/api/match/today");
         const data: TodayStatus = await res.json();
         if (cancelled) return;
         dateKeyRef.current = data.date;
@@ -103,7 +106,7 @@ export default function MatchPage() {
     setSubmitting(true);
     setSubmitError("");
     try {
-      const res = await fetch("/api/match/submit", {
+      const res = await workspaceFetch("/api/match/submit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: name.trim() || "Player", score: finalScore }),
@@ -185,7 +188,7 @@ export default function MatchPage() {
               <div className={styles.stage}>
                 <div className={styles.hud}>
                   <div className={styles.hudTitle}>
-                    <p className={styles.hudTitleName}>The Gist Decatur Match</p>
+                    <p className={styles.hudTitleName}><WorkspaceText>{"The Gist Decatur Match"}</WorkspaceText></p>
                     <p className={styles.hudTitleSub}>
                       {dateLabel ? `Today's Puzzle | ${dateLabel}` : "Today's Puzzle"}
                     </p>

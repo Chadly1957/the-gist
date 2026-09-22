@@ -1,3 +1,4 @@
+import { getWorkspace } from "@/lib/workspace";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getAdminSession } from "@/lib/auth";
@@ -52,8 +53,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Name required." }, { status: 400 });
   }
 
+  const workspace = await getWorkspace();
+  const blocks = JSON.stringify(JSON.parse(DEFAULT_BLOCKS).map((block: { type: string; content: Record<string, string> }) => {
+    if (block.type === "header") block.content = { title: workspace.name, subtitle: `Your daily briefing from ${workspace.area}`, date: "{{DATE}}" };
+    if (block.type === "text") block.content = { html: "<p>Good morning! Here is your local briefing.</p>" };
+    if (block.type === "footer") block.content = { text: "You are receiving this because you signed up for our newsletter.", unsubscribeText: "Unsubscribe" };
+    return block;
+  }));
   const template = await prisma.template.create({
-    data: { name, blocks: DEFAULT_BLOCKS },
+    data: { name, blocks },
   });
   return NextResponse.json({ template }, { status: 201 });
 }

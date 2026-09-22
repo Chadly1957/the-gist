@@ -1,4 +1,5 @@
-import Link from "next/link";
+import WorkspaceText from "@/components/workspace/WorkspaceText";
+import Link from "@/components/workspace/WorkspaceLink";
 
 interface Props {
   source: "wordy" | "match";
@@ -24,7 +25,7 @@ export default function TipJarCTA({ source, variant = "full" }: Props) {
 
   return (
     <div className="w-full max-w-xs text-center bg-amber-50 border border-amber-100 rounded-xl px-5 py-4">
-      <p className="text-sm font-semibold text-amber-900 mb-1">☕ Like what The Gist Decatur is doing?</p>
+      <p className="text-sm font-semibold text-amber-900 mb-1"><WorkspaceText>{"☕ Like what The Gist Decatur is doing?"}</WorkspaceText></p>
       <p className="text-xs text-amber-700 mb-3">Support the newsletter with a cup of coffee!</p>
       <Link
         href={href}

@@ -136,7 +136,7 @@ function renderHeader(content: Record<string, unknown>): string {
   );
   return `
     <div class="header">
-      <h1>${content.title || "The Gist Decatur"}</h1>
+      <h1>${content.title || "The Gist"}</h1>
       ${content.subtitle ? `<p class="subtitle">${content.subtitle}</p>` : ""}
       ${date ? `<p class="date">${date}</p>` : ""}
     </div>`;
@@ -235,7 +235,7 @@ function renderSpotlight(items: SpotlightItem[], tracking?: TrackingConfig): str
 
 function renderPresentingSponsor(item: PresentingSponsorItem, tracking?: TrackingConfig): string {
   const blurb = item.presentingBlurb ||
-    `Today&rsquo;s Gist Decatur is brought to you by <strong>${item.businessName}</strong>.`;
+    `Today&rsquo;s Gist is brought to you by <strong>${item.businessName}</strong>.`;
   const ctaUrl = trackedUrl(tracking, item.ctaUrl, "presenting_sponsor", item.businessName);
   return `
     <div style="padding:20px 40px;">
@@ -300,7 +300,7 @@ function renderEvents(events: EventItem[]): string {
 // {{APP_URL}} is substituted by the send/test route with the actual app URL
 function renderReferral(content: Record<string, unknown>): string {
   const title = String(content.title || "Refer a Friend, Earn Rewards");
-  const text = String(content.text || "Know someone who'd love The Gist Decatur? Share your unique link and earn a chance to win a prize!");
+  const text = String(content.text || "Know someone who'd love The Gist? Share your unique link and earn a chance to win a prize!");
   const label = String(content.buttonLabel || "Share Your Referral Link →");
   const referUrl = "{{APP_URL}}/refer/REFCODEPLACEHOLDER";
   return `
@@ -362,14 +362,14 @@ function renderWordy(content: Record<string, unknown>, wordyData?: WordyData): s
     <div style="padding:20px 40px;">
       <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:24px;text-align:center;">
         <div style="font-family:sans-serif;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#166534;margin-bottom:10px;">
-          Decatur Wordy${puzzleNum ? ` #${puzzleNum}` : ""}
+          Wordy${puzzleNum ? ` #${puzzleNum}` : ""}
         </div>
         <div style="font-size:22px;letter-spacing:4px;margin-bottom:12px;">🟩🟨⬛🟩🟨</div>
         <div style="font-size:17px;font-weight:700;color:#111827;font-family:Georgia,serif;line-height:1.4;margin-bottom:6px;">
           Today's word has ${wordLength ? `<strong>${wordLength} letters</strong>` : "a mystery number of letters"}.
         </div>
         <div style="font-size:13px;color:#4b5563;font-family:sans-serif;margin-bottom:20px;">
-          All answers are Decatur area related. Can you guess it in ${wordLength ? wordLength + 1 : "??"} tries?
+          All answers are local area related. Can you guess it in ${wordLength ? wordLength + 1 : "??"} tries?
         </div>
         <a href="${playUrl}" style="display:inline-block;background:#166534;color:#ffffff;padding:12px 28px;border-radius:6px;text-decoration:none;font-size:14px;font-family:sans-serif;font-weight:700;">
           ${buttonLabel}
@@ -403,7 +403,7 @@ function renderMatch(content: Record<string, unknown>): string {
 }
 
 function renderGames(content: Record<string, unknown>, wordyData?: WordyData): string {
-  const wordyButtonLabel = String(content.wordyButtonLabel || "Play Decatur Wordy →");
+  const wordyButtonLabel = String(content.wordyButtonLabel || "Play Wordy →");
   const matchButtonLabel = String(content.matchButtonLabel || "Play Gist Match →");
   const wordyUrl = `{{APP_URL}}/wordy?r=${RECIPIENT_PLACEHOLDER}`;
   const matchUrl = `{{APP_URL}}/match?r=${RECIPIENT_PLACEHOLDER}`;
@@ -421,7 +421,7 @@ function renderGames(content: Record<string, unknown>, wordyData?: WordyData): s
             <td width="50%" valign="top" style="padding-right:10px;text-align:center;">
               <div style="font-size:20px;letter-spacing:3px;margin-bottom:8px;">🟩🟨⬛</div>
               <div style="font-size:14px;font-weight:700;color:#111827;font-family:Georgia,serif;margin-bottom:4px;">
-                Decatur Wordy${puzzleNum ? ` #${puzzleNum}` : ""}
+                Wordy${puzzleNum ? ` #${puzzleNum}` : ""}
               </div>
               <div style="font-size:12px;color:#4b5563;font-family:sans-serif;margin-bottom:14px;">
                 ${wordLength ? `${wordLength}-letter word` : "Daily word puzzle"}
@@ -449,7 +449,7 @@ function renderGames(content: Record<string, unknown>, wordyData?: WordyData): s
 }
 
 function renderTipJar(content: Record<string, unknown>): string {
-  const headline = String(content.headline || "Like what The Gist Decatur is doing?");
+  const headline = String(content.headline || "Like what The Gist is doing?");
   const body = String(content.body || "Support the newsletter with a cup of coffee!");
   const buttonLabel = String(content.buttonLabel || "Tip $3");
   const tipUrl = "{{APP_URL}}/tip?amount=3&source=newsletter";
@@ -487,7 +487,7 @@ function renderButton(content: Record<string, unknown>, tracking?: TrackingConfi
 function renderFooter(content: Record<string, unknown>): string {
   return `
     <div class="footer">
-      <p>${content.text || "You are receiving this because you subscribed to The Gist Decatur."}</p>
+      <p>${content.text || "You are receiving this because you subscribed to The Gist."}</p>
       <p>
         <a href="{{UNSUBSCRIBE_URL}}">${content.unsubscribeText || "Unsubscribe"}</a>
         &nbsp;·&nbsp;
@@ -562,7 +562,7 @@ export function renderTemplate(
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-  <title>The Gist Decatur</title>
+  <title>The Gist</title>
   <style>${EMAIL_STYLES}</style>
 </head>
 <body>

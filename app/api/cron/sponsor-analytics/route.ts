@@ -1,3 +1,8 @@
+import { getWorkspace } from "@/lib/workspace";
+import { escapeHtml } from "@/lib/html";
+import { basePrisma } from "@/lib/db-base";
+import { withWorkspace } from "@/lib/workspace";
+import { getWorkspaceUrl } from "@/lib/workspace";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getEmailClient } from "@/lib/email";
@@ -17,6 +22,7 @@ const BOOKING_LINK_TYPE: Record<string, string> = {
 };
 
 function analyticsEmailHtml({
+  newsletterName,
   contactName,
   businessName,
   placements,
@@ -25,6 +31,7 @@ function analyticsEmailHtml({
   sponsorUrl,
   dateStr,
 }: {
+  newsletterName: string;
   contactName: string;
   businessName: string;
   placements: { label: string; clicks: number; type: string }[];
@@ -45,14 +52,14 @@ function analyticsEmailHtml({
         Your free Community Partners listing ran today!
       </p>
       <p style="margin:0;font-size:14px;color:#4b5563;line-height:1.6;">
-        Hi ${contactName}, <strong>${businessName}</strong> appeared in today&apos;s Gist Decatur newsletter as a <strong>free</strong> Community Partners listing. Here&apos;s how it performed:
+        Hi ${contactName}, <strong>${businessName}</strong> appeared in today&apos;s ${escapeHtml(newsletterName)} newsletter as a <strong>free</strong> Community Partners listing. Here&apos;s how it performed:
       </p>`
     : `
       <p style="margin:0 0 12px;font-size:17px;font-weight:700;color:#111827;">
         Your ${placementSummary} ran today!
       </p>
       <p style="margin:0;font-size:14px;color:#4b5563;line-height:1.6;">
-        Hi ${contactName}, <strong>${businessName}</strong> appeared in today&apos;s Gist Decatur newsletter. Here&apos;s how it performed so far:
+        Hi ${contactName}, <strong>${businessName}</strong> appeared in today&apos;s ${escapeHtml(newsletterName)} newsletter. Here&apos;s how it performed so far:
       </p>`;
 
   const upsellHtml = isFreeOnly
@@ -64,7 +71,7 @@ function analyticsEmailHtml({
               <td style="padding:20px 22px;">
                 <p style="margin:0 0 8px;font-size:12px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:#b45309;">You got this with a free listing</p>
                 <p style="margin:0 0 18px;font-size:14px;color:#78350f;line-height:1.6;">
-                  Paid sponsors get <strong>guaranteed placement</strong> in every newsletter, not a rotating spot shared with other free listings, plus premium visibility at the top of the send, in-article, and now on Decatur Wordy and Gist Match too. That typically means significantly more impressions and clicks than what you're seeing here.
+                  Paid sponsors get <strong>guaranteed placement</strong> in every newsletter, not a rotating spot shared with other free listings, plus premium visibility at the top of the send, in-article, and now on Wordy and Gist Match too. That typically means significantly more impressions and clicks than what you're seeing here.
                 </p>
                 <a href="${sponsorUrl}" style="background:#166534;color:#ffffff;padding:13px 26px;border-radius:10px;text-decoration:none;font-weight:700;font-size:14px;display:inline-block;">
                   Reserve a Paid Placement →
@@ -109,7 +116,7 @@ function analyticsEmailHtml({
           <tr>
             <td style="background:#166534;padding:20px 32px;">
               <p style="margin:0;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#86efac;">Sponsor Update</p>
-              <p style="margin:4px 0 0;font-size:20px;font-weight:700;color:#ffffff;">The Gist Decatur</p>
+              <p style="margin:4px 0 0;font-size:20px;font-weight:700;color:#ffffff;">${escapeHtml(newsletterName)}</p>
               <p style="margin:4px 0 0;font-size:13px;color:#bbf7d0;">${dateStr}</p>
             </td>
           </tr>
@@ -173,7 +180,7 @@ function analyticsEmailHtml({
 </html>`;
 }
 
-export async function GET(req: NextRequest) {
+async function runWorkspace(req: NextRequest) {
   const secret = process.env.CRON_SECRET;
   const provided =
     req.headers.get("authorization")?.replace("Bearer ", "") ||
@@ -183,15 +190,16 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const workspace = await getWorkspace();
   const settings = Object.fromEntries(
     (await prisma.setting.findMany()).map((r) => [r.key, r.value])
   );
-  const emailClient = getEmailClient(settings);
+  const emailClient = await getEmailClient(settings);
   if (!emailClient) {
     return NextResponse.json({ error: "Email not configured." }, { status: 503 });
   }
 
-  const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "").replace(/\/$/, "");
+  const appUrl = await getWorkspaceUrl();
   const now = new Date();
 
   // Pick up sends from 3–4 hours ago. With an hourly cron, each send
@@ -304,8 +312,9 @@ export async function GET(req: NextRequest) {
           to: sponsor.email,
           subject: isFreeOnly
             ? `Your free listing got ${impressions.toLocaleString()} impressions today`
-            : `Your ${placementSummary} results from today's Gist Decatur`,
+            : `Your ${placementSummary} results from today's ${workspace.name}`,
           htmlBody: analyticsEmailHtml({
+            newsletterName: workspace.name,
             contactName: sponsor.contactName,
             businessName: sponsor.businessName,
             placements: sponsor.placements,
@@ -323,4 +332,22 @@ export async function GET(req: NextRequest) {
   }
 
   return NextResponse.json({ ok: true, emailsSent: totalEmailsSent });
+}
+
+export async function GET(req: NextRequest) {
+  const secret = process.env.CRON_SECRET;
+  const provided = req.headers.get("authorization")?.replace("Bearer ", "") || new URL(req.url).searchParams.get("secret");
+  if (!secret || provided !== secret) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const workspaces = await basePrisma.workspace.findMany();
+  const results = [];
+  for (const workspace of workspaces) {
+    try {
+      const response = await withWorkspace(workspace, () => runWorkspace(req));
+      results.push({ workspace: workspace.slug, status: response.status, result: await response.json() });
+    } catch (error) {
+      console.error("Workspace sponsor analytics failed", workspace.id, error);
+      results.push({ workspace: workspace.slug, status: 500 });
+    }
+  }
+  return NextResponse.json({ results }, { status: results.some(r => r.status === 500) ? 500 : 200 });
 }

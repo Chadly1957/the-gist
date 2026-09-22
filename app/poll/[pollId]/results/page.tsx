@@ -1,3 +1,5 @@
+import WorkspaceText from "@/components/workspace/WorkspaceText";
+import { WorkspaceAnchor } from "@/components/workspace/WorkspaceLink";
 import { prisma } from "@/lib/db";
 import { notFound } from "next/navigation";
 
@@ -58,9 +60,7 @@ export default async function PollResultsPage({ params }: { params: { pollId: st
         </p>
 
         <div style={{ marginTop: 24, textAlign: "center" }}>
-          <a href="/" style={{ fontFamily: "sans-serif", fontSize: 13, color: "#166534", fontWeight: 600, textDecoration: "none" }}>
-            ← Back to The Gist Decatur
-          </a>
+          <WorkspaceAnchor href="/" style={{ fontFamily: "sans-serif", fontSize: 13, color: "#166534", fontWeight: 600, textDecoration: "none" }}><WorkspaceText>{" ← Back to The Gist Decatur "}</WorkspaceText></WorkspaceAnchor>
         </div>
       </div>
     </div>

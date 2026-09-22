@@ -1,3 +1,4 @@
+import { getWorkspaceUrl } from "@/lib/workspace";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getAdminSession } from "@/lib/auth";
@@ -29,7 +30,7 @@ export async function POST(
   const allSettings = Object.fromEntries(
     (await prisma.setting.findMany()).map((r) => [r.key, r.value])
   );
-  const emailClient = getEmailClient(allSettings);
+  const emailClient = await getEmailClient(allSettings);
   if (!emailClient) {
     return NextResponse.json(
       { error: "Email provider not configured. Add credentials in Settings." },
@@ -46,7 +47,7 @@ export async function POST(
     return NextResponse.json({ error: "No active subscribers to send to." }, { status: 400 });
   }
 
-  const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "").replace(/\/$/, "");
+  const appUrl = await getWorkspaceUrl();
 
   const newSend = await prisma.newsletterSend.create({
     data: {

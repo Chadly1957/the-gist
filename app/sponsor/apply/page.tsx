@@ -1,8 +1,11 @@
 "use client";
+import { WorkspaceAnchor } from "@/components/workspace/WorkspaceLink";
+
+import { workspaceFetch } from "@/lib/workspace-client";
 
 import { useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import Link from "next/link";
+import Link from "@/components/workspace/WorkspaceLink";
 import Logo from "@/components/Logo";
 import UrlInput from "@/components/UrlInput";
 import MultiDateCalendar from "@/components/MultiDateCalendar";
@@ -78,7 +81,7 @@ function ApplyContent() {
     setResendSubmitting(true);
     setResendMessage("");
     try {
-      const res = await fetch("/api/sponsor/resend", {
+      const res = await workspaceFetch("/api/sponsor/resend", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: resendEmail }),
@@ -97,7 +100,7 @@ function ApplyContent() {
     setSubmitting(true);
     setApplyError("");
     try {
-      const res = await fetch("/api/sponsor/apply", {
+      const res = await workspaceFetch("/api/sponsor/apply", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...form, website: normalizeUrl(form.website) }),
@@ -145,7 +148,7 @@ function ApplyContent() {
     setLSubmitting(true);
     setLError("");
     try {
-      const res = await fetch("/api/sponsor/spotlight", {
+      const res = await workspaceFetch("/api/sponsor/spotlight", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token, ...lForm }),
@@ -171,7 +174,7 @@ function ApplyContent() {
     setBSubmitting(true);
     setBError("");
     try {
-      const res = await fetch("/api/sponsor/booking", {
+      const res = await workspaceFetch("/api/sponsor/booking", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token, dates: bDates, date: bDates[0], ...bForm }),
@@ -214,12 +217,12 @@ function ApplyContent() {
             <p className="text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wide">Your Portal Link</p>
             <p className="text-sm break-all text-green-700 font-medium">{portalUrl}</p>
           </div>
-          <a
+          <WorkspaceAnchor
             href={`${portalUrl}${calloutSuffix}`}
             className="block w-full bg-green-700 hover:bg-green-800 text-white text-sm font-semibold py-3 rounded-xl transition-colors"
           >
             Go to My Sponsor Portal →
-          </a>
+          </WorkspaceAnchor>
           <p className="text-xs text-gray-400 mt-4">We also emailed this link to you. Save it — you&apos;ll need it to manage your sponsorship.</p>
         </div>
       </div>

@@ -1,50 +1,38 @@
 import { NextRequest, NextResponse } from "next/server";
 import { jwtVerify } from "jose";
-
-// Use jose directly here — bcryptjs (imported by lib/auth) is not Edge-compatible
-const SECRET = new TextEncoder().encode(
-  process.env.JWT_SECRET || "dev-secret-change-in-production-32chars"
-);
-
-const PUBLIC_ADMIN_PATHS = ["/admin/login"];
+import { pathWorkspace } from "./lib/workspace-constants";
+const SECRET = new TextEncoder().encode(process.env.JWT_SECRET || "dev-secret-change-in-production-32chars");
 
 export async function middleware(req: NextRequest) {
-  const { pathname } = req.nextUrl;
-
-  const isAdminPath = pathname.startsWith("/admin");
-  const isPublicAdminPath = PUBLIC_ADMIN_PATHS.some((p) =>
-    pathname.startsWith(p)
-  );
-
-  if (!isAdminPath) return NextResponse.next();
-  if (isPublicAdminPath) return NextResponse.next();
-
-  const token = req.cookies.get("gist_admin_session")?.value;
-
-  if (!token) {
-    const loginUrl = new URL("/admin/login", req.url);
-    loginUrl.searchParams.set("from", pathname);
-    return NextResponse.redirect(loginUrl);
+  const scoped = pathWorkspace(req.nextUrl.pathname);
+  const pathname = scoped?.pathname || req.nextUrl.pathname;
+  const requestHeaders = new Headers(req.headers);
+  // Never trust a caller-supplied scope. It comes only from the URL.
+  requestHeaders.delete("x-gist-workspace");
+  if (scoped) requestHeaders.set("x-gist-workspace", scoped.slug);
+  const isAdmin = pathname === "/admin" || pathname.startsWith("/admin/") || pathname.startsWith("/api/admin/");
+  const isLogin = pathname === "/admin/login" || pathname === "/api/admin/login";
+  if (isAdmin && !isLogin) {
+    let valid = false;
+    try {
+      const { payload } = await jwtVerify(req.cookies.get("gist_admin_session")?.value || "", SECRET);
+      valid = payload.role === "admin" && typeof payload.sub === "string";
+    } catch { /* expired or missing session */ }
+    // Preserve authenticated scheduled daily digest requests.
+    const cron = pathname === "/api/admin/daily-digest" && process.env.CRON_SECRET &&
+      (req.headers.get("authorization") === `Bearer ${process.env.CRON_SECRET}` || req.nextUrl.searchParams.get("secret") === process.env.CRON_SECRET);
+    if (!valid && !cron) {
+      if (pathname.startsWith("/api/")) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      const login = new URL(`${scoped?.prefix || ""}/admin/login`, req.url);
+      login.searchParams.set("from", req.nextUrl.pathname);
+      return NextResponse.redirect(login);
+    }
   }
-
-  let session = null;
-  try {
-    const { payload } = await jwtVerify(token, SECRET);
-    session = payload;
-  } catch {
-    // invalid or expired token
+  if (scoped) {
+    const url = req.nextUrl.clone();
+    url.pathname = pathname;
+    return NextResponse.rewrite(url, { request: { headers: requestHeaders } });
   }
-  if (!session) {
-    const loginUrl = new URL("/admin/login", req.url);
-    loginUrl.searchParams.set("from", pathname);
-    const res = NextResponse.redirect(loginUrl);
-    res.cookies.delete("gist_admin_session");
-    return res;
-  }
-
-  return NextResponse.next();
+  return NextResponse.next({ request: { headers: requestHeaders } });
 }
-
-export const config = {
-  matcher: ["/admin/:path*"],
-};
+export const config = { matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"] };

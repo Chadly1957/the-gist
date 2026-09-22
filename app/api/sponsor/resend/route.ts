@@ -1,3 +1,5 @@
+import { getWorkspaceUrl } from "@/lib/workspace";
+import { workspaceUnique } from "@/lib/workspace";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { sendSponsorPortalEmail } from "@/lib/sponsor-email";
@@ -12,10 +14,10 @@ export async function POST(req: NextRequest) {
   }
 
   const normalized = email.trim().toLowerCase();
-  const profile = await prisma.sponsorProfile.findUnique({ where: { email: normalized } });
+  const profile = await prisma.sponsorProfile.findUnique({ where: await workspaceUnique("email", normalized) });
 
   if (profile) {
-    const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "").replace(/\/$/, "");
+    const appUrl = await getWorkspaceUrl();
     const portalUrl = `${appUrl}/sponsor/portal?token=${profile.magicToken}`;
     await sendSponsorPortalEmail(normalized, profile.contactName, portalUrl);
   }

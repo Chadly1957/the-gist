@@ -1,3 +1,4 @@
+import { workspaceUnique } from "@/lib/workspace";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getAdminSession } from "@/lib/auth";
@@ -26,7 +27,7 @@ export async function POST(req: NextRequest) {
   }
 
   const booking = await prisma.wordyBooking.upsert({
-    where: { date },
+    where: await workspaceUnique("date", date),
     create: { date, sponsorId, headline, body: body || "", ctaUrl: ctaUrl || "", ctaLabel: ctaLabel || "Learn More", imageUrl, presentingBlurb },
     update: { sponsorId, headline, body: body || "", ctaUrl: ctaUrl || "", ctaLabel: ctaLabel || "Learn More", imageUrl, presentingBlurb },
     include: { sponsor: { select: { businessName: true, contactName: true, email: true } } },

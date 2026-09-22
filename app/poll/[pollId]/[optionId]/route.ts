@@ -1,3 +1,4 @@
+import { getWorkspaceUrl } from "@/lib/workspace";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 
@@ -10,7 +11,7 @@ export async function GET(
 ) {
   const { pollId, optionId } = params;
   const recipientId = req.nextUrl.searchParams.get("r") || null;
-  const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "").replace(/\/$/, "");
+  const appUrl = await getWorkspaceUrl();
 
   const [poll, option] = await Promise.all([
     db.poll.findUnique({ where: { id: pollId } }),

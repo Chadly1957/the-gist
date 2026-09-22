@@ -1,3 +1,4 @@
+import { getWorkspaceUrl } from "@/lib/workspace";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getAdminSession } from "@/lib/auth";
@@ -24,7 +25,7 @@ export async function GET() {
       }),
     ]);
 
-    const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "").replace(/\/$/, "");
+    const appUrl = await getWorkspaceUrl();
 
     return NextResponse.json({
       spotlights,

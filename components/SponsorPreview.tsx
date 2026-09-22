@@ -1,4 +1,6 @@
 "use client";
+import WorkspaceText from "@/components/workspace/WorkspaceText";
+
 
 export type SpotlightPreviewData = {
   type: "spotlight";
@@ -103,7 +105,7 @@ function PresentingCard({ data }: { data: PresentingPreviewData }) {
         </div>
         <p style={{ fontSize: 14, color: "#713f12", lineHeight: 1.6, fontFamily: "sans-serif", margin: 0 }}>
           {data.presentingBlurb || (
-            <>Today&apos;s Gist Decatur is brought to you by <strong>{data.businessName || "Your Business"}</strong>.</>
+            <><WorkspaceText>{"Today&apos;s Gist Decatur is brought to you by "}</WorkspaceText><strong>{data.businessName || "Your Business"}</strong>.</>
           )}
         </p>
       </div>

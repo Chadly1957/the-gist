@@ -1,25 +1,15 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
+import { getWorkspace } from "@/lib/workspace";
+import { WorkspaceProvider } from "@/components/workspace/WorkspaceProvider";
 import "./globals.css";
-
-export const metadata: Metadata = {
-  title: "The Gist Decatur: Your Daily Local Briefing",
-  description:
-    "Stay in the know. The Gist Decatur delivers the stories that matter from around Decatur, straight to your inbox, every morning.",
-  openGraph: {
-    title: "The Gist Decatur",
-    description: "Your daily local briefing from Decatur.",
-    type: "website",
-  },
-};
-
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  return (
-    <html lang="en">
-      <body>{children}</body>
-    </html>
-  );
+export const dynamic = "force-dynamic";
+export async function generateMetadata(): Promise<Metadata> {
+  const ws = await getWorkspace();
+  return { title: `${ws.name}: Your Daily Local Briefing`, description: `Your daily local briefing from ${ws.area}.`, openGraph: { title: ws.name, description: `Your daily local briefing from ${ws.area}.`, type: "website" } };
+}
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const workspace = await getWorkspace();
+  const prefix = headers().get("x-gist-workspace") ? `/w/${workspace.slug}` : "";
+  return <html lang="en"><body><WorkspaceProvider workspace={workspace} prefix={prefix}>{children}</WorkspaceProvider></body></html>;
 }

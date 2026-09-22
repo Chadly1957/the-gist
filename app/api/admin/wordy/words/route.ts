@@ -1,3 +1,4 @@
+import { workspaceUnique } from "@/lib/workspace";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getAdminSession } from "@/lib/auth";
@@ -38,7 +39,7 @@ export async function POST(req: NextRequest) {
   }
 
   const result = await prisma.wordyWord.upsert({
-    where: { date },
+    where: await workspaceUnique("date", date),
     create: { date, word: wordUpper, puzzleNum: puzzleNum ?? null },
     update: { word: wordUpper, puzzleNum: puzzleNum ?? null },
   });

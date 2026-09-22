@@ -1,4 +1,5 @@
 "use client";
+import { workspaceFetch } from "@/lib/workspace-client";
 
 import { useEffect, useState } from "react";
 
@@ -24,7 +25,7 @@ export default function PollsPage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    fetch("/api/admin/polls")
+    workspaceFetch("/api/admin/polls")
       .then((r) => r.json())
       .then((d) => {
         if (d.error) setError(d.error);

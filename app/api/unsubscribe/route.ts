@@ -1,3 +1,4 @@
+import { workspaceUnique } from "@/lib/workspace";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 
@@ -19,14 +20,14 @@ export async function POST(req: NextRequest) {
         .catch(() => {});
     }
 
-    const subscriber = await prisma.subscriber.findUnique({ where: { email: normalized } });
+    const subscriber = await prisma.subscriber.findUnique({ where: await workspaceUnique("email", normalized) });
     if (!subscriber || !subscriber.active) {
       // Return success regardless — don't leak whether an email exists
       return NextResponse.json({ ok: true });
     }
 
     await prisma.subscriber.update({
-      where: { email: normalized },
+      where: await workspaceUnique("email", normalized),
       data: { active: false },
     });
 

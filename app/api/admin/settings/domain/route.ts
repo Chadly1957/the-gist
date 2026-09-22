@@ -1,3 +1,4 @@
+import { workspaceUnique } from "@/lib/workspace";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getAdminSession } from "@/lib/auth";
@@ -50,7 +51,7 @@ export async function POST(req: NextRequest) {
   }
 
   await prisma.setting.upsert({
-    where: { key: DOMAIN_ID_KEY },
+    where: await workspaceUnique("key", DOMAIN_ID_KEY),
     update: { value: result.data.id },
     create: { key: DOMAIN_ID_KEY, value: result.data.id },
   });

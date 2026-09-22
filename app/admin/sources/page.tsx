@@ -1,4 +1,7 @@
 "use client";
+import { WorkspaceAnchor } from "@/components/workspace/WorkspaceLink";
+
+import { workspaceFetch } from "@/lib/workspace-client";
 
 import { useEffect, useState } from "react";
 import UrlInput from "@/components/UrlInput";
@@ -25,7 +28,7 @@ export default function SourcesPage() {
   const [editingKw, setEditingKw] = useState<Record<string, string>>({});
 
   async function fetchSources() {
-    const res = await fetch("/api/admin/sources");
+    const res = await workspaceFetch("/api/admin/sources");
     const data = await res.json();
     setSources(data.sources || []);
     setLoading(false);
@@ -39,7 +42,7 @@ export default function SourcesPage() {
     e.preventDefault();
     setAdding(true);
     setError("");
-    const res = await fetch("/api/admin/sources", {
+    const res = await workspaceFetch("/api/admin/sources", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name, url, keywords: keywords.trim() }),
@@ -57,7 +60,7 @@ export default function SourcesPage() {
   }
 
   async function toggleSource(id: string, active: boolean) {
-    await fetch(`/api/admin/sources/${id}`, {
+    await workspaceFetch(`/api/admin/sources/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ active: !active }),
@@ -67,7 +70,7 @@ export default function SourcesPage() {
 
   async function deleteSource(id: string) {
     if (!confirm("Remove this source?")) return;
-    await fetch(`/api/admin/sources/${id}`, { method: "DELETE" });
+    await workspaceFetch(`/api/admin/sources/${id}`, { method: "DELETE" });
     fetchSources();
   }
 
@@ -85,7 +88,7 @@ export default function SourcesPage() {
 
   async function saveKeywords(id: string) {
     const value = editingKw[id] ?? "";
-    await fetch(`/api/admin/sources/${id}`, {
+    await workspaceFetch(`/api/admin/sources/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ keywords: value }),
@@ -196,14 +199,14 @@ export default function SourcesPage() {
                         {source.name}
                       </td>
                       <td className="px-5 py-3">
-                        <a
+                        <WorkspaceAnchor
                           href={source.url}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="text-blue-600 hover:underline text-xs font-mono truncate max-w-xs block"
                         >
                           {source.url}
-                        </a>
+                        </WorkspaceAnchor>
                       </td>
                       <td className="px-5 py-3 min-w-[180px]">
                         {isEditingKw ? (

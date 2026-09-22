@@ -1,3 +1,5 @@
+import { getWorkspaceUrl } from "@/lib/workspace";
+import { workspaceUnique } from "@/lib/workspace";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { sendWelcomeEmail } from "@/lib/welcome-email";
@@ -79,7 +81,7 @@ export async function POST(req: NextRequest, { params }: { params: { code: strin
   const ref = await db.referralCode.findUnique({ where: { code: params.code } });
   if (!ref) return NextResponse.json({ error: "Invalid referral link." }, { status: 404 });
 
-  const existing = await prisma.subscriber.findUnique({ where: { email: email.toLowerCase().trim() } });
+  const existing = await prisma.subscriber.findUnique({ where: await workspaceUnique("email", email.toLowerCase().trim()) });
   if (existing?.active) {
     return NextResponse.json({ alreadySubscribed: true, message: "You're already subscribed — thanks!" });
   }
@@ -110,7 +112,7 @@ export async function POST(req: NextRequest, { params }: { params: { code: strin
     },
   });
 
-  const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "").replace(/\/$/, "");
+  const appUrl = await getWorkspaceUrl();
   try {
     await sendWelcomeEmail({ id: subscriber.id, email: subscriber.email }, appUrl);
   } catch {

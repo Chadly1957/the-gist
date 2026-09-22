@@ -1,4 +1,7 @@
 "use client";
+import { WorkspaceAnchor } from "@/components/workspace/WorkspaceLink";
+
+import { workspaceFetch } from "@/lib/workspace-client";
 
 import { useEffect, useState } from "react";
 import UrlInput from "@/components/UrlInput";
@@ -60,7 +63,7 @@ export default function AdminEventsPage() {
   const [scrapeFound, setScrapeFound] = useState<Record<string, boolean>>({});
 
   async function load() {
-    const res = await fetch("/api/admin/events");
+    const res = await workspaceFetch("/api/admin/events");
     const data = await res.json();
     setEvents(data.events || []);
     setLoading(false);
@@ -69,7 +72,7 @@ export default function AdminEventsPage() {
   useEffect(() => { load(); }, []);
 
   async function updateEvent(id: string, patch: Record<string, unknown>) {
-    await fetch(`/api/admin/events/${id}`, {
+    await workspaceFetch(`/api/admin/events/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(patch),
@@ -79,7 +82,7 @@ export default function AdminEventsPage() {
 
   async function deleteEvent(id: string) {
     if (!confirm("Delete this event?")) return;
-    await fetch(`/api/admin/events/${id}`, { method: "DELETE" });
+    await workspaceFetch(`/api/admin/events/${id}`, { method: "DELETE" });
     setExpandedId(null);
     await load();
   }
@@ -95,7 +98,7 @@ export default function AdminEventsPage() {
     setScrapeError("");
     setScrapeWarnings([]);
     setScrapeFound({});
-    const res = await fetch("/api/admin/events/scrape", {
+    const res = await workspaceFetch("/api/admin/events/scrape", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ url: scrapeUrl.trim() }),
@@ -122,7 +125,7 @@ export default function AdminEventsPage() {
     e.preventDefault();
     setAddSaving(true);
     setAddError("");
-    const res = await fetch("/api/admin/events", {
+    const res = await workspaceFetch("/api/admin/events", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(addForm),
@@ -389,7 +392,7 @@ export default function AdminEventsPage() {
                         {ev.location && <p><strong>Location:</strong> {ev.location}</p>}
                         {ev.cost && <p><strong>Cost:</strong> {ev.cost}</p>}
                         {ev.description && <p><strong>Description:</strong> {ev.description}</p>}
-                        {ev.url && <p><strong>Link:</strong> <a href={ev.url} target="_blank" rel="noopener noreferrer" className="text-green-700 underline">{ev.url}</a></p>}
+                        {ev.url && <p><strong>Link:</strong> <WorkspaceAnchor href={ev.url} target="_blank" rel="noopener noreferrer" className="text-green-700 underline">{ev.url}</WorkspaceAnchor></p>}
                       </div>
                       <div className="flex flex-wrap gap-2">
                         {ev.status === "pending" && (

@@ -1,4 +1,5 @@
 "use client";
+import { workspaceFetch } from "@/lib/workspace-client";
 
 import { useEffect, useRef, useState } from "react";
 import Logo from "@/components/Logo";
@@ -154,7 +155,7 @@ export default function PostsPage() {
   const [mobileTab, setMobileTab] = useState<"articles" | "editor">("articles");
 
   useEffect(() => {
-    fetch("/api/admin/articles")
+    workspaceFetch("/api/admin/articles")
       .then((r) => r.json())
       .then((d) => setArticles(d.articles ?? []))
       .catch(() => {})
@@ -191,7 +192,7 @@ export default function PostsPage() {
         cta,
         format,
       });
-      const res = await fetch(`/api/admin/posts/image?${params}`);
+      const res = await workspaceFetch(`/api/admin/posts/image?${params}`);
       if (!res.ok) throw new Error("Failed to generate image");
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);

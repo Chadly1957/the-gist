@@ -40,7 +40,7 @@ export async function sendWelcomeEmail(
   const allSettings = Object.fromEntries(
     (await prisma.setting.findMany()).map((r) => [r.key, r.value])
   );
-  const emailClient = getEmailClient(allSettings);
+  const emailClient = await getEmailClient(allSettings);
   if (!emailClient) return;
 
   // Create a recipient record so open/click tracking works for this send

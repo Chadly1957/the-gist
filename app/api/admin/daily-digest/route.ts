@@ -1,3 +1,5 @@
+import { getWorkspace } from "@/lib/workspace";
+import { escapeHtml } from "@/lib/html";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getEmailClient } from "@/lib/email";
@@ -5,6 +7,7 @@ import { getEmailClient } from "@/lib/email";
 export const dynamic = "force-dynamic";
 
 function digestHtml(data: {
+  newsletterName: string;
   date: string;
   activeSubscribers: number;
   newSubscribers: number;
@@ -88,7 +91,7 @@ function digestHtml(data: {
           <tr>
             <td style="background:#166534;padding:20px 32px;">
               <p style="margin:0;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#86efac;">Daily Digest</p>
-              <p style="margin:4px 0 0;font-size:20px;font-weight:700;color:#ffffff;">The Gist Decatur</p>
+              <p style="margin:4px 0 0;font-size:20px;font-weight:700;color:#ffffff;">${escapeHtml(data.newsletterName)}</p>
               <p style="margin:4px 0 0;font-size:13px;color:#bbf7d0;">${data.date}</p>
             </td>
           </tr>
@@ -120,7 +123,7 @@ function digestHtml(data: {
           <tr>
             <td style="padding:24px 32px;">
               <p style="margin:0;font-size:11px;color:#9ca3af;">
-                This is your automated daily digest from The Gist Decatur admin.
+                This is your automated daily digest from ${escapeHtml(data.newsletterName)} admin.
               </p>
             </td>
           </tr>
@@ -146,7 +149,7 @@ export async function GET(req: NextRequest) {
     (await prisma.setting.findMany()).map((r) => [r.key, r.value])
   );
 
-  const resend = getEmailClient(settings);
+  const resend = await getEmailClient(settings);
   if (!resend) {
     return NextResponse.json({ error: "SMTP not configured." }, { status: 503 });
   }
@@ -218,7 +221,7 @@ export async function GET(req: NextRequest) {
     timeZone: "America/Chicago",
   });
 
-  const html = digestHtml({ date, activeSubscribers, newSubscribers, send: sendStats });
+  const html = digestHtml({ newsletterName: (await getWorkspace()).name, date, activeSubscribers, newSubscribers, send: sendStats });
 
   const result = await resend.sendEmail({
     to: adminUser.email,

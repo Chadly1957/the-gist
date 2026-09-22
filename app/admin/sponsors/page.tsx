@@ -1,4 +1,7 @@
 "use client";
+import { WorkspaceAnchor } from "@/components/workspace/WorkspaceLink";
+
+import { workspaceFetch } from "@/lib/workspace-client";
 
 import { useEffect, useRef, useState } from "react";
 import SponsorPreview from "@/components/SponsorPreview";
@@ -229,7 +232,7 @@ export default function AdminSponsorsPage() {
         ? { bulk: true, subject: emailSubject, htmlBody: emailBody, excludedIds: Array.from(bulkExcluded) }
         : { profileId: (emailTarget as Profile).id, subject: emailSubject, htmlBody: emailBody };
     try {
-      const res = await fetch("/api/admin/sponsors/email", {
+      const res = await workspaceFetch("/api/admin/sponsors/email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -281,7 +284,7 @@ export default function AdminSponsorsPage() {
     try {
       const fd = new FormData();
       fd.append("file", file);
-      const res = await fetch("/api/admin/upload", { method: "POST", body: fd });
+      const res = await workspaceFetch("/api/admin/upload", { method: "POST", body: fd });
       const data = await res.json();
       if (!res.ok) {
         setEditBookingUploadError(data.error || "Upload failed.");
@@ -304,7 +307,7 @@ export default function AdminSponsorsPage() {
     try {
       const fd = new FormData();
       fd.append("file", file);
-      const res = await fetch("/api/admin/upload", { method: "POST", body: fd });
+      const res = await workspaceFetch("/api/admin/upload", { method: "POST", body: fd });
       const data = await res.json();
       if (!res.ok) {
         setNewBookingUploadError(data.error || "Upload failed.");
@@ -338,7 +341,7 @@ export default function AdminSponsorsPage() {
     setNewBookingSubmitting(true);
     setNewBookingError(null);
     try {
-      const res = await fetch("/api/admin/sponsors/bookings", {
+      const res = await workspaceFetch("/api/admin/sponsors/bookings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...newBookingForm, dates: newBookingDates }),
@@ -377,8 +380,8 @@ export default function AdminSponsorsPage() {
     setLoading(true);
     try {
       const [sponsorRes, settingsRes] = await Promise.all([
-        fetch("/api/admin/sponsors"),
-        fetch("/api/admin/settings"),
+        workspaceFetch("/api/admin/sponsors"),
+        workspaceFetch("/api/admin/settings"),
       ]);
       const data = await sponsorRes.json();
       const settingsData = await settingsRes.json();
@@ -399,7 +402,7 @@ export default function AdminSponsorsPage() {
 
   async function savePrices() {
     setPriceSaving(true);
-    await fetch("/api/admin/settings", {
+    await workspaceFetch("/api/admin/settings", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ settings: prices }),
@@ -410,7 +413,7 @@ export default function AdminSponsorsPage() {
   }
 
   async function updateSpotlight(id: string, patch: object) {
-    await fetch(`/api/admin/sponsors/spotlight/${id}`, {
+    await workspaceFetch(`/api/admin/sponsors/spotlight/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(patch),
@@ -420,7 +423,7 @@ export default function AdminSponsorsPage() {
 
   async function deleteSpotlight(id: string) {
     if (!confirm("Delete this spotlight listing?")) return;
-    await fetch(`/api/admin/sponsors/spotlight/${id}`, { method: "DELETE" });
+    await workspaceFetch(`/api/admin/sponsors/spotlight/${id}`, { method: "DELETE" });
     load();
   }
 
@@ -441,7 +444,7 @@ export default function AdminSponsorsPage() {
   }
 
   async function updateBooking(id: string, patch: object) {
-    await fetch(`/api/admin/sponsors/bookings/${id}`, {
+    await workspaceFetch(`/api/admin/sponsors/bookings/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(patch),
@@ -450,7 +453,7 @@ export default function AdminSponsorsPage() {
   }
 
   async function duplicateBooking(b: Booking) {
-    const res = await fetch(`/api/admin/sponsors/bookings/${b.id}/duplicate`, { method: "POST" });
+    const res = await workspaceFetch(`/api/admin/sponsors/bookings/${b.id}/duplicate`, { method: "POST" });
     if (!res.ok) return;
     const { booking: copy } = await res.json();
     // Insert at top of list and immediately open edit form so user can change the date
@@ -471,7 +474,7 @@ export default function AdminSponsorsPage() {
 
   async function deleteBooking(id: string) {
     if (!confirm("Delete this booking?")) return;
-    await fetch(`/api/admin/sponsors/bookings/${id}`, { method: "DELETE" });
+    await workspaceFetch(`/api/admin/sponsors/bookings/${id}`, { method: "DELETE" });
     load();
   }
 
@@ -624,18 +627,18 @@ export default function AdminSponsorsPage() {
                               className="px-3 py-1.5 border border-gray-200 text-gray-600 rounded-lg text-xs font-semibold hover:bg-gray-100">
                               {previewId === s.id ? "Hide Preview" : "Preview"}
                             </button>
-                            <a href={s.ctaUrl} target="_blank" rel="noopener noreferrer"
+                            <WorkspaceAnchor href={s.ctaUrl} target="_blank" rel="noopener noreferrer"
                               className="px-3 py-1.5 border border-gray-200 text-gray-600 rounded-lg text-xs font-semibold hover:bg-gray-100">
                               Visit Site ↗
-                            </a>
+                            </WorkspaceAnchor>
                             <button onClick={() => deleteSpotlight(s.id)} className="px-3 py-1.5 text-red-500 hover:text-red-700 text-xs font-semibold">
                               Delete
                             </button>
                           </div>
-                          <a href={`/sponsor/portal?token=${s.sponsor.magicToken}`} target="_blank" rel="noopener noreferrer"
+                          <WorkspaceAnchor href={`/sponsor/portal?token=${s.sponsor.magicToken}`} target="_blank" rel="noopener noreferrer"
                             className="text-xs text-green-700 underline">
                             Open sponsor portal ↗
-                          </a>
+                          </WorkspaceAnchor>
                           {previewId === s.id && (
                             <div className="mt-3">
                               <SponsorPreview data={{ type: "spotlight", businessName: s.businessName, logoUrl: s.logoUrl ?? undefined, description: s.description, ctaLabel: s.ctaLabel, ctaUrl: s.ctaUrl }} />
@@ -809,7 +812,7 @@ export default function AdminSponsorsPage() {
                         <>
                           <div className="text-xs text-gray-600 space-y-1">
                             <p><strong>Body:</strong> {b.body}</p>
-                            <p><strong>CTA:</strong> <a href={b.ctaUrl} target="_blank" rel="noopener noreferrer" className="text-green-700 underline">{b.ctaUrl}</a></p>
+                            <p><strong>CTA:</strong> <WorkspaceAnchor href={b.ctaUrl} target="_blank" rel="noopener noreferrer" className="text-green-700 underline">{b.ctaUrl}</WorkspaceAnchor></p>
                             {b.presentingBlurb && <p><strong>Custom blurb:</strong> {b.presentingBlurb}</p>}
                           </div>
                           <div className="flex flex-wrap gap-2">
@@ -883,17 +886,17 @@ export default function AdminSponsorsPage() {
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-gray-800">{p.businessName}</p>
                     <p className="text-xs text-gray-500">{p.contactName} · {p.email}{p.phone ? ` · ${p.phone}` : ""}</p>
-                    {p.website && <a href={p.website} target="_blank" rel="noopener noreferrer" className="text-xs text-green-700 hover:underline">{p.website}</a>}
+                    {p.website && <WorkspaceAnchor href={p.website} target="_blank" rel="noopener noreferrer" className="text-xs text-green-700 hover:underline">{p.website}</WorkspaceAnchor>}
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     <button onClick={() => openEmail(p)}
                       className="text-xs text-green-700 border border-green-200 rounded-lg px-3 py-1.5 hover:bg-green-50 whitespace-nowrap">
                       Email
                     </button>
-                    <a href={p.portalUrl} target="_blank" rel="noopener noreferrer"
+                    <WorkspaceAnchor href={p.portalUrl} target="_blank" rel="noopener noreferrer"
                       className="text-xs text-green-700 border border-green-200 rounded-lg px-3 py-1.5 hover:bg-green-50 whitespace-nowrap">
                       Open Portal ↗
-                    </a>
+                    </WorkspaceAnchor>
                   </div>
                 </div>
               ))}
@@ -1222,7 +1225,7 @@ export default function AdminSponsorsPage() {
           {tab === "pricing" && (
             <div className="max-w-md space-y-6">
               <p className="text-sm text-gray-500">
-                Update the prices displayed on the public <a href="/sponsor" target="_blank" className="text-green-700 underline">/sponsor</a> page.
+                Update the prices displayed on the public <WorkspaceAnchor href="/sponsor" target="_blank" className="text-green-700 underline">/sponsor</WorkspaceAnchor> page.
               </p>
 
               <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">

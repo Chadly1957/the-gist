@@ -15,6 +15,8 @@ async function main() {
     create: { email: adminEmail, password: hashed },
   });
 
+  await prisma.workspace.upsert({ where: { id: "decatur" }, update: {}, create: { id: "decatur", slug: "decatur", name: "The Gist Decatur", area: "Decatur" } });
+
   // Default sources
   const sources = [
     { name: "Decatur Daily", url: "https://www.decaturdaily.com" },
@@ -23,7 +25,7 @@ async function main() {
 
   for (const source of sources) {
     await prisma.source.upsert({
-      where: { url: source.url },
+      where: { workspaceId_url: { workspaceId: "decatur", url: source.url } },
       update: {},
       create: source,
     });

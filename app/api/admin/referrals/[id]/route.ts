@@ -27,6 +27,7 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
   const session = await getAdminSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+  await db.referralSignup.updateMany({ where: { sprintId: params.id }, data: { sprintId: null } });
   await db.referralSprint.delete({ where: { id: params.id } });
   return NextResponse.json({ ok: true });
 }

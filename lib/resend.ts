@@ -1,3 +1,4 @@
+import { workspaceEnv, getWorkspace } from "@/lib/workspace";
 // Resend API client
 // Docs reference: https://resend.com/docs
 // Configure API key and sending domain in Admin > Settings
@@ -152,16 +153,18 @@ export class ResendClient {
 export async function getResendClient(
   settings: Record<string, string>
 ): Promise<ResendClient | null> {
+  const workspace = await getWorkspace();
+  if (workspace.id !== "decatur" && !settings["resend_from_email"]) return null;
   const apiKey =
-    settings["resend_api_key"] || process.env.RESEND_API_KEY || "";
+    settings["resend_api_key"] || (await workspaceEnv("RESEND_API_KEY")) || "";
   const fromEmail =
     settings["resend_from_email"] ||
-    process.env.RESEND_FROM_EMAIL ||
+    (await workspaceEnv("RESEND_FROM_EMAIL")) ||
     "newsletter@thegistdecatur.com";
   const fromName =
     settings["resend_from_name"] ||
-    process.env.RESEND_FROM_NAME ||
-    "The Gist Decatur";
+    (await workspaceEnv("RESEND_FROM_NAME")) ||
+    workspace.name;
 
   if (!apiKey) return null;
 

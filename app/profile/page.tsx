@@ -1,4 +1,5 @@
 "use client";
+import { workspaceFetch } from "@/lib/workspace-client";
 
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
@@ -16,7 +17,7 @@ function ProfileForm() {
 
   useEffect(() => {
     if (!recipientId) { setStatus("notfound"); setLoading(false); return; }
-    fetch(`/api/profile?r=${encodeURIComponent(recipientId)}`)
+    workspaceFetch(`/api/profile?r=${encodeURIComponent(recipientId)}`)
       .then((r) => r.json())
       .then((data) => {
         if (data.error) { setStatus("notfound"); }
@@ -31,7 +32,7 @@ function ProfileForm() {
     setStatus("saving");
     setErrorMsg("");
     try {
-      const res = await fetch(`/api/profile?r=${encodeURIComponent(recipientId || "")}`, {
+      const res = await workspaceFetch(`/api/profile?r=${encodeURIComponent(recipientId || "")}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ firstName: firstName.trim() }),

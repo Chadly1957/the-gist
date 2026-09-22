@@ -1,4 +1,5 @@
-import Link from "next/link";
+import WorkspaceText from "@/components/workspace/WorkspaceText";
+import Link from "@/components/workspace/WorkspaceLink";
 import Logo from "@/components/Logo";
 
 interface Game {
@@ -63,9 +64,9 @@ export default function GamesPage() {
                 {game.icon}
               </div>
               <p className="font-semibold text-gray-900 leading-snug group-hover:text-green-800 transition-colors">
-                {game.name}
+                <WorkspaceText>{game.name}</WorkspaceText>
               </p>
-              <p className="text-sm text-gray-500 mt-2">{game.description}</p>
+              <p className="text-sm text-gray-500 mt-2"><WorkspaceText>{game.description}</WorkspaceText></p>
               <p className="text-sm text-green-700 font-medium mt-3">
                 Play now →
               </p>

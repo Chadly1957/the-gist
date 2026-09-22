@@ -1,3 +1,5 @@
+import { workspaceEnv, getWorkspace } from "@/lib/workspace";
+import { workspaceUnique } from "@/lib/workspace";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getAdminSession } from "@/lib/auth";
@@ -46,9 +48,9 @@ export async function GET() {
 
   const smtpRow = rows.reduce<Record<string, string>>((acc, r) => { acc[r.key] = r.value; return acc; }, {});
   const hasSmtp = Boolean(
-    (smtpRow["smtp_host"] || process.env.SMTP_HOST) &&
-    (smtpRow["smtp_user"] || process.env.SMTP_USER) &&
-    (smtpRow["smtp_pass"] || process.env.SMTP_PASS)
+    (smtpRow["smtp_host"] || (await workspaceEnv("SMTP_HOST"))) &&
+    (smtpRow["smtp_user"] || (await workspaceEnv("SMTP_USER"))) &&
+    (smtpRow["smtp_pass"] || (await workspaceEnv("SMTP_PASS")))
   );
 
   return NextResponse.json({ settings, hasSmtp });
@@ -65,7 +67,7 @@ export async function POST(req: NextRequest) {
     if ((key === "smtp_pass" || key === "unosend_api_key" || key === "resend_api_key") && String(value).startsWith("••••")) continue;
 
     await prisma.setting.upsert({
-      where: { key },
+      where: await workspaceUnique("key", key),
       update: { value: String(value) },
       create: { key, value: String(value) },
     });

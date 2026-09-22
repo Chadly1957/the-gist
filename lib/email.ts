@@ -1,3 +1,4 @@
+import { workspaceEnv, getWorkspace } from "@/lib/workspace";
 import nodemailer from "nodemailer";
 
 interface EmailPayload {
@@ -337,40 +338,44 @@ export class SmtpEmailClient {
   }
 }
 
-export function getEmailClient(
+export async function getEmailClient(
   settings: Record<string, string>
-): ResendClient | UnosendClient | SmtpEmailClient | null {
-  const provider = settings["email_provider"] || process.env.EMAIL_PROVIDER || "";
+): Promise<ResendClient | UnosendClient | SmtpEmailClient | null> {
+  const workspace = await getWorkspace();
+  const provider = settings["email_provider"] || (await workspaceEnv("EMAIL_PROVIDER")) || "";
 
-  if (provider === "resend" || (!provider && (settings["resend_api_key"] || process.env.RESEND_API_KEY))) {
-    const apiKey = settings["resend_api_key"] || process.env.RESEND_API_KEY || "";
+  if (provider === "resend" || (!provider && (settings["resend_api_key"] || (await workspaceEnv("RESEND_API_KEY"))))) {
+    const apiKey = settings["resend_api_key"] || (await workspaceEnv("RESEND_API_KEY")) || "";
+    if (workspace.id !== "decatur" && !settings["resend_from_email"]) return null;
     if (apiKey) {
       return new ResendClient({
         apiKey,
-        fromEmail: settings["resend_from_email"] || process.env.RESEND_FROM_EMAIL || "newsletter@thegistdecatur.com",
-        fromName: settings["resend_from_name"] || process.env.RESEND_FROM_NAME || "The Gist Decatur",
+        fromEmail: settings["resend_from_email"] || (await workspaceEnv("RESEND_FROM_EMAIL")) || "newsletter@thegistdecatur.com",
+        fromName: settings["resend_from_name"] || (await workspaceEnv("RESEND_FROM_NAME")) || workspace.name,
       });
     }
   }
 
-  if (provider === "unosend" || (!provider && (settings["unosend_api_key"] || process.env.UNOSEND_API_KEY))) {
-    const apiKey = settings["unosend_api_key"] || process.env.UNOSEND_API_KEY || "";
+  if (provider === "unosend" || (!provider && (settings["unosend_api_key"] || (await workspaceEnv("UNOSEND_API_KEY"))))) {
+    const apiKey = settings["unosend_api_key"] || (await workspaceEnv("UNOSEND_API_KEY")) || "";
+    if (workspace.id !== "decatur" && !settings["unosend_from_email"]) return null;
     if (apiKey) {
       return new UnosendClient({
         apiKey,
-        fromEmail: settings["unosend_from_email"] || process.env.UNOSEND_FROM_EMAIL || "newsletter@thegistdecatur.com",
-        fromName: settings["unosend_from_name"] || process.env.UNOSEND_FROM_NAME || "The Gist Decatur",
+        fromEmail: settings["unosend_from_email"] || (await workspaceEnv("UNOSEND_FROM_EMAIL")) || "newsletter@thegistdecatur.com",
+        fromName: settings["unosend_from_name"] || (await workspaceEnv("UNOSEND_FROM_NAME")) || workspace.name,
       });
     }
   }
 
+  if (workspace.id !== "decatur" && !settings["smtp_from"]) return null;
   // SMTP fallback
-  const host = settings["smtp_host"] || process.env.SMTP_HOST || "";
-  const port = parseInt(settings["smtp_port"] || process.env.SMTP_PORT || "587");
-  const user = settings["smtp_user"] || process.env.SMTP_USER || "";
-  const pass = settings["smtp_pass"] || process.env.SMTP_PASS || "";
-  const fromEmail = settings["smtp_from"] || process.env.SMTP_FROM || "newsletter@thegistdecatur.com";
-  const fromName = settings["smtp_from_name"] || process.env.SMTP_FROM_NAME || "The Gist Decatur";
+  const host = settings["smtp_host"] || (await workspaceEnv("SMTP_HOST")) || "";
+  const port = parseInt(settings["smtp_port"] || (await workspaceEnv("SMTP_PORT")) || "587");
+  const user = settings["smtp_user"] || (await workspaceEnv("SMTP_USER")) || "";
+  const pass = settings["smtp_pass"] || (await workspaceEnv("SMTP_PASS")) || "";
+  const fromEmail = settings["smtp_from"] || (await workspaceEnv("SMTP_FROM")) || "newsletter@thegistdecatur.com";
+  const fromName = settings["smtp_from_name"] || (await workspaceEnv("SMTP_FROM_NAME")) || workspace.name;
 
   if (!host || !user || !pass) return null;
   return new SmtpEmailClient({ host, port, user, pass, fromEmail, fromName });

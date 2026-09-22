@@ -1,4 +1,7 @@
 "use client";
+import { WorkspaceAnchor } from "@/components/workspace/WorkspaceLink";
+
+import { workspaceFetch } from "@/lib/workspace-client";
 
 import { useEffect, useState } from "react";
 
@@ -22,12 +25,12 @@ export default function GamePresentingSponsor({ game }: { game: "wordy" | "match
 
   useEffect(() => {
     let cancelled = false;
-    fetch("/api/games/sponsor")
+    workspaceFetch("/api/games/sponsor")
       .then((r) => r.json())
       .then((d) => {
         if (cancelled || !d.sponsor) return;
         setSponsor(d.sponsor);
-        fetch("/api/games/sponsor/track", {
+        workspaceFetch("/api/games/sponsor/track", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ game, eventType: "impression" }),
@@ -40,7 +43,7 @@ export default function GamePresentingSponsor({ game }: { game: "wordy" | "match
   if (!sponsor) return null;
 
   function trackClick() {
-    fetch("/api/games/sponsor/track", {
+    workspaceFetch("/api/games/sponsor/track", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ game, eventType: "click" }),
@@ -69,7 +72,7 @@ export default function GamePresentingSponsor({ game }: { game: "wordy" | "match
         </p>
         <p className="text-xs text-gray-600 truncate">{sponsor.headline}</p>
       </div>
-      <a
+      <WorkspaceAnchor
         href={sponsor.ctaUrl}
         target="_blank"
         rel="noopener noreferrer"
@@ -77,7 +80,7 @@ export default function GamePresentingSponsor({ game }: { game: "wordy" | "match
         className="shrink-0 text-xs font-semibold text-green-700 hover:text-green-800 transition-colors"
       >
         {sponsor.ctaLabel} →
-      </a>
+      </WorkspaceAnchor>
     </div>
   );
 }

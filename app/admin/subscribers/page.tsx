@@ -1,4 +1,5 @@
 "use client";
+import { workspaceFetch, workspacePath } from "@/lib/workspace-client";
 
 import { useEffect, useState, useRef } from "react";
 
@@ -25,7 +26,7 @@ export default function SubscribersPage() {
     setLoading(true);
     try {
       const params = new URLSearchParams({ search: s, page: String(p) });
-      const res = await fetch(`/api/admin/subscribers?${params}`);
+      const res = await workspaceFetch(`/api/admin/subscribers?${params}`);
       const data = await res.json();
       setSubscribers(data.subscribers || []);
       setTotal(data.total || 0);
@@ -47,7 +48,7 @@ export default function SubscribersPage() {
 
   async function handleDelete(id: string, email: string) {
     if (!confirm(`Remove ${email} from the list?`)) return;
-    await fetch("/api/admin/subscribers", {
+    await workspaceFetch("/api/admin/subscribers", {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id }),
@@ -105,7 +106,7 @@ export default function SubscribersPage() {
         return;
       }
 
-      const res = await fetch("/api/admin/subscribers/import", {
+      const res = await workspaceFetch("/api/admin/subscribers/import", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ subscribers: parsed }),
@@ -127,7 +128,7 @@ export default function SubscribersPage() {
   }
 
   function exportCSV() {
-    window.location.href = "/api/admin/subscribers/export";
+    window.location.href = workspacePath("/api/admin/subscribers/export");
   }
 
   const totalPages = Math.ceil(total / 50);

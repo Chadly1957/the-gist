@@ -1,3 +1,4 @@
+import { workspaceUnique } from "@/lib/workspace";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 
@@ -9,7 +10,7 @@ export async function GET(req: NextRequest) {
   const date = req.nextUrl.searchParams.get("date");
   if (!date) return NextResponse.json({ error: "Missing date." }, { status: 400 });
 
-  const word = await prisma.wordyWord.findUnique({ where: { date } });
+  const word = await prisma.wordyWord.findUnique({ where: await workspaceUnique("date", date) });
   if (!word) return NextResponse.json({ error: "No puzzle for this date." }, { status: 404 });
 
   return NextResponse.json({ answer: word.word.toUpperCase() });

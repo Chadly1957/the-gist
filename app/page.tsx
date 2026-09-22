@@ -1,13 +1,16 @@
 "use client";
+import { workspaceFetch } from "@/lib/workspace-client";
 
 import { useState, useEffect } from "react";
+import CommunityHome from "@/components/workspace/CommunityHome";
+import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
 import Image from "next/image";
-import Link from "next/link";
+import Link from "@/components/workspace/WorkspaceLink";
 import Logo from "@/components/Logo";
 import SponsorsMarquee from "@/components/SponsorsMarquee";
 import RecentIssues from "@/components/RecentIssues";
 
-export default function LandingPage() {
+function DecaturLandingPage() {
   const [email, setEmail] = useState("");
   const [firstName, setFirstName] = useState("");
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
@@ -18,7 +21,7 @@ export default function LandingPage() {
   const [sponsorLoginStatus, setSponsorLoginStatus] = useState<"idle" | "loading" | "sent">("idle");
 
   useEffect(() => {
-    fetch("/api/subscriber-count")
+    workspaceFetch("/api/subscriber-count")
       .then((r) => r.json())
       .then((d) => setSubCount(d.rounded ?? null))
       .catch(() => null);
@@ -29,7 +32,7 @@ export default function LandingPage() {
     setStatus("loading");
     setMessage("");
     try {
-      const res = await fetch("/api/subscribe", {
+      const res = await workspaceFetch("/api/subscribe", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, firstName }),
@@ -53,7 +56,7 @@ export default function LandingPage() {
   async function handleSponsorLogin(e: React.FormEvent) {
     e.preventDefault();
     setSponsorLoginStatus("loading");
-    await fetch("/api/sponsor/resend-portal", {
+    await workspaceFetch("/api/sponsor/resend-portal", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email: sponsorLoginEmail }),
@@ -389,4 +392,9 @@ export default function LandingPage() {
       </footer>
     </div>
   );
+}
+
+export default function LandingPage() {
+  const { workspace } = useWorkspace();
+  return workspace.id === "decatur" ? <DecaturLandingPage /> : <CommunityHome />;
 }

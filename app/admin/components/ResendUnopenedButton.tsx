@@ -1,4 +1,5 @@
 "use client";
+import { workspaceFetch } from "@/lib/workspace-client";
 
 import { useState } from "react";
 
@@ -22,7 +23,7 @@ export function ResendUnopenedButton({
       return;
     setState("loading");
     try {
-      const res = await fetch(
+      const res = await workspaceFetch(
         `/api/admin/newsletter/resend-unopened/${sendId}`,
         { method: "POST" }
       );

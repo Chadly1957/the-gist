@@ -1,4 +1,7 @@
 "use client";
+import { WorkspaceAnchor } from "@/components/workspace/WorkspaceLink";
+
+import { workspaceFetch } from "@/lib/workspace-client";
 
 import { Fragment, useEffect, useState } from "react";
 
@@ -88,7 +91,7 @@ export default function AnalyticsPage() {
     setResending((prev) => ({ ...prev, [sendId]: true }));
     setResendResult((prev) => ({ ...prev, [sendId]: undefined }));
     try {
-      const res = await fetch(`/api/admin/newsletter/resend/${sendId}`, { method: "POST" });
+      const res = await workspaceFetch(`/api/admin/newsletter/resend/${sendId}`, { method: "POST" });
       const data = await res.json();
       setResendResult((prev) => ({ ...prev, [sendId]: { ok: res.ok, message: data.message || data.error || "Unknown error" } }));
     } catch {
@@ -99,7 +102,7 @@ export default function AnalyticsPage() {
   }
 
   useEffect(() => {
-    fetch("/api/admin/analytics")
+    workspaceFetch("/api/admin/analytics")
       .then((res) => res.json())
       .then((data) => {
         setSends(data.sends || []);
@@ -357,7 +360,7 @@ export default function AnalyticsPage() {
                             <div className="space-y-1.5">
                               {(send.articleClicks ?? []).map((a, i) => (
                                 <div key={i} className="flex items-center justify-between text-sm gap-4">
-                                  <a
+                                  <WorkspaceAnchor
                                     href={a.url}
                                     target="_blank"
                                     rel="noopener noreferrer"
@@ -365,7 +368,7 @@ export default function AnalyticsPage() {
                                     onClick={(e) => e.stopPropagation()}
                                   >
                                     {a.label}
-                                  </a>
+                                  </WorkspaceAnchor>
                                   <span className="font-semibold text-gray-900 shrink-0">
                                     {a.clicks} {a.clicks === 1 ? "click" : "clicks"}
                                   </span>

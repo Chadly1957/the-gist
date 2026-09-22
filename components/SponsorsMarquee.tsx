@@ -1,4 +1,7 @@
 "use client";
+import { WorkspaceAnchor } from "@/components/workspace/WorkspaceLink";
+
+import { workspaceFetch } from "@/lib/workspace-client";
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
@@ -16,7 +19,7 @@ export default function SponsorsMarquee() {
   const [spotlights, setSpotlights] = useState<Spotlight[]>([]);
 
   useEffect(() => {
-    fetch("/api/spotlights")
+    workspaceFetch("/api/spotlights")
       .then((r) => r.json())
       .then((data) => {
         if (Array.isArray(data)) setSpotlights(data);
@@ -39,7 +42,7 @@ export default function SponsorsMarquee() {
       <div className="relative overflow-hidden">
         <div className="flex gap-12 w-max animate-marquee">
           {doubled.map((s, i) => (
-            <a
+            <WorkspaceAnchor
               key={`${s.id}-${i}`}
               href={s.ctaUrl || "#"}
               target="_blank"
@@ -65,7 +68,7 @@ export default function SponsorsMarquee() {
               <span className="text-2xl font-semibold text-gray-800 whitespace-nowrap">
                 {s.businessName}
               </span>
-            </a>
+            </WorkspaceAnchor>
           ))}
         </div>
       </div>

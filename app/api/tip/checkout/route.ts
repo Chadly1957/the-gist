@@ -1,3 +1,5 @@
+import { getWorkspace } from "@/lib/workspace";
+import { getWorkspaceUrl } from "@/lib/workspace";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import Stripe from "stripe";
@@ -19,16 +21,17 @@ export async function POST(req: NextRequest) {
   }
 
   const tipSource = VALID_SOURCES.includes(source) ? source : "web";
-  const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "").replace(/\/$/, "");
+  const appUrl = await getWorkspaceUrl();
   const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
   const session = await stripe.checkout.sessions.create({
+    metadata: { workspaceId: (await getWorkspace()).id },
     payment_method_types: ["card"],
     line_items: [
       {
         price_data: {
           currency: "usd",
-          product_data: { name: "Tip — The Gist Decatur" },
+          product_data: { name: `Tip — ${(await getWorkspace()).name}` },
           unit_amount: amountCents,
         },
         quantity: 1,

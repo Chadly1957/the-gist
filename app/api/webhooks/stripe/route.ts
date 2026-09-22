@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
+import { basePrisma } from "@/lib/db-base";
+import { DEFAULT_WORKSPACE_ID } from "@/lib/workspace-constants";
 import Stripe from "stripe";
 
 export const dynamic = "force-dynamic";
@@ -22,25 +23,26 @@ export async function POST(req: NextRequest) {
 
   const session = event.data.object as Stripe.Checkout.Session;
   const sessionId = session.id;
+  const workspaceId = session.metadata?.workspaceId || DEFAULT_WORKSPACE_ID;
 
   if (event.type === "checkout.session.completed") {
     const approvedAt = new Date();
-    await prisma.adBooking.updateMany({
-      where: { stripeSessionId: sessionId, status: "pending_payment" },
+    await basePrisma.adBooking.updateMany({
+      where: { workspaceId, stripeSessionId: sessionId, status: "pending_payment" },
       data: { isPaid: true, status: "approved", approvedAt },
     });
-    await prisma.tip.updateMany({
-      where: { stripeSessionId: sessionId, status: "pending_payment" },
+    await basePrisma.tip.updateMany({
+      where: { workspaceId, stripeSessionId: sessionId, status: "pending_payment" },
       data: { status: "paid", paidAt: approvedAt },
     });
   }
 
   if (event.type === "checkout.session.expired") {
-    await prisma.adBooking.deleteMany({
-      where: { stripeSessionId: sessionId, status: "pending_payment" },
+    await basePrisma.adBooking.deleteMany({
+      where: { workspaceId, stripeSessionId: sessionId, status: "pending_payment" },
     });
-    await prisma.tip.deleteMany({
-      where: { stripeSessionId: sessionId, status: "pending_payment" },
+    await basePrisma.tip.deleteMany({
+      where: { workspaceId, stripeSessionId: sessionId, status: "pending_payment" },
     });
   }
 
