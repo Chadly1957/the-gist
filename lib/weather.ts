@@ -48,7 +48,8 @@ function formatHourLabel(isoLocal: string): string {
 export async function fetchWeatherSnapshot(
   latitude: number,
   longitude: number,
-  locationName: string
+  locationName: string,
+  timezone = "America/Chicago"
 ): Promise<WeatherSnapshot> {
   const params = new URLSearchParams({
     latitude: String(latitude),
@@ -56,7 +57,7 @@ export async function fetchWeatherSnapshot(
     current:
       "temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m",
     hourly: "temperature_2m,weather_code,precipitation_probability",
-    timezone: "America/Chicago",
+    timezone,
     forecast_days: "2",
     temperature_unit: "fahrenheit",
     wind_speed_unit: "mph",

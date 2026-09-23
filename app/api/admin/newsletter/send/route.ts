@@ -1,4 +1,5 @@
 import { getWorkspaceUrl } from "@/lib/workspace";
+import { getWorkspace } from "@/lib/workspace";
 import { workspaceUnique } from "@/lib/workspace";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
@@ -174,12 +175,15 @@ export async function POST(req: NextRequest) {
   let weatherData: WeatherSnapshot | undefined;
   if (weatherBlock) {
     try {
-      const lat = parseFloat(String(weatherBlock.content.latitude || "39.8403"));
-      const lon = parseFloat(String(weatherBlock.content.longitude || "-88.9454"));
-      const locationName = String(weatherBlock.content.locationName || "Decatur");
-      if (!Number.isNaN(lat) && !Number.isNaN(lon)) {
-        weatherData = await fetchWeatherSnapshot(lat, lon, locationName);
-      }
+      const ws = await getWorkspace();
+      const blockLat = parseFloat(String(weatherBlock.content.latitude || ""));
+      const blockLon = parseFloat(String(weatherBlock.content.longitude || ""));
+      // Block-level coordinates override the workspace location when set
+      const lat = !Number.isNaN(blockLat) ? blockLat : ws.latitude ?? 39.8403;
+      const lon = !Number.isNaN(blockLon) ? blockLon : ws.longitude ?? -88.9454;
+      const locationName = String(weatherBlock.content.locationName || "") || ws.area || "Decatur";
+      const timezone = ws.timezone || "America/Chicago";
+      weatherData = await fetchWeatherSnapshot(lat, lon, locationName, timezone);
     } catch {
       // Weather unavailable — the block renders a graceful placeholder
     }

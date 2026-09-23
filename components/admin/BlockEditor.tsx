@@ -79,9 +79,9 @@ export default function BlockEditor({ blocks, onChange }: BlockEditorProps) {
       },
       weather: {
         label: "Today's Weather",
-        locationName: "Decatur",
-        latitude: "39.8403",
-        longitude: "-88.9454",
+        locationName: "",
+        latitude: "",
+        longitude: "",
       },
     };
     const newBlock: Block = { id: generateId(), type, content: { ...defaults[type], blockId: "" } };
@@ -400,7 +400,7 @@ function BlockPreview({ block }: { block: Block }) {
           <div>
             <p className="text-sm font-semibold text-gray-800">{block.content.label || "Today's Weather"}</p>
             <p className="text-xs text-gray-400">
-              {block.content.locationName || "Decatur"} snapshot fetched at send time — current conditions + next ~6 hours
+              {block.content.locationName ? `${block.content.locationName} snapshot` : "Workspace location snapshot"} fetched at send time — current conditions + next ~6 hours
             </p>
           </div>
         </div>
@@ -687,10 +687,10 @@ function BlockFields({
       return (
         <div className="space-y-3">
           {field("label", "Section Label", { placeholder: "Today's Weather" })}
-          {field("locationName", "Location Name", { placeholder: "Decatur" })}
-          {field("latitude", "Latitude", { placeholder: "39.8403" })}
-          {field("longitude", "Longitude", { placeholder: "-88.9454" })}
-          <p className="text-xs text-gray-400">The snapshot is fetched when the newsletter is sent — current conditions plus the next ~6 hours. No API key needed. Set the coordinates per city when you expand.</p>
+          {field("locationName", "Location Name (optional)", { placeholder: "Defaults to the workspace area" })}
+          {field("latitude", "Latitude (optional)", { placeholder: "Defaults to the workspace location" })}
+          {field("longitude", "Longitude (optional)", { placeholder: "Defaults to the workspace location" })}
+          <p className="text-xs text-gray-400">The snapshot is fetched when the newsletter is sent — current conditions plus the next ~6 hours. Leave the location fields blank to use this workspace's location (set on the Workspaces page). No API key needed.</p>
         </div>
       );
     default:

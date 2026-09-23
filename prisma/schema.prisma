@@ -13,6 +13,9 @@ model Workspace {
   name                        String
   area                        String
   domain                      String?                   @unique
+  latitude                    Float?
+  longitude                   Float?
+  timezone                    String?
   createdAt                   DateTime                  @default(now())
   sourceRows                  Source[]
   articleRows                 Article[]
