@@ -478,6 +478,17 @@ export default function AdminSponsorsPage() {
     load();
   }
 
+  async function deleteProfile(p: Profile) {
+    if (!confirm(`Delete ${p.businessName}? This also removes their listings and ad bookings.`)) return;
+    const res = await workspaceFetch(`/api/admin/sponsors/profiles/${p.id}`, { method: "DELETE" });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      alert(data.error || "Delete failed.");
+      return;
+    }
+    load();
+  }
+
   function startEditBooking(b: Booking) {
     setEditingBookingId(b.id);
     setBookingAutoFilled(false);
@@ -897,6 +908,10 @@ export default function AdminSponsorsPage() {
                       className="text-xs text-green-700 border border-green-200 rounded-lg px-3 py-1.5 hover:bg-green-50 whitespace-nowrap">
                       Open Portal ↗
                     </WorkspaceAnchor>
+                    <button onClick={() => deleteProfile(p)}
+                      className="text-xs text-red-500 hover:text-red-700 px-3 py-1.5 whitespace-nowrap font-semibold">
+                      Delete
+                    </button>
                   </div>
                 </div>
               ))}
