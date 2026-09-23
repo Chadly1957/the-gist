@@ -2,7 +2,7 @@
 
 export interface Block {
   id: string;
-  type: "header" | "text" | "image" | "articles" | "divider" | "footer" | "button" | "spotlight" | "presenting_sponsor" | "events" | "referral" | "poll" | "wordy" | "match" | "games" | "tip_jar";
+  type: "header" | "text" | "image" | "articles" | "divider" | "footer" | "button" | "spotlight" | "presenting_sponsor" | "events" | "referral" | "poll" | "wordy" | "match" | "games" | "tip_jar" | "weather";
   content: Record<string, unknown>;
 }
 
@@ -78,6 +78,10 @@ export interface TrackingConfig {
   baseUrl: string;
   sign: (url: string) => string;
 }
+
+// Type-only import: erased at compile time, so this module stays safe to
+// bundle into client components that render live previews.
+import type { WeatherSnapshot } from "./weather";
 
 // The actual recipient id is substituted in after rendering, once per
 // recipient, so the template only needs to be rendered once per send.
@@ -475,6 +479,61 @@ function renderDivider(): string {
   return `<div class="block" style="padding:8px 40px;"><hr class="divider" style="border:none;border-top:1px solid #e5e7eb;margin:0;" /></div>`;
 }
 
+function renderWeather(content: Record<string, unknown>, weather?: WeatherSnapshot): string {
+  const label = String(content.label || "Today's Weather");
+
+  // No data yet (e.g. a render path that skipped the fetch) — show a quiet
+  // placeholder instead of breaking the email.
+  if (!weather) {
+    return `
+    <div style="padding:20px 40px;">
+      <div style="font-family:sans-serif;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#6b7280;margin-bottom:14px;padding-bottom:8px;border-bottom:2px solid #e5e7eb;">
+        ${label}
+      </div>
+      <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:10px;padding:20px;text-align:center;">
+        <div style="font-size:13px;color:#0369a1;font-family:sans-serif;">Today&rsquo;s weather snapshot will appear here when the newsletter is sent.</div>
+      </div>
+    </div>`;
+  }
+
+  const hourCells = weather.hours.map((h) => `
+    <td align="center" valign="top" style="padding:10px 2px;">
+      <div style="font-size:11px;font-weight:700;color:#0369a1;font-family:sans-serif;margin-bottom:4px;">${h.time}</div>
+      <div style="font-size:22px;margin-bottom:4px;">${h.emoji}</div>
+      <div style="font-size:13px;font-weight:700;color:#111827;font-family:sans-serif;">${h.tempF}&deg;</div>
+      <div style="font-size:10px;color:#38bdf8;font-family:sans-serif;margin-top:2px;">${h.precipChance > 0 ? `💧 ${h.precipChance}%` : "&nbsp;"}</div>
+    </td>`).join("");
+
+  return `
+    <div style="padding:20px 40px;">
+      <div style="font-family:sans-serif;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#6b7280;margin-bottom:14px;padding-bottom:8px;border-bottom:2px solid #e5e7eb;">
+        ${label}
+      </div>
+      <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:10px;padding:20px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:12px;">
+          <tr>
+            <td valign="middle">
+              <div style="font-size:13px;font-weight:700;color:#0369a1;font-family:sans-serif;margin-bottom:2px;">${weather.locationName} right now</div>
+              <div style="font-size:15px;color:#0c4a6e;font-family:sans-serif;">${weather.condition}</div>
+            </td>
+            <td valign="middle" align="right">
+              <span style="font-size:40px;vertical-align:middle;">${weather.emoji}</span>
+              <span style="font-size:40px;font-weight:700;color:#0c4a6e;font-family:Georgia,serif;vertical-align:middle;">${weather.currentTempF}&deg;</span>
+            </td>
+          </tr>
+        </table>
+        <div style="font-size:12px;color:#475569;font-family:sans-serif;margin-bottom:14px;">
+          Feels like ${weather.feelsLikeF}&deg; &nbsp;·&nbsp; Humidity ${weather.humidity}% &nbsp;·&nbsp; Wind ${weather.windMph} mph
+        </div>
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-top:1px solid #bae6fd;table-layout:fixed;">
+          <tr>
+            ${hourCells}
+          </tr>
+        </table>
+      </div>
+    </div>`;
+}
+
 function renderButton(content: Record<string, unknown>, tracking?: TrackingConfig): string {
   if (!content.url) return "";
   const url = trackedUrl(tracking, String(content.url), "button", content.label ? String(content.label) : undefined);
@@ -507,7 +566,8 @@ export function renderTemplate(
   tracking?: TrackingConfig,
   events: EventItem[] = [],
   polls?: Map<string, PollData>,
-  wordyData?: WordyData
+  wordyData?: WordyData,
+  weatherData?: WeatherSnapshot
 ): string {
   const { spotlights = [], presentingSponsor = null, inArticleAds = [] } = sponsors;
 
@@ -546,6 +606,8 @@ export function renderTemplate(
           return renderGames(block.content, wordyData);
         case "tip_jar":
           return renderTipJar(block.content);
+        case "weather":
+          return renderWeather(block.content, weatherData);
         default:
           return "";
       }

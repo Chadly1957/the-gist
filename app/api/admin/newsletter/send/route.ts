@@ -1,9 +1,11 @@
 import { getWorkspaceUrl } from "@/lib/workspace";
+import { getWorkspace } from "@/lib/workspace";
 import { workspaceUnique } from "@/lib/workspace";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getAdminSession } from "@/lib/auth";
 import { renderTemplate, Block, SpotlightItem, PresentingSponsorItem, InArticleAdItem, EventItem, PollData, WordyData } from "@/lib/template-renderer";
+import { fetchWeatherSnapshot, WeatherSnapshot } from "@/lib/weather";
 import { getEmailClient, htmlToText } from "@/lib/email";
 import { signTrackingUrl } from "@/lib/tracking";
 import { blurbToHtml } from "@/lib/url";
@@ -167,6 +169,26 @@ export async function POST(req: NextRequest) {
     } catch { /* WordyWord table may not exist yet */ }
   }
 
+  // Fetch the weather snapshot at send time (if the template has a weather block).
+  // Wrapped in try/catch so a weather API hiccup never blocks the send.
+  const weatherBlock = blocks.find((b) => b.type === "weather");
+  let weatherData: WeatherSnapshot | undefined;
+  if (weatherBlock) {
+    try {
+      const ws = await getWorkspace();
+      const blockLat = parseFloat(String(weatherBlock.content.latitude || ""));
+      const blockLon = parseFloat(String(weatherBlock.content.longitude || ""));
+      // Block-level coordinates override the workspace location when set
+      const lat = !Number.isNaN(blockLat) ? blockLat : ws.latitude ?? 39.8403;
+      const lon = !Number.isNaN(blockLon) ? blockLon : ws.longitude ?? -88.9454;
+      const locationName = String(weatherBlock.content.locationName || "") || ws.area || "Decatur";
+      const timezone = ws.timezone || "America/Chicago";
+      weatherData = await fetchWeatherSnapshot(lat, lon, locationName, timezone);
+    } catch {
+      // Weather unavailable — the block renders a graceful placeholder
+    }
+  }
+
   // Render HTML once. Open/click tracking links embed a recipient-id
   // placeholder that gets swapped in per-recipient below, so the template
   // only needs to be rendered a single time regardless of list size.
@@ -177,7 +199,8 @@ export async function POST(req: NextRequest) {
     willSend ? { baseUrl: appUrl, sign: signTrackingUrl } : undefined,
     events,
     pollsMap,
-    wordyData
+    wordyData,
+    weatherData
   )
     .replace(
       /\{\{UNSUBSCRIBE_URL\}\}/g,
@@ -222,7 +245,8 @@ export async function POST(req: NextRequest) {
     undefined,
     events,
     pollsMap,
-    wordyData
+    wordyData,
+    weatherData
   )
     .replace(/\{\{UNSUBSCRIBE_URL\}\}/g, `${appUrl}/unsubscribe`)
     .replace(/\{\{PROFILE_URL\}\}/g, `${appUrl}/profile`)

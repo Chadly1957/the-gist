@@ -1,9 +1,11 @@
 import { getWorkspaceUrl } from "@/lib/workspace";
+import { getWorkspace } from "@/lib/workspace";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getAdminSession } from "@/lib/auth";
 import { getEmailClient, htmlToText } from "@/lib/email";
 import { renderTemplate, Block, SpotlightItem, PresentingSponsorItem, InArticleAdItem, EventItem } from "@/lib/template-renderer";
+import { fetchWeatherSnapshot, WeatherSnapshot } from "@/lib/weather";
 import { blurbToHtml } from "@/lib/url";
 
 export async function POST(req: NextRequest) {
@@ -102,12 +104,36 @@ export async function POST(req: NextRequest) {
     }));
 
   const appUrl = await getWorkspaceUrl();
+
+  // Fetch the weather snapshot at send time (if the template has a weather block).
+  // Wrapped in try/catch so a weather API hiccup never blocks the test send.
+  const weatherBlock = blocks.find((b) => b.type === "weather");
+  let weatherData: WeatherSnapshot | undefined;
+  if (weatherBlock) {
+    try {
+      const ws = await getWorkspace();
+      const blockLat = parseFloat(String(weatherBlock.content.latitude || ""));
+      const blockLon = parseFloat(String(weatherBlock.content.longitude || ""));
+      // Block-level coordinates override the workspace location when set
+      const lat = !Number.isNaN(blockLat) ? blockLat : ws.latitude ?? 39.8403;
+      const lon = !Number.isNaN(blockLon) ? blockLon : ws.longitude ?? -88.9454;
+      const locationName = String(weatherBlock.content.locationName || "") || ws.area || "Decatur";
+      const timezone = ws.timezone || "America/Chicago";
+      weatherData = await fetchWeatherSnapshot(lat, lon, locationName, timezone);
+    } catch {
+      // Weather unavailable — the block renders a graceful placeholder
+    }
+  }
+
   const htmlBody = renderTemplate(
     blocks,
     articles.map((a) => ({ ...a, publishedAt: a.publishedAt })),
     { spotlights, presentingSponsor, inArticleAds },
     undefined,
-    events
+    events,
+    undefined,
+    undefined,
+    weatherData
   )
     .replace(/\{\{UNSUBSCRIBE_URL\}\}/g, `${appUrl}/unsubscribe`)
     .replace(/\{\{PROFILE_URL\}\}/g, `${appUrl}/profile?r=preview`)

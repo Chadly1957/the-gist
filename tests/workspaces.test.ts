@@ -84,7 +84,7 @@ test("migration preserves legacy data; real Prisma reads, writes, unique keys an
 test("email credentials, sender identity and generated URLs stay within their workspace", async () => {
   const { withWorkspace, getWorkspace, getWorkspaceUrl } = await import("../lib/workspace");
   const { getEmailClient } = await import("../lib/email");
-  const town = { id: "town", slug: "town", name: "The Gist Town", area: "Town", domain: null };
+  const town = { id: "town", slug: "town", name: "The Gist Town", area: "Town", domain: null, latitude: null, longitude: null, timezone: null };
   const decatur = { ...town, id: "decatur", slug: "decatur", name: "The Gist Decatur" };
   const oldKey = process.env.RESEND_API_KEY;
   const oldUrl = process.env.NEXT_PUBLIC_APP_URL;
