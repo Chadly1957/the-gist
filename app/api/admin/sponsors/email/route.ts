@@ -1,3 +1,4 @@
+import { getWorkspaceUrl } from "@/lib/workspace";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getAdminSession } from "@/lib/auth";
@@ -52,7 +53,7 @@ export async function POST(req: NextRequest) {
   const allSettings = Object.fromEntries(
     (await prisma.setting.findMany()).map((r) => [r.key, r.value])
   );
-  const emailClient = getEmailClient(allSettings);
+  const emailClient = await getEmailClient(allSettings);
   if (!emailClient) {
     return NextResponse.json(
       { error: "SMTP is not configured. Add your credentials in Settings." },
@@ -60,7 +61,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "").replace(/\/$/, "");
+  const appUrl = await getWorkspaceUrl();
   const preparedBody = ensureHtml(htmlBody);
 
   if (profileId) {

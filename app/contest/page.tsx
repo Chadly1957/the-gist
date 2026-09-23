@@ -1,7 +1,13 @@
 "use client";
+import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
+import WorkspaceText from "@/components/workspace/WorkspaceText";
+
+import { WorkspaceAnchor } from "@/components/workspace/WorkspaceLink";
+
+import { workspaceFetch } from "@/lib/workspace-client";
 
 import { useState, useEffect, useRef } from "react";
-import Link from "next/link";
+import Link from "@/components/workspace/WorkspaceLink";
 import Logo from "@/components/Logo";
 
 interface Sprint {
@@ -31,6 +37,7 @@ function daysLeft(endDate: string): number {
 }
 
 export default function ContestPage() {
+  const { workspace } = useWorkspace();
   const [sprint, setSprint] = useState<Sprint | null | undefined>(undefined);
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
@@ -42,7 +49,7 @@ export default function ContestPage() {
   const emailRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    fetch("/api/contest")
+    workspaceFetch("/api/contest")
       .then((r) => r.json())
       .then((d) => setSprint(d.sprint ?? null))
       .catch(() => setSprint(null));
@@ -54,7 +61,7 @@ export default function ContestPage() {
     setError("");
     setSubmitting(true);
     try {
-      const res = await fetch("/api/contest", {
+      const res = await workspaceFetch("/api/contest", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: email.trim(), name: name.trim() }),
@@ -111,15 +118,11 @@ export default function ContestPage() {
             <h1 className="text-2xl font-bold text-gray-900 mb-3">
               No Active Giveaway Right Now
             </h1>
-            <p className="text-gray-500 mb-6">
-              Check back soon — new contests drop regularly for Gist Decatur readers.
-            </p>
+            <p className="text-gray-500 mb-6"><WorkspaceText>{" Check back soon — new contests drop regularly for Gist Decatur readers. "}</WorkspaceText></p>
             <Link
               href="/"
               className="inline-block bg-green-700 text-white font-semibold text-sm px-5 py-2.5 rounded-lg hover:bg-green-800 transition-colors"
-            >
-              Subscribe to The Gist Decatur
-            </Link>
+            ><WorkspaceText>{" Subscribe to The Gist Decatur "}</WorkspaceText></Link>
           </div>
         ) : refLink ? (
           /* Success — show referral link */
@@ -153,18 +156,18 @@ export default function ContestPage() {
             </button>
 
             <div className="flex gap-2">
-              <a
-                href={`sms:?body=${encodeURIComponent("Join The Gist Decatur — Decatur's local newsletter! Sign up with my link: " + refLink)}`}
+              <WorkspaceAnchor
+                href={`sms:?body=${encodeURIComponent(`Join ${workspace.name} — your local newsletter! Sign up with my link: ` + refLink)}`}
                 className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-2.5 rounded-xl transition-colors text-sm text-center"
               >
                 Text a Friend
-              </a>
-              <a
-                href={`mailto:?subject=${encodeURIComponent("Check out The Gist Decatur!")}&body=${encodeURIComponent("Join The Gist Decatur — Decatur's local newsletter!\n\nSign up here: " + refLink)}`}
+              </WorkspaceAnchor>
+              <WorkspaceAnchor
+                href={`mailto:?subject=${encodeURIComponent(`Check out ${workspace.name}!`)}&body=${encodeURIComponent(`Join ${workspace.name} — your local newsletter!\n\nSign up here: ` + refLink)}`}
                 className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-2.5 rounded-xl transition-colors text-sm text-center"
               >
                 Send an Email
-              </a>
+              </WorkspaceAnchor>
             </div>
 
             {/* Contest summary */}
@@ -301,9 +304,7 @@ export default function ContestPage() {
 
             <p className="text-xs text-center text-gray-400 mt-4">
               Already a subscriber? Enter your email to get your link.
-              <br />
-              By entering your email you agree to receive The Gist Decatur newsletter.
-            </p>
+              <br /><WorkspaceText>{" By entering your email you agree to receive The Gist Decatur newsletter. "}</WorkspaceText></p>
           </>
         )}
       </main>

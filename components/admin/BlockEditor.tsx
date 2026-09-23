@@ -1,4 +1,7 @@
 "use client";
+import WorkspaceText from "@/components/workspace/WorkspaceText";
+
+import { workspaceFetch } from "@/lib/workspace-client";
 
 import { useState, useRef } from "react";
 import UrlInput from "@/components/UrlInput";
@@ -28,7 +31,7 @@ const BLOCK_TYPES: { type: Block["type"]; label: string; icon: string }[] = [
   { type: "presenting_sponsor", label: "Presenting Sponsor", icon: "✦" },
   { type: "referral", label: "Refer a Friend", icon: "🔗" },
   { type: "poll", label: "Poll", icon: "📊" },
-  { type: "wordy", label: "Decatur Wordy", icon: "🟩" },
+  { type: "wordy", label: "Wordy", icon: "🟩" },
   { type: "match", label: "Gist Match", icon: "🧩" },
   { type: "games", label: "Games (Wordy + Match)", icon: "🎮" },
   { type: "tip_jar", label: "Tip Jar", icon: "☕" },
@@ -40,14 +43,14 @@ export default function BlockEditor({ blocks, onChange }: BlockEditorProps) {
 
   function addBlock(type: Block["type"]) {
     const defaults: Record<Block["type"], Record<string, string>> = {
-      header: { title: "The Gist Decatur", subtitle: "Your daily briefing", date: "{{DATE}}" },
+      header: { title: "The Gist", subtitle: "Your daily briefing", date: "{{DATE}}" },
       text: { html: "<p>Write your message here…</p>" },
       image: { url: "", alt: "", caption: "", paddingTop: "0", paddingRight: "0", paddingBottom: "0", paddingLeft: "0" },
       articles: { label: "Today's Top Stories" },
       divider: {},
       button: { label: "Read More", url: "https://" },
       footer: {
-        text: "You're receiving this because you signed up at thegistdecatur.com",
+        text: "You're receiving this because you signed up at our website",
         unsubscribeText: "Unsubscribe",
       },
       spotlight: {},
@@ -55,7 +58,7 @@ export default function BlockEditor({ blocks, onChange }: BlockEditorProps) {
       events: {},
       referral: {
         title: "Refer a Friend, Earn Rewards",
-        text: "Know someone who'd love The Gist Decatur? Share your unique link and earn a chance to win a prize!",
+        text: "Know someone who'd love The Gist? Share your unique link and earn a chance to win a prize!",
         buttonLabel: "Share Your Referral Link →",
       },
       poll: {
@@ -67,9 +70,9 @@ export default function BlockEditor({ blocks, onChange }: BlockEditorProps) {
       },
       wordy: { buttonLabel: "Play Today's Wordy →" },
       match: { buttonLabel: "Play Today's Match →" },
-      games: { wordyButtonLabel: "Play Decatur Wordy →", matchButtonLabel: "Play Gist Match →" },
+      games: { wordyButtonLabel: "Play Wordy →", matchButtonLabel: "Play Gist Match →" },
       tip_jar: {
-        headline: "Like what The Gist Decatur is doing?",
+        headline: "Like what The Gist is doing?",
         body: "Support the newsletter with a cup of coffee!",
         buttonLabel: "Tip $3",
       },
@@ -327,10 +330,10 @@ function BlockPreview({ block }: { block: Block }) {
     case "wordy":
       return (
         <div className="bg-green-50 border border-green-200 rounded-xl p-4">
-          <div className="text-xs font-semibold text-green-700 uppercase tracking-wide mb-1">Decatur Wordy</div>
+          <div className="text-xs font-semibold text-green-700 uppercase tracking-wide mb-1"><WorkspaceText>{"Wordy"}</WorkspaceText></div>
           <div className="text-lg mb-1">🟩🟨⬛🟩🟨</div>
           <p className="text-sm font-bold text-gray-900 mb-1">Today&apos;s word — can you guess it?</p>
-          <p className="text-xs text-gray-500 mb-2">All answers are Decatur area related</p>
+          <p className="text-xs text-gray-500 mb-2"><WorkspaceText>{"All answers are local area related"}</WorkspaceText></p>
           <span className="inline-block bg-green-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg">
             {block.content.buttonLabel || "Play Today's Wordy →"}
           </span>
@@ -355,7 +358,7 @@ function BlockPreview({ block }: { block: Block }) {
           <div className="grid grid-cols-2 gap-3">
             <div className="text-center">
               <div className="text-base mb-1">🟩🟨⬛</div>
-              <p className="text-xs font-bold text-gray-900 mb-1.5">Decatur Wordy</p>
+              <p className="text-xs font-bold text-gray-900 mb-1.5"><WorkspaceText>{"Wordy"}</WorkspaceText></p>
               <span className="inline-block bg-green-700 text-white text-[10px] font-semibold px-2 py-1 rounded-lg">
                 {block.content.wordyButtonLabel || "Play →"}
               </span>
@@ -374,7 +377,7 @@ function BlockPreview({ block }: { block: Block }) {
       return (
         <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-center">
           <div className="text-xs font-semibold text-amber-700 uppercase tracking-wide mb-1">Tip Jar</div>
-          <p className="text-sm font-bold text-gray-900 mb-1">☕ {block.content.headline || "Like what The Gist Decatur is doing?"}</p>
+          <p className="text-sm font-bold text-gray-900 mb-1">☕ {block.content.headline || "Like what The Gist is doing?"}</p>
           <p className="text-xs text-gray-500 mb-2">{block.content.body || "Support the newsletter with a cup of coffee!"}</p>
           <span className="inline-block bg-amber-500 text-white text-xs font-semibold px-3 py-1.5 rounded-lg">
             {block.content.buttonLabel || "Tip $3"}
@@ -406,7 +409,7 @@ function ImageBlockFields({
     try {
       const fd = new FormData();
       fd.append("file", file);
-      const res = await fetch("/api/admin/upload", { method: "POST", body: fd });
+      const res = await workspaceFetch("/api/admin/upload", { method: "POST", body: fd });
       const data = await res.json();
       if (!res.ok) {
         setUploadError(data.error || "Upload failed.");
@@ -588,9 +591,9 @@ function BlockFields({
       return (
         <div className="space-y-3">
           {field("title", "Heading", { placeholder: "Refer a Friend, Earn Rewards" })}
-          {field("text", "Body Text", { rows: 2, placeholder: "Know someone who'd love The Gist Decatur? Share your unique link and earn a chance to win a prize!" })}
+          {field("text", "Body Text", { rows: 2, placeholder: "Know someone who'd love The Gist? Share your unique link and earn a chance to win a prize!" })}
           {field("buttonLabel", "Button Label", { placeholder: "Share Your Referral Link →" })}
-          <p className="text-xs text-gray-400">Each subscriber automatically gets a unique referral link. The button links to their personal referral portal at thegistdecatur.com/refer/[code].</p>
+          <p className="text-xs text-gray-400"><WorkspaceText>{"Each subscriber automatically gets a unique referral link. The button links to their personal referral portal at your workspace website."}</WorkspaceText></p>
         </div>
       );
     case "articles":
@@ -632,31 +635,31 @@ function BlockFields({
       return (
         <div className="space-y-3">
           {field("buttonLabel", "Button Label", { placeholder: "Play Today's Wordy →" })}
-          <p className="text-xs text-gray-400">Links to thegistdecatur.com/wordy. Word length and puzzle number are pulled from the Wordy schedule at send time.</p>
+          <p className="text-xs text-gray-400"><WorkspaceText>{"Links to your workspace Wordy page. Word length and puzzle number are pulled from the Wordy schedule at send time."}</WorkspaceText></p>
         </div>
       );
     case "match":
       return (
         <div className="space-y-3">
           {field("buttonLabel", "Button Label", { placeholder: "Play Today's Match →" })}
-          <p className="text-xs text-gray-400">Links to thegistdecatur.com/match. A new shared puzzle and leaderboard unlock every day at midnight.</p>
+          <p className="text-xs text-gray-400"><WorkspaceText>{"Links to your workspace Match page. A new shared puzzle and leaderboard unlock every day at midnight."}</WorkspaceText></p>
         </div>
       );
     case "games":
       return (
         <div className="space-y-3">
-          {field("wordyButtonLabel", "Wordy Button Label", { placeholder: "Play Decatur Wordy →" })}
+          {field("wordyButtonLabel", "Wordy Button Label", { placeholder: "Play Wordy →" })}
           {field("matchButtonLabel", "Match Button Label", { placeholder: "Play Gist Match →" })}
-          <p className="text-xs text-gray-400">Combines Decatur Wordy and Gist Match side by side in one block — use this instead of adding both games separately.</p>
+          <p className="text-xs text-gray-400"><WorkspaceText>{"Combines Wordy and Gist Match side by side in one block — use this instead of adding both games separately."}</WorkspaceText></p>
         </div>
       );
     case "tip_jar":
       return (
         <div className="space-y-3">
-          {field("headline", "Headline", { placeholder: "Like what The Gist Decatur is doing?" })}
+          {field("headline", "Headline", { placeholder: "Like what The Gist is doing?" })}
           {field("body", "Body", { placeholder: "Support the newsletter with a cup of coffee!" })}
           {field("buttonLabel", "Button Label", { placeholder: "Tip $3" })}
-          <p className="text-xs text-gray-400">Links to thegistdecatur.com/tip with $3 pre-selected — readers can still enter their own amount.</p>
+          <p className="text-xs text-gray-400"><WorkspaceText>{"Links to your workspace tip page with $3 pre-selected — readers can still enter their own amount."}</WorkspaceText></p>
         </div>
       );
     default:

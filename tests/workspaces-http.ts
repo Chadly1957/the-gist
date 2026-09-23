@@ -1,0 +1,43 @@
+// Run against scripts/dev-workspace-db.ts + next dev (disposable data only).
+import assert from "node:assert/strict";
+const base = "http://localhost:3100";
+async function main() {
+  const login = await fetch(`${base}/api/admin/login`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: "admin@example.test", password: "workspace-preview" }) });
+  assert.equal(login.status, 200);
+  const cookie = login.headers.get("set-cookie")!.split(";")[0];
+  const request = (path: string, method = "GET", body?: unknown, extra: Record<string,string> = {}) => fetch(base + path, { method, headers: { cookie, "Content-Type": "application/json", ...extra }, ...(body ? { body: JSON.stringify(body) } : {}) });
+  assert.equal((await fetch(`${base}/w/decatur/api/admin/subscribers`)).status, 401);
+  const slug = `http-test-${Date.now()}`;
+  const created = await request("/api/admin/workspaces", "POST", { name: "Test Town", area: "Test Town", slug });
+  assert.equal(created.status, 201);
+  assert.equal((await request("/api/admin/workspaces", "POST", { name: "Bad", area: "Town", slug: "../../admin" })).status, 400);
+  const url = `/w/${slug}`;
+  const list = await (await request(url + "/api/admin/subscribers")).json();
+  assert.equal(list.total, 0);
+  assert.equal((await (await request(url + "/api/admin/settings")).json()).hasSmtp, false);
+  await request(url + "/api/subscribe", "POST", { email: "decatur@example.test", firstName: "Town Reader" });
+  const own = await (await request(url + "/api/admin/subscribers")).json();
+  assert.equal(own.total, 1);
+  assert.equal(own.subscribers[0].firstName, "Town Reader");
+  const legacy = await (await request("/api/admin/subscribers", "GET", undefined, { "x-gist-workspace": slug })).json();
+  assert.equal(legacy.total, 1);
+  assert.equal(legacy.subscribers[0].id, "demo-reader");
+  const createdTemplate = await request(url + "/api/admin/templates", "POST", { name: "Town template" });
+  assert.equal(createdTemplate.status, 201);
+  const template = (await createdTemplate.json()).template;
+  assert.ok(template.blocks.includes("Test Town"));
+  assert.equal((await request(`/w/decatur/api/admin/templates/${template.id}`)).status, 404);
+  const csv = await (await request(url + "/api/admin/subscribers/export")).text();
+  assert.ok(csv.includes("Town Reader"));
+  assert.ok(!(await (await request("/api/admin/subscribers/export")).text()).includes("Town Reader"));
+  const [left, right] = await Promise.all([request("/w/decatur/api/admin/subscribers"), request(url + "/api/admin/subscribers")]);
+  assert.equal((await left.json()).subscribers[0].id, "demo-reader");
+  assert.equal((await right.json()).subscribers[0].firstName, "Town Reader");
+  assert.equal((await request("/w/no-such-workspace/api/admin/subscribers")).status, 404);
+  const page = await (await request(url)).text();
+  assert.ok(page.includes("Test Town"));
+  assert.ok(page.includes(url + "/games"));
+  assert.equal((await request("/api/admin/workspaces", "POST", { name: "Duplicate", area: "Town", slug })).status, 409);
+  console.log("HTTP checks passed: authentication, creation, validation, public signup, settings, templates, exports, spoofed headers, parallel workspaces, unknown workspace and public website.");
+}
+main().catch(e => { console.error(e); process.exit(1); });

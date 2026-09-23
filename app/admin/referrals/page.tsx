@@ -1,4 +1,5 @@
 "use client";
+import { workspaceFetch } from "@/lib/workspace-client";
 
 import { useState, useEffect, useCallback } from "react";
 
@@ -269,7 +270,7 @@ export default function ReferralsPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/admin/referrals");
+      const res = await workspaceFetch("/api/admin/referrals");
       const data = await res.json();
       if (res.ok) {
         setSprints(data.sprints);
@@ -287,7 +288,7 @@ export default function ReferralsPage() {
     setCreating(true);
     setError("");
     try {
-      const res = await fetch("/api/admin/referrals", {
+      const res = await workspaceFetch("/api/admin/referrals", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...form, goal: parseInt(form.goal) }),
@@ -303,7 +304,7 @@ export default function ReferralsPage() {
   }
 
   async function handleStatusChange(id: string, status: string) {
-    await fetch(`/api/admin/referrals/${id}`, {
+    await workspaceFetch(`/api/admin/referrals/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status }),
@@ -313,7 +314,7 @@ export default function ReferralsPage() {
 
   async function handleDelete(id: string) {
     if (!confirm("Delete this sprint? This cannot be undone.")) return;
-    await fetch(`/api/admin/referrals/${id}`, { method: "DELETE" });
+    await workspaceFetch(`/api/admin/referrals/${id}`, { method: "DELETE" });
     await load();
   }
 
@@ -321,7 +322,7 @@ export default function ReferralsPage() {
     if (!confirm(`Draw a random winner from ${sprint.qualifiedReferrers} qualified referrer${sprint.qualifiedReferrers !== 1 ? "s" : ""}?`)) return;
     setDrawingId(sprint.id);
     try {
-      const res = await fetch(`/api/admin/referrals/${sprint.id}/draw`, { method: "POST" });
+      const res = await workspaceFetch(`/api/admin/referrals/${sprint.id}/draw`, { method: "POST" });
       const data = await res.json();
       if (!res.ok) { alert(data.error || "Could not draw winner."); return; }
       setDrawResult({ sprintId: sprint.id, winner: data.winner, totalEligible: data.totalEligible });

@@ -1,3 +1,4 @@
+import { workspaceUnique, getWorkspace } from "@/lib/workspace";
 import { prisma } from "@/lib/db";
 import { getAdminSession } from "@/lib/auth";
 import { scrapeAllSources } from "@/lib/scraper";
@@ -13,6 +14,7 @@ export async function POST() {
     });
   }
 
+  const workspace = await getWorkspace();
   const sources = await prisma.source.findMany({
     where: { active: true },
     select: { url: true, name: true, keywords: true },
@@ -52,16 +54,16 @@ export async function POST() {
 
         // Upsert to DB
         await Promise.allSettled(
-          scraped.map((a) =>
+          scraped.map(async (a) =>
             prisma.article.upsert({
-              where: { articleUrl: a.articleUrl },
+              where: await workspaceUnique("articleUrl", a.articleUrl),
               update: {
                 title: a.title,
                 description: a.description,
                 imageUrl: a.imageUrl,
                 sourceName: a.sourceName,
                 publishedAt: a.publishedAt,
-                tags: a.tags,
+                tags: workspace.id === "decatur" ? a.tags : (`${a.title} ${a.description}`.toLowerCase().includes(workspace.area.toLowerCase()) ? [workspace.area.toLowerCase()] : []),
               },
               create: {
                 title: a.title,
@@ -71,7 +73,7 @@ export async function POST() {
                 sourceName: a.sourceName,
                 publishedAt: a.publishedAt,
                 selected: false,
-                tags: a.tags,
+                tags: workspace.id === "decatur" ? a.tags : (`${a.title} ${a.description}`.toLowerCase().includes(workspace.area.toLowerCase()) ? [workspace.area.toLowerCase()] : []),
               },
             })
           )

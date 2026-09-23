@@ -1,3 +1,4 @@
+import { workspaceUnique } from "@/lib/workspace";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getAdminSession } from "@/lib/auth";
@@ -26,7 +27,7 @@ export async function POST(req: NextRequest) {
 
     try {
       await prisma.subscriber.upsert({
-        where: { email },
+        where: await workspaceUnique("email", email),
         update: { active: true, firstName: row.firstName || undefined },
         create: { email, firstName: row.firstName || null, active: true },
       });

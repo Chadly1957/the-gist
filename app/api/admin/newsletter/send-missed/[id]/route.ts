@@ -1,3 +1,4 @@
+import { getWorkspaceUrl } from "@/lib/workspace";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getAdminSession } from "@/lib/auth";
@@ -55,7 +56,7 @@ export async function POST(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (await prisma.setting.findMany()).map((r: any) => [r.key, r.value])
   );
-  const emailClient = getEmailClient(allSettings);
+  const emailClient = await getEmailClient(allSettings);
   if (!emailClient) {
     return NextResponse.json({ error: "Email provider not configured." }, { status: 503 });
   }
@@ -78,7 +79,7 @@ export async function POST(
     return NextResponse.json({ message: "No missed subscribers — everyone got it!", sent: 0 });
   }
 
-  const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "").replace(/\/$/, "");
+  const appUrl = await getWorkspaceUrl();
 
   // Look up existing referral codes for missed subscribers
   const missedIds = missed.map((s) => s.id);

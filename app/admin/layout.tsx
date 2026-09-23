@@ -1,9 +1,14 @@
 "use client";
+import { workspaceFetch } from "@/lib/workspace-client";
 
-import Link from "next/link";
+import Link from "@/components/workspace/WorkspaceLink";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import Logo from "@/components/Logo";
+import WorkspaceSwitcher from "@/components/workspace/WorkspaceSwitcher";
+import { pathWorkspace } from "@/lib/workspace-constants";
+import { workspacePath } from "@/lib/workspace-client";
+import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
 
 const NAV_ITEMS = [
   {
@@ -127,15 +132,17 @@ const NAV_ITEMS = [
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname();
+  const rawPathname = usePathname();
+  const pathname = pathWorkspace(rawPathname)?.pathname || rawPathname;
+  const { workspace } = useWorkspace();
   const router = useRouter();
   const [loggingOut, setLoggingOut] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   async function handleLogout() {
     setLoggingOut(true);
-    await fetch("/api/admin/logout", { method: "POST" });
-    router.push("/admin/login");
+    await workspaceFetch("/api/admin/logout", { method: "POST" });
+    router.push(workspacePath("/admin/login"));
   }
 
   const currentLabel = NAV_ITEMS.find((item) =>
@@ -146,7 +153,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     <>
       <div className="px-5 py-6 border-b border-gray-200">
         <Logo className="h-14 w-auto" />
-        <p className="text-gray-400 text-xs mt-0.5 ml-4">Admin</p>
+        <p className="text-gray-500 text-xs mt-1">{workspace.name} · Admin</p>
+        <WorkspaceSwitcher />
       </div>
 
       <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
@@ -188,6 +196,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     </>
   );
 
+  if (pathname === "/admin/login") return <>{children}</>;
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Mobile backdrop */}
@@ -225,9 +235,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
             </svg>
           </button>
-          <span className="text-sm font-semibold text-gray-800">{currentLabel}</span>
+          <div className="min-w-0"><p className="truncate text-xs text-green-800">{workspace.name}</p><p className="text-sm font-semibold text-gray-800">{pathname === "/admin/workspaces" ? "Workspaces" : currentLabel}</p></div>
         </header>
 
+        <div className="hidden md:block border-b bg-white px-8 py-3 text-sm font-medium text-gray-600">{workspace.name}<span className="mx-3 text-gray-300">/</span>{pathname === "/admin/workspaces" ? "Workspaces" : currentLabel}</div>
         <main className="flex-1">{children}</main>
       </div>
     </div>

@@ -1,4 +1,5 @@
 "use client";
+import { workspaceFetch } from "@/lib/workspace-client";
 
 import { useEffect, useState } from "react";
 import BlockEditor, { Block } from "@/components/admin/BlockEditor";
@@ -28,7 +29,7 @@ export default function TemplatesPage() {
   async function fetchTemplates(selectAfter?: string) {
     setLoadError(false);
     try {
-      const res = await fetch("/api/admin/templates");
+      const res = await workspaceFetch("/api/admin/templates");
       if (!res.ok) throw new Error("Failed to load");
       const data = await res.json();
       const tpls: Template[] = (data.templates || []).map(
@@ -60,7 +61,7 @@ export default function TemplatesPage() {
     if (!selected) return;
     setSaving(true);
     try {
-      await fetch(`/api/admin/templates/${selected.id}`, {
+      await workspaceFetch(`/api/admin/templates/${selected.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -80,7 +81,7 @@ export default function TemplatesPage() {
     setCreating(true);
     setCreateError("");
     try {
-      const res = await fetch("/api/admin/templates", {
+      const res = await workspaceFetch("/api/admin/templates", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: name.trim() }),

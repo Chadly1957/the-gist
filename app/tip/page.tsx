@@ -1,8 +1,11 @@
 "use client";
+import WorkspaceText from "@/components/workspace/WorkspaceText";
+
+import { workspaceFetch } from "@/lib/workspace-client";
 
 import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import Link from "next/link";
+import Link from "@/components/workspace/WorkspaceLink";
 import Logo from "@/components/Logo";
 
 const PRESETS = [3, 5, 10];
@@ -38,7 +41,7 @@ function TipForm() {
     }
     setSubmitting(true);
     try {
-      const res = await fetch("/api/tip/checkout", {
+      const res = await workspaceFetch("/api/tip/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ amountCents, source }),
@@ -62,10 +65,8 @@ function TipForm() {
         <Link href="/" className="mb-6"><Logo className="h-12 w-auto" /></Link>
         <p className="text-4xl mb-3">☕</p>
         <h1 className="text-xl font-bold text-gray-900 mb-2">Thank you so much!</h1>
-        <p className="text-sm text-gray-500 max-w-xs">
-          Your tip means a lot and helps keep The Gist Decatur going. We really appreciate you.
-        </p>
-        <Link href="/" className="mt-6 text-sm text-green-700 font-semibold hover:underline">← Back to The Gist Decatur</Link>
+        <p className="text-sm text-gray-500 max-w-xs"><WorkspaceText>{" Your tip means a lot and helps keep The Gist Decatur going. We really appreciate you. "}</WorkspaceText></p>
+        <Link href="/" className="mt-6 text-sm text-green-700 font-semibold hover:underline"><WorkspaceText>{"← Back to The Gist Decatur"}</WorkspaceText></Link>
       </div>
     );
   }
@@ -75,7 +76,7 @@ function TipForm() {
       <Link href="/" className="mb-8"><Logo className="h-12 w-auto" /></Link>
       <div className="w-full max-w-sm text-center">
         <p className="text-4xl mb-3">☕</p>
-        <h1 className="text-xl font-bold text-gray-900 mb-2">Support The Gist Decatur</h1>
+        <h1 className="text-xl font-bold text-gray-900 mb-2"><WorkspaceText>{"Support The Gist Decatur"}</WorkspaceText></h1>
         <p className="text-sm text-gray-500 mb-6">
           Like what we&apos;re doing? Leave a tip to help keep local, independent news going strong.
         </p>
@@ -136,9 +137,7 @@ function TipForm() {
           {submitting ? "Redirecting…" : `Tip $${selectedAmount || 0}`}
         </button>
 
-        <Link href="/" className="mt-6 inline-block text-xs text-gray-400 hover:text-gray-600 transition-colors">
-          ← Back to The Gist Decatur
-        </Link>
+        <Link href="/" className="mt-6 inline-block text-xs text-gray-400 hover:text-gray-600 transition-colors"><WorkspaceText>{" ← Back to The Gist Decatur "}</WorkspaceText></Link>
       </div>
     </div>
   );

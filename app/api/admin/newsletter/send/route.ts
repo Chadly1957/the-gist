@@ -1,3 +1,5 @@
+import { getWorkspaceUrl } from "@/lib/workspace";
+import { workspaceUnique } from "@/lib/workspace";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getAdminSession } from "@/lib/auth";
@@ -119,7 +121,7 @@ export async function POST(req: NextRequest) {
       imageUrl: b.imageUrl,
     }));
 
-  const emailClient = getEmailClient(allSettings);
+  const emailClient = await getEmailClient(allSettings);
   const activeSubscribers = emailClient
     ? await prisma.subscriber.findMany({ where: { active: true }, select: { id: true, email: true } })
     : [];
@@ -127,7 +129,7 @@ export async function POST(req: NextRequest) {
 
   // Create Poll + PollOption DB records for any poll blocks.
   // Wrapped in try/catch so a missing Poll table (pre-migration) never blocks sending.
-  const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "").replace(/\/$/, "");
+  const appUrl = await getWorkspaceUrl();
   const pollBlocks = blocks.filter((b) => b.type === "poll");
   const pollsMap = new Map<string, PollData>();
   if (pollBlocks.length > 0 && db.poll) {
@@ -157,7 +159,7 @@ export async function POST(req: NextRequest) {
   let wordyData: WordyData | undefined;
   if (hasWordyBlock) {
     try {
-      const wordyWord = await prisma.wordyWord.findUnique({ where: { date } });
+      const wordyWord = await prisma.wordyWord.findUnique({ where: await workspaceUnique("date", date) });
       if (wordyWord) {
         const puzzleNum = wordyWord.puzzleNum ?? (await prisma.wordyWord.count({ where: { date: { lte: date } } }));
         wordyData = { puzzleNum, wordLength: wordyWord.word.length, appUrl };

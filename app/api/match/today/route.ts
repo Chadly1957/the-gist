@@ -1,3 +1,4 @@
+import { getWorkspace } from "@/lib/workspace";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getDeviceId, setDeviceCookie, todayDateKey } from "@/lib/matchGame";
@@ -9,7 +10,7 @@ export async function GET(req: NextRequest) {
   const { deviceId, isNew } = getDeviceId(req);
 
   const existing = await prisma.matchScore.findUnique({
-    where: { date_deviceId: { date, deviceId } },
+    where: { workspaceId_date_deviceId: { workspaceId: (await getWorkspace()).id, date, deviceId } },
   });
 
   const res = NextResponse.json({

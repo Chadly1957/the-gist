@@ -7,6 +7,40 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model Workspace {
+  id                          String                    @id @default(cuid())
+  slug                        String                    @unique
+  name                        String
+  area                        String
+  domain                      String?                   @unique
+  createdAt                   DateTime                  @default(now())
+  sourceRows                  Source[]
+  articleRows                 Article[]
+  templateRows                Template[]
+  subscriberRows              Subscriber[]
+  settingRows                 Setting[]
+  newsletterSendRows          NewsletterSend[]
+  newsletterSendSpotlightRows NewsletterSendSpotlight[]
+  newsletterRecipientRows     NewsletterRecipient[]
+  linkClickRows               LinkClick[]
+  sponsorProfileRows          SponsorProfile[]
+  spotlightListingRows        SpotlightListing[]
+  adBookingRows               AdBooking[]
+  gameSponsorEventRows        GameSponsorEvent[]
+  eventRows                   Event[]
+  referralSprintRows          ReferralSprint[]
+  referralCodeRows            ReferralCode[]
+  referralSignupRows          ReferralSignup[]
+  wordyWordRows               WordyWord[]
+  wordyBookingRows            WordyBooking[]
+  wordyPlayRows               WordyPlay[]
+  matchScoreRows              MatchScore[]
+  pollRows                    Poll[]
+  pollOptionRows              PollOption[]
+  pollVoteRows                PollVote[]
+  tipRows                     Tip[]
+}
+
 model AdminUser {
   id        String   @id @default(cuid())
   email     String   @unique
@@ -15,52 +49,83 @@ model AdminUser {
 }
 
 model Source {
-  id        String   @id @default(cuid())
-  name      String
-  url       String   @unique
-  active    Boolean  @default(true)
-  keywords  String   @default("")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  workspaceId String    @default("decatur")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  id          String    @id @default(cuid())
+  name        String
+  url         String
+  active      Boolean   @default(true)
+  keywords    String    @default("")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([workspaceId, url])
+  @@unique([id, workspaceId])
+  @@index([workspaceId])
 }
 
 model Article {
-  id          String   @id @default(cuid())
+  workspaceId String    @default("decatur")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  id          String    @id @default(cuid())
   title       String
   description String
   imageUrl    String?
-  articleUrl  String   @unique
+  articleUrl  String
   sourceName  String
   publishedAt DateTime
-  scrapedAt   DateTime @default(now())
-  selected    Boolean  @default(false)
-  tags        String[] @default([])
+  scrapedAt   DateTime  @default(now())
+  selected    Boolean   @default(false)
+  tags        String[]  @default([])
+
+  @@unique([workspaceId, articleUrl])
+  @@unique([id, workspaceId])
+  @@index([workspaceId])
 }
 
 model Template {
-  id        String   @id @default(cuid())
-  name      String
-  blocks    String   // JSON array of block objects
-  isDefault Boolean  @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  workspaceId String    @default("decatur")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  id          String    @id @default(cuid())
+  name        String
+  blocks      String // JSON array of block objects
+  isDefault   Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([id, workspaceId])
+  @@index([workspaceId])
 }
 
 model Subscriber {
-  id           String   @id @default(cuid())
-  email        String   @unique
+  workspaceId  String    @default("decatur")
+  workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  id           String    @id @default(cuid())
+  email        String
   firstName    String?
-  subscribedAt DateTime @default(now())
-  active       Boolean  @default(true)
+  subscribedAt DateTime  @default(now())
+  active       Boolean   @default(true)
+
+  @@unique([workspaceId, email])
+  @@unique([id, workspaceId])
+  @@index([workspaceId])
 }
 
 model Setting {
-  id    String @id @default(cuid())
-  key   String @unique
-  value String
+  workspaceId String    @default("decatur")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  id          String    @id @default(cuid())
+  key         String
+  value       String
+
+  @@unique([workspaceId, key])
+  @@unique([id, workspaceId])
+  @@index([workspaceId])
 }
 
 model NewsletterSend {
+  workspaceId          String                    @default("decatur")
+  workspace            Workspace                 @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
   id                   String                    @id @default(cuid())
   subject              String
   htmlBody             String
@@ -70,23 +135,32 @@ model NewsletterSend {
   status               String                    @default("sent")
   recipients           NewsletterRecipient[]
   spotlightAppearances NewsletterSendSpotlight[]
+
+  @@unique([id, workspaceId])
+  @@index([workspaceId])
 }
 
 model NewsletterSendSpotlight {
+  workspaceId      String           @default("decatur")
+  workspace        Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
   id               String           @id @default(cuid())
   newsletterSendId String
-  newsletterSend   NewsletterSend   @relation(fields: [newsletterSendId], references: [id], onDelete: Cascade)
+  newsletterSend   NewsletterSend   @relation(fields: [newsletterSendId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
   spotlightId      String
-  spotlight        SpotlightListing @relation(fields: [spotlightId], references: [id], onDelete: Cascade)
+  spotlight        SpotlightListing @relation(fields: [spotlightId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
 
+  @@unique([id, workspaceId])
   @@index([newsletterSendId])
   @@index([spotlightId])
+  @@index([workspaceId])
 }
 
 model NewsletterRecipient {
+  workspaceId      String         @default("decatur")
+  workspace        Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
   id               String         @id @default(cuid())
   newsletterSendId String
-  newsletterSend   NewsletterSend @relation(fields: [newsletterSendId], references: [id], onDelete: Cascade)
+  newsletterSend   NewsletterSend @relation(fields: [newsletterSendId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
   subscriberId     String?
   email            String
   resendEmailId    String?
@@ -98,26 +172,34 @@ model NewsletterRecipient {
   createdAt        DateTime       @default(now())
   clicks           LinkClick[]
 
+  @@unique([id, workspaceId])
   @@index([newsletterSendId])
+  @@index([workspaceId])
 }
 
 model LinkClick {
-  id                     String              @id @default(cuid())
-  newsletterRecipientId  String
-  newsletterRecipient    NewsletterRecipient @relation(fields: [newsletterRecipientId], references: [id], onDelete: Cascade)
-  url                    String
-  linkType               String // article | button | spotlight | presenting_sponsor | in_article_ad
-  label                  String?
-  createdAt              DateTime            @default(now())
+  workspaceId           String              @default("decatur")
+  workspace             Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  id                    String              @id @default(cuid())
+  newsletterRecipientId String
+  newsletterRecipient   NewsletterRecipient @relation(fields: [newsletterRecipientId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
+  url                   String
+  linkType              String // article | button | spotlight | presenting_sponsor | in_article_ad
+  label                 String?
+  createdAt             DateTime            @default(now())
 
+  @@unique([id, workspaceId])
   @@index([newsletterRecipientId])
+  @@index([workspaceId])
 }
 
 model SponsorProfile {
+  workspaceId   String             @default("decatur")
+  workspace     Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
   id            String             @id @default(cuid())
   businessName  String
   contactName   String
-  email         String             @unique
+  email         String
   phone         String?
   website       String?
   magicToken    String             @unique @default(cuid())
@@ -128,12 +210,18 @@ model SponsorProfile {
   bookings      AdBooking[]
   events        Event[]
   wordyBookings WordyBooking[]
+
+  @@unique([workspaceId, email])
+  @@unique([id, workspaceId])
+  @@index([workspaceId])
 }
 
 model SpotlightListing {
+  workspaceId     String                    @default("decatur")
+  workspace       Workspace                 @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
   id              String                    @id @default(cuid())
   sponsorId       String
-  sponsor         SponsorProfile            @relation(fields: [sponsorId], references: [id], onDelete: Cascade)
+  sponsor         SponsorProfile            @relation(fields: [sponsorId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
   businessName    String
   logoUrl         String?
   description     String
@@ -145,47 +233,60 @@ model SpotlightListing {
   createdAt       DateTime                  @default(now())
   approvedAt      DateTime?
   sendAppearances NewsletterSendSpotlight[]
+
+  @@unique([id, workspaceId])
+  @@index([workspaceId])
 }
 
 model AdBooking {
-  id              String         @id @default(cuid())
-  sponsorId       String
-  sponsor         SponsorProfile @relation(fields: [sponsorId], references: [id], onDelete: Cascade)
-  type            String
-  date            String
-  status          String         @default("pending_review")
-  isPaid          Boolean        @default(false)
-  discountPct     Int            @default(0)
-  stripeSessionId String?
-  imageUrl        String?
-  headline        String
-  body            String
-  ctaUrl          String
-  ctaLabel        String         @default("Learn More")
-  presentingBlurb String?
-  adminNotes      String?
-  createdAt       DateTime       @default(now())
-  approvedAt      DateTime?
+  workspaceId       String             @default("decatur")
+  workspace         Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  id                String             @id @default(cuid())
+  sponsorId         String
+  sponsor           SponsorProfile     @relation(fields: [sponsorId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
+  type              String
+  date              String
+  status            String             @default("pending_review")
+  isPaid            Boolean            @default(false)
+  discountPct       Int                @default(0)
+  stripeSessionId   String?
+  imageUrl          String?
+  headline          String
+  body              String
+  ctaUrl            String
+  ctaLabel          String             @default("Learn More")
+  presentingBlurb   String?
+  adminNotes        String?
+  createdAt         DateTime           @default(now())
+  approvedAt        DateTime?
   gameSponsorEvents GameSponsorEvent[]
 
+  @@unique([id, workspaceId])
   @@index([stripeSessionId])
+  @@index([workspaceId])
 }
 
 model GameSponsorEvent {
-  id        String    @id @default(cuid())
-  date      String
-  game      String    // "wordy" | "match"
-  eventType String    // "impression" | "click"
-  bookingId String
-  booking   AdBooking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-  createdAt DateTime  @default(now())
+  workspaceId String    @default("decatur")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  id          String    @id @default(cuid())
+  date        String
+  game        String // "wordy" | "match"
+  eventType   String // "impression" | "click"
+  bookingId   String
+  booking     AdBooking @relation(fields: [bookingId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
 
+  @@unique([id, workspaceId])
   @@index([date])
   @@index([bookingId])
   @@index([game])
+  @@index([workspaceId])
 }
 
 model Event {
+  workspaceId String          @default("decatur")
+  workspace   Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
   id          String          @id @default(cuid())
   title       String
   description String?
@@ -197,14 +298,18 @@ model Event {
   cost        String?
   status      String          @default("pending")
   sponsorId   String?
-  sponsor     SponsorProfile? @relation(fields: [sponsorId], references: [id], onDelete: SetNull)
+  sponsor     SponsorProfile? @relation(fields: [sponsorId, workspaceId], references: [id, workspaceId], onDelete: Restrict)
   createdAt   DateTime        @default(now())
   approvedAt  DateTime?
 
+  @@unique([id, workspaceId])
   @@index([sponsorId])
+  @@index([workspaceId])
 }
 
 model ReferralSprint {
+  workspaceId      String           @default("decatur")
+  workspace        Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
   id               String           @id @default(cuid())
   name             String
   startDate        String
@@ -216,44 +321,63 @@ model ReferralSprint {
   drawnAt          DateTime?
   createdAt        DateTime         @default(now())
   signups          ReferralSignup[]
+
+  @@unique([id, workspaceId])
+  @@index([workspaceId])
 }
 
 model ReferralCode {
+  workspaceId  String           @default("decatur")
+  workspace    Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
   id           String           @id @default(cuid())
   subscriberId String           @unique
   code         String           @unique
   createdAt    DateTime         @default(now())
   signups      ReferralSignup[]
 
+  @@unique([id, workspaceId])
   @@index([code])
+  @@index([workspaceId])
 }
 
 model ReferralSignup {
+  workspaceId     String          @default("decatur")
+  workspace       Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
   id              String          @id @default(cuid())
   referralCodeId  String
-  referralCode    ReferralCode    @relation(fields: [referralCodeId], references: [id], onDelete: Cascade)
+  referralCode    ReferralCode    @relation(fields: [referralCodeId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
   newSubscriberId String?
   sprintId        String?
-  sprint          ReferralSprint? @relation(fields: [sprintId], references: [id], onDelete: SetNull)
+  sprint          ReferralSprint? @relation(fields: [sprintId, workspaceId], references: [id, workspaceId], onDelete: Restrict)
   createdAt       DateTime        @default(now())
 
+  @@unique([id, workspaceId])
   @@index([referralCodeId])
   @@index([sprintId])
+  @@index([workspaceId])
 }
 
 model WordyWord {
-  id        String   @id @default(cuid())
-  date      String   @unique
-  word      String
-  puzzleNum Int?
-  createdAt DateTime @default(now())
+  workspaceId String    @default("decatur")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  id          String    @id @default(cuid())
+  date        String
+  word        String
+  puzzleNum   Int?
+  createdAt   DateTime  @default(now())
+
+  @@unique([workspaceId, date])
+  @@unique([id, workspaceId])
+  @@index([workspaceId])
 }
 
 model WordyBooking {
+  workspaceId     String         @default("decatur")
+  workspace       Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
   id              String         @id @default(cuid())
-  date            String         @unique
+  date            String
   sponsorId       String
-  sponsor         SponsorProfile @relation(fields: [sponsorId], references: [id], onDelete: Cascade)
+  sponsor         SponsorProfile @relation(fields: [sponsorId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
   headline        String
   body            String         @default("")
   ctaUrl          String         @default("")
@@ -267,70 +391,96 @@ model WordyBooking {
   createdAt       DateTime       @default(now())
   approvedAt      DateTime?
 
+  @@unique([workspaceId, date])
+  @@unique([id, workspaceId])
   @@index([sponsorId])
   @@index([stripeSessionId])
+  @@index([workspaceId])
 }
 
 model WordyPlay {
-  id            String   @id @default(cuid())
-  date          String
-  recipientId   String?
-  won           Boolean
-  guesses       Int
-  maxGuesses    Int
-  wordLength    Int
-  createdAt     DateTime @default(now())
+  workspaceId String    @default("decatur")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  id          String    @id @default(cuid())
+  date        String
+  recipientId String?
+  won         Boolean
+  guesses     Int
+  maxGuesses  Int
+  wordLength  Int
+  createdAt   DateTime  @default(now())
 
+  @@unique([id, workspaceId])
   @@index([date])
+  @@index([workspaceId])
 }
 
 model MatchScore {
-  id        String   @id @default(cuid())
-  date      String
-  deviceId  String
-  name      String
-  score     Int
-  createdAt DateTime @default(now())
+  workspaceId String    @default("decatur")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  id          String    @id @default(cuid())
+  date        String
+  deviceId    String
+  name        String
+  score       Int
+  createdAt   DateTime  @default(now())
 
-  @@unique([date, deviceId])
+  @@unique([workspaceId, date, deviceId])
+  @@unique([id, workspaceId])
   @@index([date])
+  @@index([workspaceId])
 }
 
 model Poll {
-  id               String         @id @default(cuid())
+  workspaceId      String       @default("decatur")
+  workspace        Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  id               String       @id @default(cuid())
   question         String
   newsletterSendId String?
-  createdAt        DateTime       @default(now())
+  createdAt        DateTime     @default(now())
   options          PollOption[]
   votes            PollVote[]
+
+  @@unique([id, workspaceId])
+  @@index([workspaceId])
 }
 
 model PollOption {
-  id        String     @id @default(cuid())
-  pollId    String
-  poll      Poll       @relation(fields: [pollId], references: [id], onDelete: Cascade)
-  label     String
-  sortOrder Int        @default(0)
-  votes     PollVote[]
+  workspaceId String     @default("decatur")
+  workspace   Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  id          String     @id @default(cuid())
+  pollId      String
+  poll        Poll       @relation(fields: [pollId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
+  label       String
+  sortOrder   Int        @default(0)
+  votes       PollVote[]
 
+  @@unique([id, workspaceId])
   @@index([pollId])
+  @@index([workspaceId])
 }
 
 model PollVote {
+  workspaceId String     @default("decatur")
+  workspace   Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
   id          String     @id @default(cuid())
   pollId      String
-  poll        Poll       @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  poll        Poll       @relation(fields: [pollId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
   optionId    String
-  option      PollOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
+  option      PollOption @relation(fields: [optionId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
   recipientId String?
   createdAt   DateTime   @default(now())
 
   @@unique([pollId, recipientId])
+  @@unique([id, workspaceId])
   @@index([pollId])
   @@index([optionId])
+  @@index([workspaceId])
 }
 
 model Tip {
+  workspaceId     String    @default("decatur")
+  workspace       Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
   id              String    @id @default(cuid())
   amountCents     Int
   source          String    @default("web") // "web" | "newsletter" | "wordy" | "match"
@@ -339,6 +489,8 @@ model Tip {
   createdAt       DateTime  @default(now())
   paidAt          DateTime?
 
+  @@unique([id, workspaceId])
   @@index([stripeSessionId])
   @@index([status])
+  @@index([workspaceId])
 }

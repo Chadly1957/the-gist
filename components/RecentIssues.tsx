@@ -1,7 +1,8 @@
 "use client";
+import { workspaceFetch } from "@/lib/workspace-client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/workspace/WorkspaceLink";
 
 interface Issue {
   id: string;
@@ -13,7 +14,7 @@ export default function RecentIssues() {
   const [issues, setIssues] = useState<Issue[]>([]);
 
   useEffect(() => {
-    fetch("/api/issues")
+    workspaceFetch("/api/issues")
       .then((r) => r.json())
       .then((data) => {
         if (Array.isArray(data)) setIssues(data.slice(0, 3));

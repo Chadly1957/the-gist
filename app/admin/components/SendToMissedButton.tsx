@@ -1,4 +1,5 @@
 "use client";
+import { workspaceFetch } from "@/lib/workspace-client";
 
 import { useState } from "react";
 
@@ -17,7 +18,7 @@ export function SendToMissedButton({
     if (!confirm(`Send to ${missedCount} missed subscriber${missedCount === 1 ? "" : "s"}?`)) return;
     setState("loading");
     try {
-      const res = await fetch(`/api/admin/newsletter/send-missed/${sendId}`, {
+      const res = await workspaceFetch(`/api/admin/newsletter/send-missed/${sendId}`, {
         method: "POST",
       });
       const data = await res.json();

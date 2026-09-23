@@ -1,3 +1,4 @@
+import { getWorkspaceUrl } from "@/lib/workspace";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getAdminSession } from "@/lib/auth";
@@ -100,7 +101,7 @@ export async function POST(req: NextRequest) {
       imageUrl: b.imageUrl,
     }));
 
-  const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "").replace(/\/$/, "");
+  const appUrl = await getWorkspaceUrl();
   const htmlBody = renderTemplate(
     blocks,
     articles.map((a) => ({ ...a, publishedAt: a.publishedAt })),
@@ -113,7 +114,7 @@ export async function POST(req: NextRequest) {
     .replace(/\{\{APP_URL\}\}/g, appUrl)
     .replace(/REFCODEPLACEHOLDER/g, "preview");
 
-  const emailClient = getEmailClient(allSettings);
+  const emailClient = await getEmailClient(allSettings);
   if (!emailClient) {
     return NextResponse.json(
       { error: "SMTP is not configured. Add your credentials in Settings." },

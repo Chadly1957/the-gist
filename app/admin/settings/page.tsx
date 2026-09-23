@@ -1,4 +1,5 @@
 "use client";
+import { workspaceFetch } from "@/lib/workspace-client";
 
 import { useEffect, useState } from "react";
 
@@ -83,7 +84,7 @@ export default function SettingsPage() {
   const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null);
 
   async function loadSettings() {
-    const res = await fetch("/api/admin/settings");
+    const res = await workspaceFetch("/api/admin/settings");
     const data = await res.json();
     setSettings((prev) => ({ ...prev, ...data.settings }));
     setHasSmtp(Boolean(data.hasSmtp));
@@ -102,7 +103,7 @@ export default function SettingsPage() {
     e.preventDefault();
     setSaving(true);
     setSaved(false);
-    await fetch("/api/admin/settings", {
+    await workspaceFetch("/api/admin/settings", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ settings }),
@@ -116,7 +117,7 @@ export default function SettingsPage() {
   async function handleTestConnection() {
     setTesting(true);
     setTestResult(null);
-    const res = await fetch("/api/admin/settings/test", {
+    const res = await workspaceFetch("/api/admin/settings/test", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ settings }),

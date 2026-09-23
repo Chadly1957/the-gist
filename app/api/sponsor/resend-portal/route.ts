@@ -1,3 +1,6 @@
+import { escapeHtml } from "@/lib/html";
+import { getWorkspaceUrl, getWorkspace } from "@/lib/workspace";
+import { workspaceUnique } from "@/lib/workspace";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getEmailClient } from "@/lib/email";
@@ -11,7 +14,7 @@ export async function POST(req: NextRequest) {
   }
 
   const profile = await prisma.sponsorProfile.findUnique({
-    where: { email: email.trim().toLowerCase() },
+    where: await workspaceUnique("email", email.trim().toLowerCase()),
   });
 
   // Always return success — don't reveal whether an email exists
@@ -19,20 +22,21 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true });
   }
 
-  const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "").replace(/\/$/, "");
+  const appUrl = await getWorkspaceUrl();
   const portalUrl = `${appUrl}/sponsor/portal?token=${profile.magicToken}`;
 
   const allSettings = Object.fromEntries(
     (await prisma.setting.findMany()).map((r) => [r.key, r.value])
   );
-  const emailClient = getEmailClient(allSettings);
+  const emailClient = await getEmailClient(allSettings);
   if (!emailClient) {
     return NextResponse.json({ error: "Email not configured." }, { status: 503 });
   }
 
+  const workspace = await getWorkspace();
   await emailClient.sendEmail({
     to: profile.email,
-    subject: "Your Gist Decatur Sponsor Portal Link",
+    subject: `Your ${workspace.name} Sponsor Portal Link`,
     htmlBody: `<!DOCTYPE html>
 <html>
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
@@ -44,7 +48,7 @@ export async function POST(req: NextRequest) {
           <tr>
             <td style="background:#166534;padding:20px 32px;">
               <p style="margin:0;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#86efac;">Sponsor Portal</p>
-              <p style="margin:4px 0 0;font-size:20px;font-weight:700;color:#ffffff;">The Gist Decatur</p>
+              <p style="margin:4px 0 0;font-size:20px;font-weight:700;color:#ffffff;">${escapeHtml(workspace.name)}</p>
             </td>
           </tr>
           <tr>

@@ -1,4 +1,7 @@
 "use client";
+import WorkspaceText from "@/components/workspace/WorkspaceText";
+
+import { workspaceFetch } from "@/lib/workspace-client";
 
 import { useState, useEffect } from "react";
 import Logo from "@/components/Logo";
@@ -38,7 +41,7 @@ export default function ReferralPage({ params }: { params: { code: string } }) {
   const [nameSaved, setNameSaved] = useState(false);
 
   useEffect(() => {
-    fetch(`/api/refer/${params.code}`)
+    workspaceFetch(`/api/refer/${params.code}`)
       .then((r) => r.json())
       .then((d) => {
         setData(d);
@@ -55,7 +58,7 @@ export default function ReferralPage({ params }: { params: { code: string } }) {
     setSubmitting(true);
     setErrorMsg("");
     try {
-      const res = await fetch(`/api/refer/${params.code}`, {
+      const res = await workspaceFetch(`/api/refer/${params.code}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: email.trim(), firstName: firstName.trim() }),
@@ -83,7 +86,7 @@ export default function ReferralPage({ params }: { params: { code: string } }) {
     e.preventDefault();
     setNameSaving(true);
     try {
-      const res = await fetch(`/api/refer/${params.code}`, {
+      const res = await workspaceFetch(`/api/refer/${params.code}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ firstName: nameInput.trim() }),
@@ -142,9 +145,7 @@ export default function ReferralPage({ params }: { params: { code: string } }) {
             </svg>
           </div>
           <h2 className="text-xl font-bold text-gray-900 mb-2">You&apos;re subscribed!</h2>
-          <p className="text-gray-500 text-sm">
-            Welcome to The Gist Decatur.
-            {data.referrerFirstName ? ` ${data.referrerFirstName} referred you — thanks to you both!` : ""}
+          <p className="text-gray-500 text-sm"><WorkspaceText>{" Welcome to The Gist Decatur. "}</WorkspaceText>{data.referrerFirstName ? ` ${data.referrerFirstName} referred you — thanks to you both!` : ""}
           </p>
         </div>
       </div>
@@ -157,7 +158,7 @@ export default function ReferralPage({ params }: { params: { code: string } }) {
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 w-full max-w-sm text-center">
           <Logo className="h-12 w-auto mx-auto mb-4" />
           <h2 className="text-xl font-bold text-gray-900 mb-2">Already subscribed!</h2>
-          <p className="text-gray-500 text-sm">You&apos;re already on The Gist Decatur list — no action needed.</p>
+          <p className="text-gray-500 text-sm"><WorkspaceText>{"You&apos;re already on The Gist Decatur list — no action needed."}</WorkspaceText></p>
         </div>
       </div>
     );
@@ -169,7 +170,7 @@ export default function ReferralPage({ params }: { params: { code: string } }) {
         {/* Header */}
         <div className="bg-green-800 px-8 py-8 text-center">
           <Logo className="h-14 w-auto mx-auto mb-3" />
-          <p className="text-green-200 text-sm">Your daily Decatur briefing</p>
+          <p className="text-green-200 text-sm"><WorkspaceText>{"Your daily Decatur briefing"}</WorkspaceText></p>
         </div>
 
         <div className="p-8">
@@ -177,12 +178,10 @@ export default function ReferralPage({ params }: { params: { code: string } }) {
           <div className="text-center mb-6">
             <h1 className="text-2xl font-bold text-gray-900 mb-2">
               {currentName
-                ? <>{currentName} invited you to The Gist Decatur</>
-                : <>You&apos;ve been invited to The Gist Decatur</>}
+                ? <>{currentName}<WorkspaceText>{" invited you to The Gist Decatur"}</WorkspaceText></>
+                : <><WorkspaceText>{"You&apos;ve been invited to The Gist Decatur"}</WorkspaceText></>}
             </h1>
-            <p className="text-gray-500 text-sm">
-              Sign up to get a daily email covering what&apos;s happening in Decatur — local news, events, and more.
-            </p>
+            <p className="text-gray-500 text-sm"><WorkspaceText>{" Sign up to get a daily email covering what&apos;s happening in Decatur — local news, events, and more. "}</WorkspaceText></p>
           </div>
 
           {/* Sprint progress (if active sprint) */}

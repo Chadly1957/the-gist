@@ -1,4 +1,6 @@
-import Link from "next/link";
+import WorkspaceText from "@/components/workspace/WorkspaceText";
+import { WorkspaceAnchor } from "@/components/workspace/WorkspaceLink";
+import Link from "@/components/workspace/WorkspaceLink";
 import { prisma } from "@/lib/db";
 import Logo from "@/components/Logo";
 import SponsorsMarquee from "@/components/SponsorsMarquee";
@@ -36,7 +38,7 @@ export default async function SponsorPage() {
       name: "Community Partners",
       price: prices.spotlight,
       description:
-        "Get your business in front of Decatur readers every week. Your listing rotates in a group of up to 5 local businesses and appears in every newsletter we send.",
+        "Get your business in front of local readers every week. Your listing rotates in a group of up to 5 local businesses and appears in every newsletter we send.",
       includes: [
         "Your logo, business name, and a 1-2 sentence description",
         "A direct link to your website",
@@ -64,11 +66,11 @@ export default async function SponsorPage() {
       name: "Presenting Sponsor",
       price: prices.presenting,
       description:
-        "The top sponsorship slot. You're featured as the day's presenting sponsor with a mention in the opening, plus a full standard ad placement, outside the 2-slot limit — and the same placement carries over to Decatur Wordy and Gist Match.",
+        "The top sponsorship slot. You're featured as the day's presenting sponsor with a mention in the opening, plus a full standard ad placement, outside the 2-slot limit — and the same placement carries over to Wordy and Gist Match.",
       includes: [
         "\"Today's Gist is brought to you by [Your Business]\" opening mention",
         "Full standard ad placement (does not count against the 2-slot cap)",
-        "Featured at the top of Decatur Wordy and Gist Match, every day you're booked",
+        "Featured at the top of Wordy and Gist Match, every day you're booked",
         "Exclusive: only 1 presenting sponsor per day",
       ],
       cta: "Reserve Dates",
@@ -92,10 +94,8 @@ export default async function SponsorPage() {
         <Link href="/" className="flex items-center justify-center mb-5 sm:mb-6">
           <Logo className="h-12 sm:h-16 w-auto" />
         </Link>
-        <h1 className="text-3xl sm:text-4xl font-bold mb-3 sm:mb-4 text-gray-900">Reach Decatur Every Day</h1>
-        <p className="text-gray-500 text-base sm:text-lg max-w-xl mx-auto">
-          Sponsor The Gist Decatur and put your business in front of engaged, local readers who care about their community.
-        </p>
+        <h1 className="text-3xl sm:text-4xl font-bold mb-3 sm:mb-4 text-gray-900"><WorkspaceText>{"Reach Decatur Every Day"}</WorkspaceText></h1>
+        <p className="text-gray-500 text-base sm:text-lg max-w-xl mx-auto"><WorkspaceText>{" Sponsor The Gist Decatur and put your business in front of engaged, local readers who care about their community. "}</WorkspaceText></p>
       </div>
 
       {/* Tiers */}
@@ -146,9 +146,9 @@ export default async function SponsorPage() {
 
         <p className="text-center text-sm text-gray-400 mt-10">
           Questions?{" "}
-          <a href="mailto:hello@thegistdecatur.com" className="text-green-700 hover:underline">
+          <WorkspaceAnchor href="mailto:hello@thegistdecatur.com" className="text-green-700 hover:underline">
             Get in touch
-          </a>{" "}
+          </WorkspaceAnchor>{" "}
           and we&apos;re happy to help you find the right fit.
         </p>
       </div>

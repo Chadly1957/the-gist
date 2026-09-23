@@ -1,4 +1,5 @@
 "use client";
+import { workspaceFetch, workspacePath } from "@/lib/workspace-client";
 
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -24,7 +25,7 @@ function LoginForm() {
     const timeout = setTimeout(() => controller.abort(), 20000);
 
     try {
-      const res = await fetch("/api/admin/login", {
+      const res = await workspaceFetch("/api/admin/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
@@ -36,7 +37,7 @@ function LoginForm() {
       if (res.ok) {
         // Navigate to compose (client component) to avoid a DB-heavy server render on redirect
         const dest = from === "/admin/login" || from === "/admin" ? "/admin/compose" : from;
-        router.push(dest);
+        router.push(workspacePath(dest.startsWith("/") && !dest.startsWith("//") ? dest : "/admin"));
         router.refresh();
       } else {
         setStatus("error");

@@ -1,3 +1,4 @@
+import { workspaceUnique } from "@/lib/workspace";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 
@@ -6,7 +7,7 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   const today = new Date().toLocaleDateString("en-CA"); // YYYY-MM-DD in local time
 
-  const word = await prisma.wordyWord.findUnique({ where: { date: today } });
+  const word = await prisma.wordyWord.findUnique({ where: await workspaceUnique("date", today) });
   if (!word) return NextResponse.json({ hasWord: false, date: today });
 
   // Puzzle number = count of all words up to and including today

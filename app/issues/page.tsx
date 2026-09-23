@@ -1,4 +1,5 @@
-import Link from "next/link";
+import WorkspaceText from "@/components/workspace/WorkspaceText";
+import Link from "@/components/workspace/WorkspaceLink";
 import { prisma } from "@/lib/db";
 import Logo from "@/components/Logo";
 
@@ -18,7 +19,7 @@ export default async function IssuesPage() {
           <Logo className="h-10 sm:h-14 w-auto" />
         </Link>
         <h1 className="text-3xl font-extrabold text-gray-900 mb-2">Past Issues</h1>
-        <p className="text-gray-500">Browse every edition of The Gist Decatur.</p>
+        <p className="text-gray-500"><WorkspaceText>{"Browse every edition of The Gist Decatur."}</WorkspaceText></p>
       </div>
 
       <div className="max-w-2xl mx-auto px-4 sm:px-6 py-8 sm:py-12">

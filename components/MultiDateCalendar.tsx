@@ -1,4 +1,5 @@
 "use client";
+import { workspaceFetch } from "@/lib/workspace-client";
 
 import { useEffect, useState } from "react";
 import { getDayDiscount } from "@/lib/discount";
@@ -36,7 +37,7 @@ export default function MultiDateCalendar({ bookingType, selectedDates, onChange
 
   useEffect(() => {
     setLoading(true);
-    fetch(`/api/sponsor/calendar?year=${year}&month=${month + 1}`)
+    workspaceFetch(`/api/sponsor/calendar?year=${year}&month=${month + 1}`)
       .then((r) => r.json())
       .then((d) => setAvailability(d.availability || {}))
       .catch(() => {})

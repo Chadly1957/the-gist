@@ -1,4 +1,7 @@
 "use client";
+import { WorkspaceAnchor } from "@/components/workspace/WorkspaceLink";
+
+import { workspaceFetch } from "@/lib/workspace-client";
 
 import { useEffect, useState, useRef, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
@@ -96,7 +99,7 @@ function BookingDatePicker({
 
   useEffect(() => {
     if (availability[monthKey]) return;
-    fetch(`/api/sponsor/calendar?year=${year}&month=${month + 1}`)
+    workspaceFetch(`/api/sponsor/calendar?year=${year}&month=${month + 1}`)
       .then((r) => r.json())
       .then((data) => setAvailability((prev) => ({ ...prev, [monthKey]: data.availability || {} })));
   }, [monthKey, year, month, availability]);
@@ -277,7 +280,7 @@ function PortalContent() {
 
   useEffect(() => {
     if (!token) { setError("No portal link provided."); setLoading(false); return; }
-    fetch(`/api/sponsor/portal?token=${encodeURIComponent(token)}`)
+    workspaceFetch(`/api/sponsor/portal?token=${encodeURIComponent(token)}`)
       .then((r) => r.json())
       .then((data) => {
         if (data.error) { setError(data.error); }
@@ -312,7 +315,7 @@ function PortalContent() {
     fd.append("file", file);
     fd.append("token", token);
     try {
-      const res = await fetch("/api/sponsor/upload", { method: "POST", body: fd });
+      const res = await workspaceFetch("/api/sponsor/upload", { method: "POST", body: fd });
       const data = await res.json();
       if (res.ok) onSuccess(data.url);
       else setError(data.error || "Upload failed.");
@@ -325,7 +328,7 @@ function PortalContent() {
     setSSubmitting(true); setSError("");
     try {
       if (editingSpotlight) {
-        const res = await fetch("/api/sponsor/spotlight", {
+        const res = await workspaceFetch("/api/sponsor/spotlight", {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ token, id: editingSpotlight.id, ...sForm }),
@@ -337,7 +340,7 @@ function PortalContent() {
           setView("overview");
         } else setSError(data.error || "Update failed.");
       } else {
-        const res = await fetch("/api/sponsor/spotlight", {
+        const res = await workspaceFetch("/api/sponsor/spotlight", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ token, ...sForm }),
@@ -354,7 +357,7 @@ function PortalContent() {
     e.preventDefault();
     setPSaving(true); setPError(""); setPSaved(false);
     try {
-      const res = await fetch("/api/sponsor/portal", {
+      const res = await workspaceFetch("/api/sponsor/portal", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token, ...pForm }),
@@ -374,7 +377,7 @@ function PortalContent() {
     if (bDates.length === 0) { setBError("Select at least one date."); return; }
     setBSubmitting(true); setBError("");
     try {
-      const res = await fetch("/api/sponsor/checkout", {
+      const res = await workspaceFetch("/api/sponsor/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token, bookingType: bType, dates: bDates, ...bForm }),
@@ -404,7 +407,7 @@ function PortalContent() {
     e.preventDefault();
     setESubmitting(true); setEError("");
     try {
-      const res = await fetch("/api/sponsor/events", {
+      const res = await workspaceFetch("/api/sponsor/events", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token, ...eForm }),
@@ -426,7 +429,7 @@ function PortalContent() {
     <div className="min-h-screen flex items-center justify-center p-4">
       <div className="text-center">
         <p className="text-gray-500 text-sm mb-2">{error}</p>
-        <a href="/sponsor/apply" className="text-sm text-green-700 underline">Resend my portal link or apply for a new one</a>
+        <WorkspaceAnchor href="/sponsor/apply" className="text-sm text-green-700 underline">Resend my portal link or apply for a new one</WorkspaceAnchor>
       </div>
     </div>
   );
@@ -443,7 +446,7 @@ function PortalContent() {
             <span className="text-gray-300 mx-2">|</span>
             <span className="text-sm text-gray-600">{profile.businessName}</span>
           </div>
-          <a href="/sponsor" className="text-xs text-gray-400 hover:text-gray-600">Sponsorship Info</a>
+          <WorkspaceAnchor href="/sponsor" className="text-xs text-gray-400 hover:text-gray-600">Sponsorship Info</WorkspaceAnchor>
         </div>
       </div>
 

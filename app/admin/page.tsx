@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/workspace/WorkspaceLink";
 import { prisma } from "@/lib/db";
 import { SendToMissedButton } from "@/app/admin/components/SendToMissedButton";
 import { ResendUnopenedButton } from "@/app/admin/components/ResendUnopenedButton";

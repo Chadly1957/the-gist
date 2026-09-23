@@ -1,8 +1,12 @@
 "use client";
+import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
+import WorkspaceText from "@/components/workspace/WorkspaceText";
+
+import { workspaceFetch, workspaceStorage } from "@/lib/workspace-client";
 
 import { useState, useEffect, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import Link from "next/link";
+import Link from "@/components/workspace/WorkspaceLink";
 import Logo from "@/components/Logo";
 import GamePresentingSponsor from "@/components/GamePresentingSponsor";
 import TipJarCTA from "@/components/TipJarCTA";
@@ -34,6 +38,7 @@ const KEY_COLORS: Record<string, string> = {
 };
 
 function WordyGame() {
+  const { workspace, prefix } = useWorkspace();
   const searchParams = useSearchParams();
   const recipientId = searchParams.get("r");
 
@@ -69,22 +74,22 @@ function WordyGame() {
   async function finishGame(newPhase: "won" | "lost", revealedAnswer: string, finalGuesses: string[], finalResults: LetterState[][], m: GameMeta) {
     setPhase(newPhase);
     setAnswer(revealedAnswer);
-    fetch("/api/wordy/complete", {
+    workspaceFetch("/api/wordy/complete", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ date: m.date, won: newPhase === "won", guesses: finalGuesses.length, maxGuesses: m.maxGuesses, wordLength: m.wordLength, recipientId }),
     }).catch(() => {});
     const lsKey = `decatur_wordy_${m.date}`;
-    localStorage.setItem(lsKey, JSON.stringify({ guesses: finalGuesses, results: finalResults, phase: newPhase, answer: revealedAnswer }));
+    workspaceStorage.setItem(lsKey, JSON.stringify({ guesses: finalGuesses, results: finalResults, phase: newPhase, answer: revealedAnswer }));
   }
 
   // Load today's puzzle + check localStorage
   useEffect(() => {
-    fetch("/api/wordy/today").then(r => r.json()).then(d => {
+    workspaceFetch("/api/wordy/today").then(r => r.json()).then(d => {
       if (!d.hasWord) { setPhase("no-word"); return; }
       setMeta(d);
 
-      const saved = localStorage.getItem(`decatur_wordy_${d.date}`);
+      const saved = workspaceStorage.getItem(`decatur_wordy_${d.date}`);
       if (saved) {
         try {
           const s = JSON.parse(saved);
@@ -112,7 +117,7 @@ function WordyGame() {
     if (current.length !== meta.wordLength) { showError(`Word must be ${meta.wordLength} letters`); return; }
 
     setSubmitting(true);
-    const res = await fetch("/api/wordy/guess", {
+    const res = await workspaceFetch("/api/wordy/guess", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ date: meta.date, guess: current }),
@@ -132,18 +137,18 @@ function WordyGame() {
     if (data.won) {
       finishGame("won", data.answer, newGuesses, newResults, meta);
     } else if (newGuesses.length >= meta.maxGuesses) {
-      const revealData = await fetch(`/api/wordy/reveal?date=${meta.date}`).then(r => r.json()).catch(() => ({}));
+      const revealData = await workspaceFetch(`/api/wordy/reveal?date=${meta.date}`).then(r => r.json()).catch(() => ({}));
       const finalAnswer = revealData.answer || "?";
       setPhase("lost");
       setAnswer(finalAnswer);
-      fetch("/api/wordy/complete", {
+      workspaceFetch("/api/wordy/complete", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ date: meta.date, won: false, guesses: newGuesses.length, maxGuesses: meta.maxGuesses, wordLength: meta.wordLength, recipientId }),
       }).catch(() => {});
-      localStorage.setItem(`decatur_wordy_${meta.date}`, JSON.stringify({ guesses: newGuesses, results: newResults, phase: "lost", answer: finalAnswer }));
+      workspaceStorage.setItem(`decatur_wordy_${meta.date}`, JSON.stringify({ guesses: newGuesses, results: newResults, phase: "lost", answer: finalAnswer }));
     } else {
-      localStorage.setItem(`decatur_wordy_${meta.date}`, JSON.stringify({ guesses: newGuesses, results: newResults, phase: "playing", answer: null }));
+      workspaceStorage.setItem(`decatur_wordy_${meta.date}`, JSON.stringify({ guesses: newGuesses, results: newResults, phase: "playing", answer: null }));
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [current, guesses, meta, phase, recipientId, results, submitting]);
@@ -169,7 +174,7 @@ function WordyGame() {
     if (!meta) return;
     const score = phase === "won" ? `${guesses.length}/${meta.maxGuesses}` : `X/${meta.maxGuesses}`;
     const grid = results.map(row => row.map(r => r === "correct" ? "🟩" : r === "present" ? "🟨" : "⬛").join("")).join("\n");
-    const text = `Decatur Wordy #${meta.puzzleNum} — ${score}\n\n${grid}\n\nSubscribe to Decatur's favorite email for local news, events, and The Gist Decatur Wordy!\nthegistdecatur.com`;
+    const text = `${workspace.area} Wordy #${meta.puzzleNum} — ${score}\n\n${grid}\n\nSubscribe to ${workspace.name} for local news, events, and Wordy!\n${window.location.origin}${prefix}`;
     navigator.clipboard.writeText(text).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); }).catch(() => {
       const ta = document.createElement("textarea");
       ta.value = text;
@@ -195,8 +200,8 @@ function WordyGame() {
     <div className="text-center py-16 px-6">
       <p className="text-5xl mb-4">📅</p>
       <h2 className="text-xl font-bold text-gray-900 mb-2">No puzzle today</h2>
-      <p className="text-gray-500 text-sm">Check back tomorrow for the next Decatur Wordy!</p>
-      <Link href="/" className="mt-6 inline-block text-sm text-green-700 font-semibold hover:underline">← Back to The Gist Decatur</Link>
+      <p className="text-gray-500 text-sm"><WorkspaceText>{"Check back tomorrow for the next Decatur Wordy!"}</WorkspaceText></p>
+      <Link href="/" className="mt-6 inline-block text-sm text-green-700 font-semibold hover:underline"><WorkspaceText>{"← Back to The Gist Decatur"}</WorkspaceText></Link>
     </div>
   );
 
@@ -212,7 +217,7 @@ function WordyGame() {
       {/* Puzzle info */}
       <div className="text-center">
         <p className="text-sm font-medium text-gray-600">Puzzle #{meta?.puzzleNum} · {meta?.wordLength} letters · {meta?.maxGuesses} guesses</p>
-        <p className="text-xs text-gray-400 mt-0.5">All answers are Decatur area related</p>
+        <p className="text-xs text-gray-400 mt-0.5"><WorkspaceText>{"All answers are Decatur area related"}</WorkspaceText></p>
       </div>
 
       {/* Grid */}
@@ -267,7 +272,7 @@ function WordyGame() {
               : <><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" /></svg>Share Results</>
             }
           </button>
-          <Link href="/" className="text-xs text-gray-400 hover:text-gray-600 transition-colors">← Back to thegistdecatur.com</Link>
+          <Link href="/" className="text-xs text-gray-400 hover:text-gray-600 transition-colors"><WorkspaceText>{"← Back to thegistdecatur.com"}</WorkspaceText></Link>
         </div>
       )}
 
@@ -302,8 +307,8 @@ export default function WordyPage() {
         <div className="max-w-lg mx-auto px-6 flex items-center justify-between">
           <Link href="/"><Logo className="h-10 w-auto" /></Link>
           <div className="text-right">
-            <p className="text-sm font-bold text-gray-900">Decatur Wordy</p>
-            <p className="text-xs text-gray-400">Daily puzzle · all answers Decatur area</p>
+            <p className="text-sm font-bold text-gray-900"><WorkspaceText>{"Decatur Wordy"}</WorkspaceText></p>
+            <p className="text-xs text-gray-400"><WorkspaceText>{"Daily puzzle · all answers Decatur area"}</WorkspaceText></p>
           </div>
         </div>
       </header>

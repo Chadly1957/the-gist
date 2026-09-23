@@ -1,4 +1,9 @@
 "use client";
+import WorkspaceText from "@/components/workspace/WorkspaceText";
+
+import { WorkspaceAnchor } from "@/components/workspace/WorkspaceLink";
+
+import { workspaceFetch } from "@/lib/workspace-client";
 
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
@@ -22,7 +27,7 @@ function UnsubscribeForm() {
     setErrorMsg("");
     try {
       const recipientId = searchParams.get("r");
-      const res = await fetch("/api/unsubscribe", {
+      const res = await workspaceFetch("/api/unsubscribe", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, recipientId }),
@@ -50,14 +55,12 @@ function UnsubscribeForm() {
         </div>
         <h2 className="text-xl font-bold text-gray-900 mb-2">You&apos;re unsubscribed</h2>
         <p className="text-gray-500 text-sm">
-          {email} has been removed from The Gist Decatur.
-          You won&apos;t receive any more emails from us.
-        </p>
+          {email}<WorkspaceText>{" has been removed from The Gist Decatur. You won&apos;t receive any more emails from us. "}</WorkspaceText></p>
         <p className="text-gray-400 text-xs mt-4">
           Changed your mind?{" "}
-          <a href="/" className="text-green-700 underline hover:text-green-800">
+          <WorkspaceAnchor href="/" className="text-green-700 underline hover:text-green-800">
             Resubscribe here
-          </a>
+          </WorkspaceAnchor>
         </p>
       </div>
     );
@@ -70,9 +73,7 @@ function UnsubscribeForm() {
           <Logo className="h-12 w-auto" />
         </div>
         <h1 className="text-2xl font-bold text-gray-900 mb-2">Unsubscribe</h1>
-        <p className="text-gray-500 text-sm">
-          Enter your email address below to stop receiving The Gist Decatur.
-        </p>
+        <p className="text-gray-500 text-sm"><WorkspaceText>{" Enter your email address below to stop receiving The Gist Decatur. "}</WorkspaceText></p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">

@@ -1,3 +1,5 @@
+import { getWorkspaceUrl } from "@/lib/workspace";
+import { workspaceUnique } from "@/lib/workspace";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 
@@ -42,11 +44,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Email is required." }, { status: 400 });
   }
 
-  const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "").replace(/\/$/, "");
+  const appUrl = await getWorkspaceUrl();
   const normalizedEmail = email.trim().toLowerCase();
 
   // Find or create subscriber
-  let subscriber = await prisma.subscriber.findUnique({ where: { email: normalizedEmail } });
+  let subscriber = await prisma.subscriber.findUnique({ where: await workspaceUnique("email", normalizedEmail) });
   let isNew = false;
 
   if (!subscriber) {

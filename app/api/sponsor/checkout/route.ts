@@ -1,3 +1,5 @@
+import { getWorkspace } from "@/lib/workspace";
+import { getWorkspaceUrl } from "@/lib/workspace";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import Stripe from "stripe";
@@ -59,7 +61,8 @@ export async function POST(req: NextRequest) {
   const profile = await prisma.sponsorProfile.findUnique({ where: { magicToken: token } });
   if (!profile) return NextResponse.json({ error: "Invalid token." }, { status: 401 });
 
-  const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "").replace(/\/$/, "");
+  const workspace = await getWorkspace();
+  const appUrl = await getWorkspaceUrl();
 
   // Load price from settings (fall back to defaults)
   const allSettings = Object.fromEntries(
@@ -133,7 +136,7 @@ export async function POST(req: NextRequest) {
         currency: "usd",
         product_data: {
           name: `${placementName} — ${formatDate(date)}${discountLabel}`,
-          description: `The Gist Decatur newsletter placement on ${formatDate(date)}`,
+          description: `${workspace.name} newsletter placement on ${formatDate(date)}`,
         },
         unit_amount: unitPriceCents,
       },
@@ -144,6 +147,7 @@ export async function POST(req: NextRequest) {
     cancel_url: `${appUrl}/sponsor/portal?token=${token}&booking=cancelled`,
     customer_email: profile.email,
     metadata: {
+      workspaceId: workspace.id,
       bookingModel: "ad",
       token,
     },

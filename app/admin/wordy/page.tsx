@@ -1,4 +1,7 @@
 "use client";
+import WorkspaceText from "@/components/workspace/WorkspaceText";
+
+import { workspaceFetch } from "@/lib/workspace-client";
 
 import { useEffect, useState, useCallback } from "react";
 
@@ -42,7 +45,7 @@ export default function WordyAdminPage() {
   const monthKey = `${calYear}-${String(calMonth + 1).padStart(2, "0")}`;
 
   const loadWords = useCallback(() => {
-    fetch(`/api/admin/wordy/words?month=${monthKey}`)
+    workspaceFetch(`/api/admin/wordy/words?month=${monthKey}`)
       .then(r => r.json())
       .then(d => setWords(d.words || []));
   }, [monthKey]);
@@ -51,7 +54,7 @@ export default function WordyAdminPage() {
   useEffect(() => {
     if (tab === "analytics" && !analytics) {
       setAnalyticsLoading(true);
-      fetch("/api/admin/wordy/analytics")
+      workspaceFetch("/api/admin/wordy/analytics")
         .then(r => r.json())
         .then(d => setAnalytics(d))
         .finally(() => setAnalyticsLoading(false));
@@ -78,7 +81,7 @@ export default function WordyAdminPage() {
     if (!wordInput.trim()) { await deleteWord(); return; }
     setWordSaving(true);
     setWordError("");
-    const res = await fetch("/api/admin/wordy/words", {
+    const res = await workspaceFetch("/api/admin/wordy/words", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ date: selectedDate, word: wordInput.trim() }),
@@ -92,7 +95,7 @@ export default function WordyAdminPage() {
   async function deleteWord() {
     if (!selectedDate) return;
     setWordSaving(true);
-    await fetch(`/api/admin/wordy/words/${selectedDate}`, { method: "DELETE" });
+    await workspaceFetch(`/api/admin/wordy/words/${selectedDate}`, { method: "DELETE" });
     loadWords();
     setSelectedDate(null);
     setWordSaving(false);
@@ -104,7 +107,7 @@ export default function WordyAdminPage() {
     <div className="p-4 sm:p-8 max-w-4xl">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Games</h1>
-        <p className="text-sm text-gray-500 mt-1">Schedule Decatur Wordy's daily word and review game analytics.</p>
+        <p className="text-sm text-gray-500 mt-1"><WorkspaceText>{"Schedule Decatur Wordy's daily word and review game analytics."}</WorkspaceText></p>
       </div>
 
       {/* Tabs */}
@@ -245,7 +248,7 @@ export default function WordyAdminPage() {
             <div className="space-y-8">
               {/* Wordy play stats */}
               <div>
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Decatur Wordy — Plays</p>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2"><WorkspaceText>{"Decatur Wordy — Plays"}</WorkspaceText></p>
                 <div className="space-y-3">
                   {[
                     { label: "Today", stats: analytics.wordy.today },

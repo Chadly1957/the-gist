@@ -1,8 +1,9 @@
 "use client";
+import { workspaceFetch } from "@/lib/workspace-client";
 
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
-import Link from "next/link";
+import Link from "@/components/workspace/WorkspaceLink";
 import Logo from "@/components/Logo";
 
 export default function IssuePage() {
@@ -15,7 +16,7 @@ export default function IssuePage() {
   const [iframeHeight, setIframeHeight] = useState(2400);
 
   useEffect(() => {
-    fetch(`/api/issues`)
+    workspaceFetch(`/api/issues`)
       .then((r) => r.json())
       .then((issues: { id: string; subject: string; sentAt: string }[]) => {
         const match = issues.find((i) => i.id === id);

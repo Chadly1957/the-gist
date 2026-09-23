@@ -1,13 +1,20 @@
-import { PrismaClient } from "@prisma/client";
+import { validateWorkspaceReferences } from "./workspace-references";
+import { basePrisma } from "./db-base";
+import { getWorkspace } from "./workspace";
+import { scopeQuery } from "./workspace-scope";
 
-const globalForPrisma = globalThis as unknown as {
-  prisma: PrismaClient | undefined;
-};
-
-export const prisma =
-  globalForPrisma.prisma ??
-  new PrismaClient({
-    log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
-  });
-
-if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
+export const prisma = basePrisma.$extends({
+  name: "workspace-isolation",
+  query: {
+    $allModels: {
+      async $allOperations({ model, operation, args, query }) {
+        if (model === "AdminUser") return query(args);
+        if (model === "Workspace") throw new Error("Use the workspace management API");
+        const workspace = await getWorkspace();
+        const scoped = scopeQuery(model, operation, args, workspace.id);
+        await validateWorkspaceReferences(model, operation, scoped, workspace.id);
+        return query(scoped);
+      },
+    },
+  },
+});

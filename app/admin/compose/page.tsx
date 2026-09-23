@@ -1,5 +1,7 @@
 "use client";
+import { workspaceFetch, workspaceStorage } from "@/lib/workspace-client";
 
+import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
 import { useEffect, useRef, useState } from "react";
 import { renderTemplate } from "@/lib/template-renderer";
 import { blurbToHtml } from "@/lib/url";
@@ -29,15 +31,16 @@ function todayStr() {
   return new Date().toISOString().split("T")[0];
 }
 
-function defaultSubject() {
-  return `The Gist Decatur: ${new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}`;
+function defaultSubject(name: string) {
+  return `${name}: ${new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}`;
 }
 
 export default function ComposePage() {
+  const { workspace } = useWorkspace();
   const [articles, setArticles] = useState<Article[]>([]);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
-  const [subject, setSubject] = useState(defaultSubject());
+  const [subject, setSubject] = useState(defaultSubject(workspace.name));
   const [blurb, setBlurb] = useState("");
   const [newsletterDate, setNewsletterDate] = useState(todayStr());
   const savedDraftRef = useRef<{ selectedTemplateId?: string; selectedArticleIds?: string[] } | null>(null);
@@ -64,11 +67,11 @@ export default function ComposePage() {
   // Restore draft from localStorage on mount (runs before fetch effects)
   useEffect(() => {
     try {
-      const raw = localStorage.getItem(DRAFT_KEY);
+      const raw = workspaceStorage.getItem(DRAFT_KEY);
       if (!raw) return;
       const saved = JSON.parse(raw);
       if (saved.date !== todayStr()) {
-        localStorage.removeItem(DRAFT_KEY);
+        workspaceStorage.removeItem(DRAFT_KEY);
         return;
       }
       if (saved.subject) setSubject(saved.subject);
@@ -92,29 +95,29 @@ export default function ComposePage() {
       selectedTemplateId,
       selectedArticleIds: articles.filter((a) => a.selected).map((a) => a.id),
     };
-    localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+    workspaceStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
   }, [subject, blurb, newsletterDate, selectedTemplateId, articles]);
 
   useEffect(() => {
-    const saved = localStorage.getItem("gist_keyword_filters");
+    const saved = workspaceStorage.getItem("gist_keyword_filters");
     if (saved) {
       try { setSavedKeywords(JSON.parse(saved)); } catch { /* ignore */ }
     }
-    const savedLocal = localStorage.getItem("gist_local_first");
+    const savedLocal = workspaceStorage.getItem("gist_local_first");
     if (savedLocal !== null) setLocalFirst(savedLocal !== "false");
   }, []);
 
   useEffect(() => {
-    localStorage.setItem("gist_keyword_filters", JSON.stringify(savedKeywords));
+    workspaceStorage.setItem("gist_keyword_filters", JSON.stringify(savedKeywords));
   }, [savedKeywords]);
 
   useEffect(() => {
-    localStorage.setItem("gist_local_first", String(localFirst));
+    workspaceStorage.setItem("gist_local_first", String(localFirst));
   }, [localFirst]);
 
   useEffect(() => {
     // Load templates
-    fetch("/api/admin/templates")
+    workspaceFetch("/api/admin/templates")
       .then((r) => r.json())
       .then((data) => {
         setTemplates(data.templates || []);
@@ -129,7 +132,7 @@ export default function ComposePage() {
         }
       });
     // Load already-scraped articles
-    fetch("/api/admin/articles")
+    workspaceFetch("/api/admin/articles")
       .then((r) => r.json())
       .then((data) => {
         const savedIds = new Set(savedDraftRef.current?.selectedArticleIds || []);
@@ -149,7 +152,7 @@ export default function ComposePage() {
     setScrapeProgress({ total: 0, results: [] });
 
     try {
-      const res = await fetch("/api/admin/scrape", { method: "POST" });
+      const res = await workspaceFetch("/api/admin/scrape", { method: "POST" });
 
       // Non-streaming error (auth, no sources, etc.)
       if (!res.body || res.headers.get("Content-Type")?.includes("application/json")) {
@@ -264,9 +267,9 @@ export default function ComposePage() {
   }
 
   function handleResetDraft() {
-    localStorage.removeItem(DRAFT_KEY);
+    workspaceStorage.removeItem(DRAFT_KEY);
     savedDraftRef.current = null;
-    setSubject(defaultSubject());
+    setSubject(defaultSubject(workspace.name));
     setBlurb("");
     setNewsletterDate(todayStr());
     const def = templates.find((t) => t.isDefault);
@@ -278,7 +281,7 @@ export default function ComposePage() {
   async function handleClearPool() {
     if (!confirm("Clear all saved articles from the pool? This can't be undone.")) return;
     setClearingPool(true);
-    await fetch("/api/admin/articles", { method: "DELETE" });
+    await workspaceFetch("/api/admin/articles", { method: "DELETE" });
     setArticles([]);
     setActiveKeyword("");
     setClearingPool(false);
@@ -322,7 +325,7 @@ export default function ComposePage() {
     setSending(true);
     setSendResult(null);
 
-    const res = await fetch("/api/admin/newsletter/send", {
+    const res = await workspaceFetch("/api/admin/newsletter/send", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -347,7 +350,7 @@ export default function ComposePage() {
     setTestSending(true);
     setSendResult(null);
     try {
-      const res = await fetch("/api/admin/newsletter/test", {
+      const res = await workspaceFetch("/api/admin/newsletter/test", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
