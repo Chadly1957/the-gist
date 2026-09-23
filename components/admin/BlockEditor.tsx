@@ -8,7 +8,7 @@ import UrlInput from "@/components/UrlInput";
 
 export interface Block {
   id: string;
-  type: "header" | "text" | "image" | "articles" | "divider" | "button" | "footer" | "spotlight" | "presenting_sponsor" | "events" | "referral" | "poll" | "wordy" | "match" | "games" | "tip_jar";
+  type: "header" | "text" | "image" | "articles" | "divider" | "button" | "footer" | "spotlight" | "presenting_sponsor" | "events" | "referral" | "poll" | "wordy" | "match" | "games" | "tip_jar" | "weather";
   content: Record<string, string>;
 }
 
@@ -35,6 +35,7 @@ const BLOCK_TYPES: { type: Block["type"]; label: string; icon: string }[] = [
   { type: "match", label: "Gist Match", icon: "🧩" },
   { type: "games", label: "Games (Wordy + Match)", icon: "🎮" },
   { type: "tip_jar", label: "Tip Jar", icon: "☕" },
+  { type: "weather", label: "Weather Snapshot", icon: "🌤️" },
 ];
 
 export default function BlockEditor({ blocks, onChange }: BlockEditorProps) {
@@ -75,6 +76,12 @@ export default function BlockEditor({ blocks, onChange }: BlockEditorProps) {
         headline: "Like what The Gist is doing?",
         body: "Support the newsletter with a cup of coffee!",
         buttonLabel: "Tip $3",
+      },
+      weather: {
+        label: "Today's Weather",
+        locationName: "Decatur",
+        latitude: "39.8403",
+        longitude: "-88.9454",
       },
     };
     const newBlock: Block = { id: generateId(), type, content: { ...defaults[type], blockId: "" } };
@@ -384,6 +391,20 @@ function BlockPreview({ block }: { block: Block }) {
           </span>
         </div>
       );
+    case "weather":
+      return (
+        <div className="flex items-center gap-3 py-2">
+          <div className="w-8 h-8 rounded-lg bg-sky-100 flex items-center justify-center">
+            <span className="text-sm">🌤️</span>
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-gray-800">{block.content.label || "Today's Weather"}</p>
+            <p className="text-xs text-gray-400">
+              {block.content.locationName || "Decatur"} snapshot fetched at send time — current conditions + next ~6 hours
+            </p>
+          </div>
+        </div>
+      );
     default:
       return null;
   }
@@ -660,6 +681,16 @@ function BlockFields({
           {field("body", "Body", { placeholder: "Support the newsletter with a cup of coffee!" })}
           {field("buttonLabel", "Button Label", { placeholder: "Tip $3" })}
           <p className="text-xs text-gray-400"><WorkspaceText>{"Links to your workspace tip page with $3 pre-selected — readers can still enter their own amount."}</WorkspaceText></p>
+        </div>
+      );
+    case "weather":
+      return (
+        <div className="space-y-3">
+          {field("label", "Section Label", { placeholder: "Today's Weather" })}
+          {field("locationName", "Location Name", { placeholder: "Decatur" })}
+          {field("latitude", "Latitude", { placeholder: "39.8403" })}
+          {field("longitude", "Longitude", { placeholder: "-88.9454" })}
+          <p className="text-xs text-gray-400">The snapshot is fetched when the newsletter is sent — current conditions plus the next ~6 hours. No API key needed. Set the coordinates per city when you expand.</p>
         </div>
       );
     default:

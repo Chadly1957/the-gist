@@ -4,6 +4,7 @@ import { workspaceFetch, workspaceStorage } from "@/lib/workspace-client";
 import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
 import { useEffect, useRef, useState } from "react";
 import { renderTemplate } from "@/lib/template-renderer";
+import { sampleWeatherSnapshot } from "@/lib/weather";
 import { blurbToHtml } from "@/lib/url";
 
 interface Article {
@@ -308,7 +309,13 @@ export default function ComposePage() {
       selectedArticles.map((a) => ({
         ...a,
         publishedAt: new Date(a.publishedAt),
-      }))
+      })),
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      sampleWeatherSnapshot()
     );
   }
 

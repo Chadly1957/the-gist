@@ -4,6 +4,7 @@ import { workspaceFetch } from "@/lib/workspace-client";
 import { useEffect, useState } from "react";
 import BlockEditor, { Block } from "@/components/admin/BlockEditor";
 import { renderTemplate } from "@/lib/template-renderer";
+import { sampleWeatherSnapshot } from "@/lib/weather";
 
 interface Template {
   id: string;
@@ -119,7 +120,14 @@ export default function TemplatesPage() {
           sourceName: "AL.com",
           publishedAt: new Date(),
         },
-      ])
+      ],
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      sampleWeatherSnapshot()
+    )
     : "";
 
   if (loading) {
