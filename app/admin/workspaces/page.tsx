@@ -20,7 +20,7 @@ function tzLabel(value: string | null) {
   return TIMEZONES.find((t) => t.value === value)?.label || value || "—";
 }
 
-function LocationEditor({
+function WorkspaceEditor({
   workspace,
   onSaved,
 }: {
@@ -28,6 +28,8 @@ function LocationEditor({
   onSaved: (w: WorkspaceSummary) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [name, setName] = useState(workspace.name);
+  const [area, setArea] = useState(workspace.area);
   const [latitude, setLatitude] = useState(workspace.latitude?.toString() ?? "");
   const [longitude, setLongitude] = useState(workspace.longitude?.toString() ?? "");
   const [timezone, setTimezone] = useState(workspace.timezone ?? "America/Chicago");
@@ -42,14 +44,14 @@ function LocationEditor({
       const res = await workspaceFetch("/api/admin/workspaces", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: workspace.id, latitude, longitude, timezone }),
+        body: JSON.stringify({ id: workspace.id, name, area, latitude, longitude, timezone }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Could not save location.");
-      onSaved({ ...workspace, latitude: data.workspace.latitude, longitude: data.workspace.longitude, timezone: data.workspace.timezone });
+      if (!res.ok) throw new Error(data.error || "Could not save workspace.");
+      onSaved({ ...workspace, name: data.workspace.name, area: data.workspace.area, latitude: data.workspace.latitude, longitude: data.workspace.longitude, timezone: data.workspace.timezone });
       setOpen(false);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not save location.");
+      setError(e instanceof Error ? e.message : "Could not save workspace.");
     } finally {
       setSaving(false);
     }
@@ -58,13 +60,21 @@ function LocationEditor({
   if (!open) {
     return (
       <button onClick={() => setOpen(true)} className="text-xs font-medium text-green-700 hover:underline">
-        {workspace.latitude == null ? "Set location" : "Edit location"}
+        Edit workspace
       </button>
     );
   }
 
   return (
     <form onSubmit={save} className="mt-3 rounded-xl bg-gray-50 border border-gray-200 p-4 space-y-3">
+      <div className="grid grid-cols-2 gap-3">
+        <label className="text-xs font-medium text-gray-600">Newsletter name
+          <input required maxLength={100} value={name} onChange={(e) => setName(e.target.value)} className="mt-1 block w-full rounded-lg border border-gray-200 p-2 text-sm" />
+        </label>
+        <label className="text-xs font-medium text-gray-600">Town or area
+          <input required maxLength={100} value={area} onChange={(e) => setArea(e.target.value)} className="mt-1 block w-full rounded-lg border border-gray-200 p-2 text-sm" />
+        </label>
+      </div>
       <div className="grid grid-cols-2 gap-3">
         <label className="text-xs font-medium text-gray-600">Latitude
           <input required value={latitude} onChange={(e) => setLatitude(e.target.value)} placeholder="39.8403" inputMode="decimal" className="mt-1 block w-full rounded-lg border border-gray-200 p-2 text-sm" />
@@ -129,7 +139,7 @@ export default function WorkspacesPage() {
         <div className="flex gap-6 mt-6 text-sm"><p><strong className="block text-xl">{item._count.subscriberRows.toLocaleString()}</strong>Subscribers</p><p><strong className="block text-xl">{item._count.sourceRows}</strong>Sources</p><p><strong className="block text-xl">{item._count.newsletterSendRows}</strong>Issues</p></div>
         <div className="flex gap-5 mt-6 items-center"><WorkspaceAnchor href={`/w/${item.slug}/admin`} className="text-sm font-semibold text-green-800 hover:underline">Open workspace →</WorkspaceAnchor><WorkspaceAnchor href={`/w/${item.slug}`} target="_blank" rel="noreferrer" className="text-sm text-gray-600 hover:underline">View website ↗</WorkspaceAnchor></div>
         <div className="mt-4 border-t border-gray-100 pt-3">
-          <LocationEditor workspace={item} onSaved={(w) => setItems((items) => items.map((i) => i.id === w.id ? w : i))} />
+          <WorkspaceEditor workspace={item} onSaved={(w) => setItems((items) => items.map((i) => i.id === w.id ? w : i))} />
         </div>
       </section>)}
     </div>}

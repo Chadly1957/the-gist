@@ -72,7 +72,21 @@ export async function PATCH(req: NextRequest) {
   const existing = await basePrisma.workspace.findUnique({ where: { id }, select: { id: true } });
   if (!existing) return NextResponse.json({ error: "Workspace not found." }, { status: 404 });
 
-  const data: { latitude?: number; longitude?: number; timezone?: string } = {};
+  const data: { name?: string; area?: string; latitude?: number; longitude?: number; timezone?: string } = {};
+  const name = typeof body?.name === "string" ? body.name.trim() : undefined;
+  const area = typeof body?.area === "string" ? body.area.trim() : undefined;
+  if (name !== undefined) {
+    if (!name || name.length > 100) {
+      return NextResponse.json({ error: "Enter a newsletter name (max 100 characters)." }, { status: 400 });
+    }
+    data.name = name;
+  }
+  if (area !== undefined) {
+    if (!area || area.length > 100) {
+      return NextResponse.json({ error: "Enter a town or area (max 100 characters)." }, { status: 400 });
+    }
+    data.area = area;
+  }
   if (body?.latitude !== undefined || body?.longitude !== undefined) {
     const latitude = parseCoordinate(body?.latitude, -90, 90);
     const longitude = parseCoordinate(body?.longitude, -180, 180);
