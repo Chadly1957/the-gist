@@ -202,18 +202,20 @@ async function runWorkspace(req: NextRequest) {
   const appUrl = await getWorkspaceUrl();
   const now = new Date();
 
-  // Pick up sends from 3–4 hours ago. With an hourly cron, each send
-  // falls in this window exactly once.
-  const windowEnd   = new Date(now.getTime() - 3 * 60 * 60 * 1000);
-  const windowStart = new Date(now.getTime() - 4 * 60 * 60 * 1000);
+  // Once-daily cron (5 PM CT). Pick up sent newsletters from roughly the
+  // last day and a half that haven't had sponsor analytics emailed yet.
+  // The sponsorAnalyticsSentAt flag makes this idempotent: each send is
+  // processed exactly once, even if a run is missed or retried.
+  const windowStart = new Date(now.getTime() - 36 * 60 * 60 * 1000);
 
   const sends = await prisma.newsletterSend.findMany({
-    where: { sentAt: { gte: windowStart, lte: windowEnd }, status: "sent" },
+    where: { sentAt: { gte: windowStart }, status: "sent", sponsorAnalyticsSentAt: null },
     select: { id: true, sentAt: true },
+    orderBy: { sentAt: "asc" },
   });
 
   if (sends.length === 0) {
-    return NextResponse.json({ ok: true, emailsSent: 0, message: "No sends in window." });
+    return NextResponse.json({ ok: true, emailsSent: 0, message: "No new sends since last run." });
   }
 
   let totalEmailsSent = 0;
@@ -329,6 +331,12 @@ async function runWorkspace(req: NextRequest) {
         console.error(`Failed to send analytics email to ${sponsor.email}:`, err);
       }
     }
+
+    // Mark this send as processed so a later run doesn't email duplicates.
+    await prisma.newsletterSend.update({
+      where: { id: send.id },
+      data: { sponsorAnalyticsSentAt: new Date() },
+    });
   }
 
   return NextResponse.json({ ok: true, emailsSent: totalEmailsSent });
