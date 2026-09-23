@@ -133,6 +133,7 @@ model NewsletterSend {
   sentAt               DateTime                  @default(now())
   recipientCount       Int                       @default(0)
   status               String                    @default("sent")
+  sponsorAnalyticsSentAt DateTime?
   recipients           NewsletterRecipient[]
   spotlightAppearances NewsletterSendSpotlight[]
 
