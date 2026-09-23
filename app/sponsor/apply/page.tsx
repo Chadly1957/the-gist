@@ -3,7 +3,7 @@ import { WorkspaceAnchor } from "@/components/workspace/WorkspaceLink";
 
 import { workspaceFetch } from "@/lib/workspace-client";
 
-import { useState, Suspense } from "react";
+import { useState, Suspense, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "@/components/workspace/WorkspaceLink";
 import Logo from "@/components/Logo";
@@ -57,6 +57,8 @@ function ApplyContent() {
   const [lForm, setLForm] = useState({ businessName: "", description: "", ctaUrl: "", ctaLabel: "Visit Website", logoUrl: "" });
   const [lSubmitting, setLSubmitting] = useState(false);
   const [lError, setLError] = useState("");
+  const [lUploading, setLUploading] = useState(false);
+  const lFileRef = useRef<HTMLInputElement>(null);
 
   // Step 2b — booking (in_article / presenting)
   const [bDates, setBDates] = useState<string[]>([]);
@@ -140,6 +142,27 @@ function ApplyContent() {
       setApplyError("Connection error. Please try again.");
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function handleLogoUpload(file: File) {
+    setLUploading(true);
+    setLError("");
+    const fd = new FormData();
+    fd.append("file", file);
+    fd.append("token", token);
+    try {
+      const res = await workspaceFetch("/api/sponsor/upload", { method: "POST", body: fd });
+      const data = await res.json();
+      if (res.ok) {
+        setLForm((f) => ({ ...f, logoUrl: data.url }));
+      } else {
+        setLError(data.error || "Logo upload failed.");
+      }
+    } catch {
+      setLError("Logo upload failed. Please try again.");
+    } finally {
+      setLUploading(false);
     }
   }
 
@@ -328,6 +351,27 @@ function ApplyContent() {
                 <label className="block text-xs font-semibold text-gray-600 mb-1">Business Name *</label>
                 <input type="text" value={lForm.businessName} onChange={(e) => setLForm((f) => ({ ...f, businessName: e.target.value }))} required
                   className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">Logo</label>
+                <div className="flex gap-2">
+                  <UrlInput value={lForm.logoUrl} onChange={(v) => setLForm((f) => ({ ...f, logoUrl: v }))} placeholder="https://… or upload"
+                    className="flex-1 px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+                  <input ref={lFileRef} type="file" accept="image/*" className="hidden"
+                    onChange={(e) => { const f = e.target.files?.[0]; if (f) handleLogoUpload(f); e.target.value = ""; }} />
+                  <button type="button" onClick={() => lFileRef.current?.click()} disabled={lUploading}
+                    className="px-3 py-2 border border-gray-200 rounded-xl text-xs font-medium text-gray-600 hover:bg-gray-50 whitespace-nowrap disabled:opacity-60">
+                    {lUploading ? "Uploading…" : "Upload Logo"}
+                  </button>
+                </div>
+                {lForm.logoUrl ? (
+                  <div className="mt-2 flex items-center gap-2">
+                    <img src={lForm.logoUrl} alt="Logo preview" className="w-12 h-12 rounded-lg object-contain border border-gray-100 bg-white" />
+                    <button type="button" onClick={() => setLForm((f) => ({ ...f, logoUrl: "" }))}
+                      className="text-xs text-gray-400 hover:text-red-600">Remove</button>
+                  </div>
+                ) : null}
+                <p className="text-[11px] text-gray-400 mt-1">PNG or JPG, under 5MB. Appears next to your listing in the newsletter.</p>
               </div>
               <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-1">
