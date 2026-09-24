@@ -7,8 +7,9 @@
 :root {
   --brand-green: #166534;
   --brand-green-light: #22c55e;
-  /* Per-workspace brand colors. The root layout sets these from the workspace
-     record; the admin layout resets them to the defaults below. */
+  /* Per-workspace brand colors. The root layout sets these per request from
+     the active workspace record (body inline style); they cascade to the
+     whole app, admin included. */
   --gist-primary: #15803d;
   --gist-secondary: #166534;
 }
@@ -65,8 +66,6 @@ body {
    These rules remap Tailwind's green utilities to the workspace's brand
    colors (--gist-primary / --gist-secondary, set per request in the root
    layout). They come after @tailwind utilities so they win ties.
-   The admin layout resets the variables to the defaults, so the admin
-   tool always keeps the classic green look.
 ------------------------------------------------------------------- */
 
 /* Primary: buttons, links, accents (default #15803d) */

@@ -199,7 +199,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   if (pathname === "/admin/login") return <>{children}</>;
 
   return (
-    <div className="min-h-screen bg-gray-50" style={{ "--gist-primary": "#15803d", "--gist-secondary": "#166534" } as React.CSSProperties}>
+    <div className="min-h-screen bg-gray-50">
       {/* Mobile backdrop */}
       {sidebarOpen && (
         <div
