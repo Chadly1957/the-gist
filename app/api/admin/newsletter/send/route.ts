@@ -132,6 +132,8 @@ export async function POST(req: NextRequest) {
   // Create Poll + PollOption DB records for any poll blocks.
   // Wrapped in try/catch so a missing Poll table (pre-migration) never blocks sending.
   const appUrl = await getWorkspaceUrl();
+  const themeWs = await getWorkspace();
+  const theme = { primary: themeWs.primaryColor, secondary: themeWs.secondaryColor };
   const pollBlocks = blocks.filter((b) => b.type === "poll");
   const pollsMap = new Map<string, PollData>();
   if (pollBlocks.length > 0 && db.poll) {
@@ -200,7 +202,8 @@ export async function POST(req: NextRequest) {
     events,
     pollsMap,
     wordyData,
-    weatherData
+    weatherData,
+    theme
   )
     .replace(
       /\{\{UNSUBSCRIBE_URL\}\}/g,
@@ -246,7 +249,8 @@ export async function POST(req: NextRequest) {
     events,
     pollsMap,
     wordyData,
-    weatherData
+    weatherData,
+    theme
   )
     .replace(/\{\{UNSUBSCRIBE_URL\}\}/g, `${appUrl}/unsubscribe`)
     .replace(/\{\{PROFILE_URL\}\}/g, `${appUrl}/profile`)

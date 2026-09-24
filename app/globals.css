@@ -7,6 +7,11 @@
 :root {
   --brand-green: #166534;
   --brand-green-light: #22c55e;
+  /* Per-workspace brand colors. The root layout sets these per request from
+     the active workspace record (body inline style); they cascade to the
+     whole app, admin included. */
+  --gist-primary: #15803d;
+  --gist-secondary: #166534;
 }
 
 html {
@@ -55,3 +60,46 @@ body {
 .toolbar-btn.active {
   @apply bg-gray-200;
 }
+
+/* ------------------------------------------------------------------
+   Per-workspace brand theming.
+   These rules remap Tailwind's green utilities to the workspace's brand
+   colors (--gist-primary / --gist-secondary, set per request in the root
+   layout). They come after @tailwind utilities so they win ties.
+------------------------------------------------------------------- */
+
+/* Primary: buttons, links, accents (default #15803d) */
+.bg-green-500, .bg-green-600, .bg-green-700 { background-color: var(--gist-primary); }
+.text-green-500, .text-green-600, .text-green-700 { color: var(--gist-primary); }
+.border-green-500, .border-green-600, .border-green-700 { border-color: var(--gist-primary); }
+.ring-green-500, .ring-green-600, .ring-green-700 { --tw-ring-color: var(--gist-primary); }
+.accent-green-700 { accent-color: var(--gist-primary); }
+.focus\:ring-green-500:focus, .focus\:ring-green-600:focus { --tw-ring-color: var(--gist-primary); }
+.focus\:border-green-500:focus { border-color: var(--gist-primary); }
+.hover\:bg-green-600:hover, .hover\:bg-green-700:hover { background-color: var(--gist-primary); }
+.hover\:text-green-600:hover, .hover\:text-green-700:hover { color: var(--gist-primary); }
+
+/* Primary tints, mixed toward white so they follow the brand color */
+.bg-green-50, .hover\:bg-green-50:hover { background-color: color-mix(in srgb, var(--gist-primary) 7%, white); }
+.bg-green-100, .hover\:bg-green-100:hover { background-color: color-mix(in srgb, var(--gist-primary) 13%, white); }
+.bg-green-200 { background-color: color-mix(in srgb, var(--gist-primary) 22%, white); }
+.bg-green-300, .disabled\:bg-green-300:disabled { background-color: color-mix(in srgb, var(--gist-primary) 35%, white); }
+.border-green-100 { border-color: color-mix(in srgb, var(--gist-primary) 25%, white); }
+.border-green-200, .hover\:border-green-200:hover { border-color: color-mix(in srgb, var(--gist-primary) 30%, white); }
+.border-green-300, .hover\:border-green-300:hover { border-color: color-mix(in srgb, var(--gist-primary) 40%, white); }
+.border-green-400, .hover\:border-green-400:hover { border-color: color-mix(in srgb, var(--gist-primary) 55%, white); }
+.ring-green-100 { --tw-ring-color: color-mix(in srgb, var(--gist-primary) 25%, white); }
+.text-green-200 { color: color-mix(in srgb, var(--gist-primary) 70%, white); }
+.text-green-300 { color: color-mix(in srgb, var(--gist-primary) 55%, white); }
+.text-green-400 { color: color-mix(in srgb, var(--gist-primary) 42%, white); }
+.from-green-50 {
+  --tw-gradient-from: color-mix(in srgb, var(--gist-primary) 7%, white) var(--tw-gradient-from-position);
+  --tw-gradient-to: color-mix(in srgb, var(--gist-primary) 7%, transparent) var(--tw-gradient-to-position);
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
+}
+
+/* Secondary: darker headings, hover states (default #166534) */
+.bg-green-800, .bg-green-900 { background-color: var(--gist-secondary); }
+.text-green-800, .text-green-900 { color: var(--gist-secondary); }
+.hover\:bg-green-800:hover { background-color: var(--gist-secondary); }
+.hover\:text-green-800:hover { color: var(--gist-secondary); }

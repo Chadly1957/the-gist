@@ -79,6 +79,14 @@ export interface TrackingConfig {
   sign: (url: string) => string;
 }
 
+/** Brand colors for the email. Primary drives accents, secondary drives the header and buttons. */
+export interface ThemeColors {
+  primary: string;
+  secondary: string;
+}
+
+const DEFAULT_THEME: ThemeColors = { primary: "#16a34a", secondary: "#166534" };
+
 // Type-only import: erased at compile time, so this module stays safe to
 // bundle into client components that render live previews.
 import type { WeatherSnapshot } from "./weather";
@@ -567,7 +575,8 @@ export function renderTemplate(
   events: EventItem[] = [],
   polls?: Map<string, PollData>,
   wordyData?: WordyData,
-  weatherData?: WeatherSnapshot
+  weatherData?: WeatherSnapshot,
+  theme: ThemeColors = DEFAULT_THEME
 ): string {
   const { spotlights = [], presentingSponsor = null, inArticleAds = [] } = sponsors;
 
@@ -618,14 +627,22 @@ export function renderTemplate(
     ? `<img src="${tracking.baseUrl}/api/track/open?r=${RECIPIENT_PLACEHOLDER}" width="1" height="1" alt="" style="display:none;width:1px;height:1px;border:0;" />`
     : "";
 
-  return `<!DOCTYPE html>
+  // Apply the workspace brand colors. The renderer is authored with the
+  // Decatur defaults (#166534 secondary / #16a34a primary); swap them for the
+  // workspace theme so every city gets its own look in email.
+  const themedStyles =
+    theme.primary === DEFAULT_THEME.primary && theme.secondary === DEFAULT_THEME.secondary
+      ? EMAIL_STYLES
+      : EMAIL_STYLES.replaceAll("#166534", theme.secondary).replaceAll("#16a34a", theme.primary);
+
+  let html = `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta http-equiv="X-UA-Compatible" content="IE=edge" />
   <title>The Gist</title>
-  <style>${EMAIL_STYLES}</style>
+  <style>${themedStyles}</style>
 </head>
 <body>
   <div class="wrapper">
@@ -634,4 +651,9 @@ export function renderTemplate(
   ${openPixel}
 </body>
 </html>`;
+
+  if (theme.primary !== DEFAULT_THEME.primary || theme.secondary !== DEFAULT_THEME.secondary) {
+    html = html.replaceAll("#166534", theme.secondary).replaceAll("#16a34a", theme.primary);
+  }
+  return html;
 }

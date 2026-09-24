@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import BlockEditor, { Block } from "@/components/admin/BlockEditor";
 import { renderTemplate } from "@/lib/template-renderer";
 import { sampleWeatherSnapshot } from "@/lib/weather";
+import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
 
 interface Template {
   id: string;
@@ -14,6 +15,7 @@ interface Template {
 }
 
 export default function TemplatesPage() {
+  const { workspace } = useWorkspace();
   const [templates, setTemplates] = useState<Template[]>([]);
   const [selected, setSelected] = useState<Template | null>(null);
   const [loading, setLoading] = useState(true);
@@ -126,7 +128,8 @@ export default function TemplatesPage() {
       undefined,
       undefined,
       undefined,
-      sampleWeatherSnapshot()
+      sampleWeatherSnapshot(),
+      { primary: workspace.primaryColor, secondary: workspace.secondaryColor }
     )
     : "";
 

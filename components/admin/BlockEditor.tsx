@@ -40,7 +40,8 @@ const BLOCK_TYPES: { type: Block["type"]; label: string; icon: string }[] = [
 
 export default function BlockEditor({ blocks, onChange }: BlockEditorProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
-  const dragRef = useRef<number | null>(null);
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [dropIndex, setDropIndex] = useState<number | null>(null);
 
   function addBlock(type: Block["type"]) {
     const defaults: Record<Block["type"], Record<string, string>> = {
@@ -98,12 +99,47 @@ export default function BlockEditor({ blocks, onChange }: BlockEditorProps) {
     onChange(blocks.filter((b) => b.id !== id));
   }
 
-  function moveBlock(index: number, dir: -1 | 1) {
-    const next = index + dir;
-    if (next < 0 || next >= blocks.length) return;
+  function moveBlock(from: number, to: number) {
+    // `to` is the insertion index in the original array; adjust for the
+    // removal of the dragged block when it moves downward.
+    if (to < 0 || to > blocks.length || from === to) return;
     const arr = [...blocks];
-    [arr[index], arr[next]] = [arr[next], arr[index]];
+    const [moved] = arr.splice(from, 1);
+    arr.splice(to > from ? to - 1 : to, 0, moved);
     onChange(arr);
+  }
+
+  function resetDrag() {
+    setDragIndex(null);
+    setDropIndex(null);
+  }
+
+  function handleDragStart(e: React.DragEvent, index: number) {
+    setDragIndex(index);
+    setDropIndex(null);
+    e.dataTransfer.effectAllowed = "move";
+    // Firefox requires setData() for a drag to start
+    e.dataTransfer.setData("text/plain", String(index));
+    // Show the whole block row (not just the handle) as the drag ghost
+    const row = (e.currentTarget as HTMLElement).closest("[data-block-row]");
+    if (row instanceof HTMLElement) e.dataTransfer.setDragImage(row, 24, 24);
+  }
+
+  function handleDragOverRow(e: React.DragEvent, index: number) {
+    // preventDefault is required to allow dropping
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    if (dragIndex === null) return;
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const next = e.clientY < rect.top + rect.height / 2 ? index : index + 1;
+    // Dropping right back where it came from is a no-op: hide the indicator
+    setDropIndex(next === dragIndex || next === dragIndex + 1 ? null : next);
+  }
+
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault();
+    if (dragIndex !== null && dropIndex !== null) moveBlock(dragIndex, dropIndex);
+    resetDrag();
   }
 
   return (
@@ -111,11 +147,27 @@ export default function BlockEditor({ blocks, onChange }: BlockEditorProps) {
       {blocks.map((block, index) => (
         <div
           key={block.id}
-          className="group relative border border-gray-200 rounded-xl bg-white"
+          data-block-row
+          onDragOver={(e) => handleDragOverRow(e, index)}
+          onDrop={handleDrop}
+          className={`group relative border border-gray-200 rounded-xl bg-white transition-opacity ${dragIndex === index ? "opacity-40" : ""}`}
         >
+          {/* Insertion-line indicator shown while dragging */}
+          {dropIndex === index && (
+            <div className="absolute -top-1 left-3 right-3 h-[3px] bg-blue-500 rounded-full pointer-events-none z-10" />
+          )}
           {/* Block controls */}
           <div className="flex items-center justify-between px-4 py-2 border-b border-gray-100 bg-gray-50 rounded-t-xl">
             <div className="flex items-center gap-2">
+              <span
+                draggable
+                onDragStart={(e) => handleDragStart(e, index)}
+                onDragEnd={resetDrag}
+                className="cursor-grab active:cursor-grabbing select-none text-gray-300 hover:text-gray-500 px-1 text-sm leading-none tracking-tighter"
+                title="Drag to reorder"
+              >
+                ⋮⋮
+              </span>
               <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
                 {block.type === "articles" ? "Article List Block" : block.type}
               </span>
@@ -126,26 +178,6 @@ export default function BlockEditor({ blocks, onChange }: BlockEditorProps) {
               )}
             </div>
             <div className="flex items-center gap-1">
-              <button
-                onClick={() => moveBlock(index, -1)}
-                disabled={index === 0}
-                className="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-30"
-                title="Move up"
-              >
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
-                </svg>
-              </button>
-              <button
-                onClick={() => moveBlock(index, 1)}
-                disabled={index === blocks.length - 1}
-                className="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-30"
-                title="Move down"
-              >
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                </svg>
-              </button>
               <button
                 onClick={() =>
                   setEditingId(editingId === block.id ? null : block.id)
@@ -185,6 +217,13 @@ export default function BlockEditor({ blocks, onChange }: BlockEditorProps) {
           )}
         </div>
       ))}
+
+      {/* Insertion-line indicator for dropping after the last block */}
+      {dropIndex === blocks.length && (
+        <div className="relative h-0 pointer-events-none">
+          <div className="absolute top-0 left-3 right-3 h-[3px] bg-blue-500 rounded-full" />
+        </div>
+      )}
 
       {/* Add block buttons */}
       <div className="flex flex-wrap gap-2 pt-2">

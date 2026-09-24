@@ -104,6 +104,8 @@ export async function POST(req: NextRequest) {
     }));
 
   const appUrl = await getWorkspaceUrl();
+  const themeWs = await getWorkspace();
+  const theme = { primary: themeWs.primaryColor, secondary: themeWs.secondaryColor };
 
   // Fetch the weather snapshot at send time (if the template has a weather block).
   // Wrapped in try/catch so a weather API hiccup never blocks the test send.
@@ -133,7 +135,8 @@ export async function POST(req: NextRequest) {
     events,
     undefined,
     undefined,
-    weatherData
+    weatherData,
+    theme
   )
     .replace(/\{\{UNSUBSCRIBE_URL\}\}/g, `${appUrl}/unsubscribe`)
     .replace(/\{\{PROFILE_URL\}\}/g, `${appUrl}/profile?r=preview`)
