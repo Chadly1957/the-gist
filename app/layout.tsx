@@ -11,5 +11,9 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const workspace = await getWorkspace();
   const prefix = headers().get("x-gist-workspace") ? `/w/${workspace.slug}` : "";
-  return <html lang="en"><body><WorkspaceProvider workspace={workspace} prefix={prefix}>{children}</WorkspaceProvider></body></html>;
+  const themeVars = {
+    "--gist-primary": workspace.primaryColor,
+    "--gist-secondary": workspace.secondaryColor,
+  } as React.CSSProperties;
+  return <html lang="en"><body style={themeVars}><WorkspaceProvider workspace={workspace} prefix={prefix}>{children}</WorkspaceProvider></body></html>;
 }

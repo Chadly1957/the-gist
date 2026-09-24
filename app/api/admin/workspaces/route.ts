@@ -8,7 +8,7 @@ export async function GET() {
   if (!await getAdminSession()) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const workspaces = await basePrisma.workspace.findMany({
     orderBy: { createdAt: "asc" },
-    select: { id: true, name: true, slug: true, area: true, domain: true, latitude: true, longitude: true, timezone: true, _count: { select: { subscriberRows: true, sourceRows: true, newsletterSendRows: true } } },
+    select: { id: true, name: true, slug: true, area: true, domain: true, latitude: true, longitude: true, timezone: true, primaryColor: true, secondaryColor: true, _count: { select: { subscriberRows: true, sourceRows: true, newsletterSendRows: true } } },
   });
   return NextResponse.json({ workspaces, currentId: (await getWorkspace()).id });
 }
@@ -19,6 +19,13 @@ function parseCoordinate(value: unknown, min: number, max: number): number | nul
   const n = Number(String(value).trim());
   if (!Number.isFinite(n) || n < min || n > max) return null;
   return n;
+}
+
+function parseColor(value: unknown): string | null | undefined {
+  // Returns undefined when absent/blank, null when invalid, otherwise the hex.
+  if (value === undefined || value === null || String(value).trim() === "") return undefined;
+  const v = String(value).trim();
+  return /^#[0-9a-fA-F]{6}$/.test(v) ? v : null;
 }
 
 const US_TIMEZONES = new Set([
@@ -50,13 +57,18 @@ export async function POST(req: NextRequest) {
   if (!US_TIMEZONES.has(timezone)) {
     return NextResponse.json({ error: "Pick a timezone for this workspace." }, { status: 400 });
   }
+  const primaryColor = parseColor(body?.primaryColor);
+  const secondaryColor = parseColor(body?.secondaryColor);
+  if (primaryColor === null || secondaryColor === null) {
+    return NextResponse.json({ error: "Colors must be hex values like #15803d." }, { status: 400 });
+  }
   // Give the ordinary duplicate case a clear response; the unique constraint
   // and P2002 handler below still handle concurrent creation attempts.
   if (await basePrisma.workspace.findUnique({ where: { slug }, select: { id: true } })) {
     return NextResponse.json({ error: "That workspace URL is already in use." }, { status: 409 });
   }
   try {
-    const workspace = await basePrisma.workspace.create({ data: { name, area, slug, latitude, longitude, timezone } });
+    const workspace = await basePrisma.workspace.create({ data: { name, area, slug, latitude, longitude, timezone, primaryColor: primaryColor ?? "#15803d", secondaryColor: secondaryColor ?? "#166534" } });
     return NextResponse.json({ workspace }, { status: 201 });
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") return NextResponse.json({ error: "That workspace URL is already in use." }, { status: 409 });
@@ -72,7 +84,7 @@ export async function PATCH(req: NextRequest) {
   const existing = await basePrisma.workspace.findUnique({ where: { id }, select: { id: true } });
   if (!existing) return NextResponse.json({ error: "Workspace not found." }, { status: 404 });
 
-  const data: { name?: string; area?: string; latitude?: number; longitude?: number; timezone?: string } = {};
+  const data: { name?: string; area?: string; latitude?: number; longitude?: number; timezone?: string; primaryColor?: string; secondaryColor?: string } = {};
   const name = typeof body?.name === "string" ? body.name.trim() : undefined;
   const area = typeof body?.area === "string" ? body.area.trim() : undefined;
   if (name !== undefined) {
@@ -103,6 +115,16 @@ export async function PATCH(req: NextRequest) {
     }
     data.timezone = timezone;
   }
+  const primaryColor = parseColor(body?.primaryColor);
+  if (primaryColor === null) {
+    return NextResponse.json({ error: "Primary color must be a hex value like #15803d." }, { status: 400 });
+  }
+  if (primaryColor !== undefined) data.primaryColor = primaryColor;
+  const secondaryColor = parseColor(body?.secondaryColor);
+  if (secondaryColor === null) {
+    return NextResponse.json({ error: "Secondary color must be a hex value like #166534." }, { status: 400 });
+  }
+  if (secondaryColor !== undefined) data.secondaryColor = secondaryColor;
   if (Object.keys(data).length === 0) {
     return NextResponse.json({ error: "Nothing to update." }, { status: 400 });
   }

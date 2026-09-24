@@ -315,7 +315,8 @@ export default function ComposePage() {
       undefined,
       undefined,
       undefined,
-      sampleWeatherSnapshot()
+      sampleWeatherSnapshot(),
+      { primary: workspace.primaryColor, secondary: workspace.secondaryColor }
     );
   }
 

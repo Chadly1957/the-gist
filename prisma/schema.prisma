@@ -16,6 +16,8 @@ model Workspace {
   latitude                    Float?
   longitude                   Float?
   timezone                    String?
+  primaryColor                String                    @default("#15803d")
+  secondaryColor              String                    @default("#166534")
   createdAt                   DateTime                  @default(now())
   sourceRows                  Source[]
   articleRows                 Article[]

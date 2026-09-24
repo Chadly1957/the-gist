@@ -33,6 +33,8 @@ function WorkspaceEditor({
   const [latitude, setLatitude] = useState(workspace.latitude?.toString() ?? "");
   const [longitude, setLongitude] = useState(workspace.longitude?.toString() ?? "");
   const [timezone, setTimezone] = useState(workspace.timezone ?? "America/Chicago");
+  const [primaryColor, setPrimaryColor] = useState(workspace.primaryColor);
+  const [secondaryColor, setSecondaryColor] = useState(workspace.secondaryColor);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -44,11 +46,11 @@ function WorkspaceEditor({
       const res = await workspaceFetch("/api/admin/workspaces", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: workspace.id, name, area, latitude, longitude, timezone }),
+        body: JSON.stringify({ id: workspace.id, name, area, latitude, longitude, timezone, primaryColor, secondaryColor }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Could not save workspace.");
-      onSaved({ ...workspace, name: data.workspace.name, area: data.workspace.area, latitude: data.workspace.latitude, longitude: data.workspace.longitude, timezone: data.workspace.timezone });
+      onSaved({ ...workspace, name: data.workspace.name, area: data.workspace.area, latitude: data.workspace.latitude, longitude: data.workspace.longitude, timezone: data.workspace.timezone, primaryColor: data.workspace.primaryColor, secondaryColor: data.workspace.secondaryColor });
       setOpen(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not save workspace.");
@@ -88,6 +90,22 @@ function WorkspaceEditor({
           {TIMEZONES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
         </select>
       </label>
+      <div className="grid grid-cols-2 gap-3">
+        <label className="text-xs font-medium text-gray-600">Primary color
+          <span className="mt-1 flex items-center gap-2">
+            <input type="color" value={primaryColor} onChange={(e) => setPrimaryColor(e.target.value)} className="h-9 w-12 cursor-pointer rounded border border-gray-200 bg-white p-1" />
+            <input value={primaryColor} onChange={(e) => setPrimaryColor(e.target.value)} pattern="#[0-9a-fA-F]{6}" maxLength={7} className="block w-full rounded-lg border border-gray-200 p-2 text-sm font-mono" />
+          </span>
+          <span className="block mt-1 text-[11px] font-normal text-gray-400">Buttons, links, accents</span>
+        </label>
+        <label className="text-xs font-medium text-gray-600">Secondary color
+          <span className="mt-1 flex items-center gap-2">
+            <input type="color" value={secondaryColor} onChange={(e) => setSecondaryColor(e.target.value)} className="h-9 w-12 cursor-pointer rounded border border-gray-200 bg-white p-1" />
+            <input value={secondaryColor} onChange={(e) => setSecondaryColor(e.target.value)} pattern="#[0-9a-fA-F]{6}" maxLength={7} className="block w-full rounded-lg border border-gray-200 p-2 text-sm font-mono" />
+          </span>
+          <span className="block mt-1 text-[11px] font-normal text-gray-400">Darker headings, email header</span>
+        </label>
+      </div>
       {error && <p className="text-xs text-red-600">{error}</p>}
       <div className="flex gap-2">
         <button disabled={saving} className="rounded-lg bg-green-700 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50">{saving ? "Saving…" : "Save"}</button>
@@ -109,6 +127,8 @@ export default function WorkspacesPage() {
   const [latitude, setLatitude] = useState("");
   const [longitude, setLongitude] = useState("");
   const [timezone, setTimezone] = useState("America/Chicago");
+  const [primaryColor, setPrimaryColor] = useState("#15803d");
+  const [secondaryColor, setSecondaryColor] = useState("#166534");
   useEffect(() => {
     workspaceFetch("/api/admin/workspaces").then(async r => {
       if (!r.ok) throw new Error("Could not load workspaces. Please reload to try again.");
@@ -118,7 +138,7 @@ export default function WorkspacesPage() {
   async function create(e: React.FormEvent) {
     e.preventDefault(); setSaving(true); setError("");
     try {
-      const response = await workspaceFetch("/api/admin/workspaces", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, area, slug, latitude, longitude, timezone }) });
+      const response = await workspaceFetch("/api/admin/workspaces", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, area, slug, latitude, longitude, timezone, primaryColor, secondaryColor }) });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Could not create workspace.");
       window.location.assign(`/w/${data.workspace.slug}/admin`);
@@ -135,6 +155,11 @@ export default function WorkspacesPage() {
         <h2 className="text-xl font-semibold mt-2">{item.name}</h2>
         <p className="text-xs text-gray-500 mt-1">
           📍 {item.latitude != null && item.longitude != null ? `${item.latitude}, ${item.longitude}` : "No location set"} · {tzLabel(item.timezone)}
+        </p>
+        <p className="mt-2 flex items-center gap-2">
+          <span className="inline-block h-5 w-5 rounded-full border border-gray-200" style={{ background: item.primaryColor }} title={`Primary ${item.primaryColor}`} />
+          <span className="inline-block h-5 w-5 rounded-full border border-gray-200" style={{ background: item.secondaryColor }} title={`Secondary ${item.secondaryColor}`} />
+          <span className="text-xs text-gray-400 font-mono">{item.primaryColor} · {item.secondaryColor}</span>
         </p>
         <div className="flex gap-6 mt-6 text-sm"><p><strong className="block text-xl">{item._count.subscriberRows.toLocaleString()}</strong>Subscribers</p><p><strong className="block text-xl">{item._count.sourceRows}</strong>Sources</p><p><strong className="block text-xl">{item._count.newsletterSendRows}</strong>Issues</p></div>
         <div className="flex gap-5 mt-6 items-center"><WorkspaceAnchor href={`/w/${item.slug}/admin`} className="text-sm font-semibold text-green-800 hover:underline">Open workspace →</WorkspaceAnchor><WorkspaceAnchor href={`/w/${item.slug}`} target="_blank" rel="noreferrer" className="text-sm text-gray-600 hover:underline">View website ↗</WorkspaceAnchor></div>
@@ -160,6 +185,24 @@ export default function WorkspacesPage() {
             <select value={timezone} onChange={e => setTimezone(e.target.value)} className="mt-1 block w-full rounded-lg border p-2.5 bg-white">
               {TIMEZONES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
             </select>
+          </label>
+        </div>
+      </div>
+      <div className="mt-4 rounded-xl bg-violet-50 border border-violet-200 p-4">
+        <p className="text-sm font-semibold text-violet-900">Brand colors</p>
+        <p className="text-xs text-violet-700 mt-1 mb-3">Gives this city its own look on the website and in emails. Primary drives buttons and links; secondary drives darker headings and the email header.</p>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <label className="text-sm font-medium">Primary color
+            <span className="mt-1 flex items-center gap-2">
+              <input type="color" value={primaryColor} onChange={e => setPrimaryColor(e.target.value)} className="h-10 w-14 cursor-pointer rounded border border-gray-200 bg-white p-1" />
+              <input value={primaryColor} onChange={e => setPrimaryColor(e.target.value)} pattern="#[0-9a-fA-F]{6}" maxLength={7} className="block w-full rounded-lg border p-2.5 bg-white font-mono" />
+            </span>
+          </label>
+          <label className="text-sm font-medium">Secondary color
+            <span className="mt-1 flex items-center gap-2">
+              <input type="color" value={secondaryColor} onChange={e => setSecondaryColor(e.target.value)} className="h-10 w-14 cursor-pointer rounded border border-gray-200 bg-white p-1" />
+              <input value={secondaryColor} onChange={e => setSecondaryColor(e.target.value)} pattern="#[0-9a-fA-F]{6}" maxLength={7} className="block w-full rounded-lg border p-2.5 bg-white font-mono" />
+            </span>
           </label>
         </div>
       </div>
