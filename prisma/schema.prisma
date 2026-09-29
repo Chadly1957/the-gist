@@ -31,6 +31,10 @@ model Workspace {
   sponsorProfileRows          SponsorProfile[]
   spotlightListingRows        SpotlightListing[]
   adBookingRows               AdBooking[]
+  sponsorWeekRows             SponsorWeek[]
+  sponsorHoldRows             SponsorHold[]
+  sponsorWeekBookingRows      SponsorWeekBooking[]
+  sponsorDayConfigRows        SponsorDayConfig[]
   gameSponsorEventRows        GameSponsorEvent[]
   eventRows                   Event[]
   referralSprintRows          ReferralSprint[]
@@ -214,6 +218,7 @@ model SponsorProfile {
   createdAt     DateTime           @default(now())
   spotlights    SpotlightListing[]
   bookings      AdBooking[]
+  weekBookings  SponsorWeekBooking[]
   events        Event[]
   wordyBookings WordyBooking[]
 
@@ -236,6 +241,7 @@ model SpotlightListing {
   status          String                    @default("pending")
   lastShownAt     DateTime?
   shownCount      Int                       @default(0)
+  upgradeNudgeSentAt DateTime?
   createdAt       DateTime                  @default(now())
   approvedAt      DateTime?
   sendAppearances NewsletterSendSpotlight[]
@@ -254,6 +260,9 @@ model AdBooking {
   date              String
   status            String             @default("pending_review")
   isPaid            Boolean            @default(false)
+  // $0 comp/house placement (spec section 12). Marked in admin only; the
+  // newsletter renders it like any other ad.
+  isComp            Boolean            @default(false)
   discountPct       Int                @default(0)
   stripeSessionId   String?
   imageUrl          String?
@@ -263,6 +272,9 @@ model AdBooking {
   ctaLabel          String             @default("Learn More")
   presentingBlurb   String?
   adminNotes        String?
+  // Set when this row was projected from a week-based SponsorWeekBooking.
+  sponsorWeekBookingId String?
+  sponsorWeekBooking   SponsorWeekBooking? @relation(fields: [sponsorWeekBookingId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
   createdAt         DateTime           @default(now())
   approvedAt        DateTime?
   gameSponsorEvents GameSponsorEvent[]
@@ -270,6 +282,90 @@ model AdBooking {
   @@unique([id, workspaceId])
   @@index([stripeSessionId])
   @@index([workspaceId])
+  @@index([sponsorWeekBookingId])
+}
+
+model SponsorDayConfig {
+  workspaceId  String    @default("decatur")
+  workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  date         String    // YYYY-MM-DD of the newsletter issue
+  maxInArticle Int       @default(2) // per-issue standard-slot override (soft cap)
+  createdAt    DateTime  @default(now())
+
+  @@id([workspaceId, date])
+  @@index([workspaceId])
+}
+
+// Week-based sponsor packages (Presenting $150/wk, Standard $75/wk).
+// One row per calendar week (Monday date string); the row doubles as the
+// lock target for atomic slot assignment (SELECT ... FOR UPDATE).
+model SponsorWeek {
+  workspaceId String               @default("decatur")
+  workspace   Workspace            @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  id          String               @id @default(cuid())
+  weekStart   String               // Monday, YYYY-MM-DD
+  createdAt   DateTime             @default(now())
+  holds       SponsorHold[]
+  bookings    SponsorWeekBooking[]
+
+  @@unique([workspaceId, weekStart])
+  @@unique([id, workspaceId])
+  @@index([workspaceId])
+}
+
+// Short-lived slot reservation while the buyer fills the business form.
+model SponsorHold {
+  workspaceId String      @default("decatur")
+  workspace   Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  id          String      @id @default(cuid())
+  weekId      String
+  week        SponsorWeek @relation(fields: [weekId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
+  tier        String      // "presenting" | "standard"
+  holdToken   String      @unique @default(cuid())
+  expiresAt   DateTime
+  createdAt   DateTime    @default(now())
+
+  @@unique([id, workspaceId])
+  @@index([workspaceId])
+  @@index([expiresAt])
+}
+
+model SponsorWeekBooking {
+  workspaceId     String         @default("decatur")
+  workspace       Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  id              String         @id @default(cuid())
+  weekId          String
+  week            SponsorWeek    @relation(fields: [weekId, workspaceId], references: [id, workspaceId], onDelete: Restrict)
+  sponsorId       String
+  sponsor         SponsorProfile @relation(fields: [sponsorId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
+  tier            String         // "presenting" | "standard"
+  status          String         @default("pending_payment") // pending_payment -> paid -> completed | cancelled
+  amountCents     Int
+  stripeSessionId String?
+  businessName    String
+  contactName     String
+  email           String
+  website         String?
+  logoUrl         String
+  aboutText       String
+  chadWritesCopy  Boolean        @default(true)
+  finalAdCopy     String?
+  copyFinalizedAt DateTime?
+  rebookToken     String         @unique @default(cuid())
+  resultsSentAt   DateTime?
+  renewalSentAt   DateTime?
+  paidAt          DateTime?
+  ownerNotifiedAt   DateTime?
+  buyerNotifiedAt   DateTime?
+  fulfillmentAlertSentAt DateTime?
+  createdAt       DateTime       @default(now())
+  adBookingRows   AdBooking[]
+
+  @@unique([id, workspaceId])
+  @@index([workspaceId])
+  @@index([stripeSessionId])
+  @@index([weekId])
+  @@index([status])
 }
 
 model GameSponsorEvent {

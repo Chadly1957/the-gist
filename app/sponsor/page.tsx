@@ -1,79 +1,56 @@
 import WorkspaceText from "@/components/workspace/WorkspaceText";
 import { WorkspaceAnchor } from "@/components/workspace/WorkspaceLink";
 import Link from "@/components/workspace/WorkspaceLink";
-import { prisma } from "@/lib/db";
 import Logo from "@/components/Logo";
 import SponsorsMarquee from "@/components/SponsorsMarquee";
 
 export const dynamic = "force-dynamic";
 
-const TIER_DEFAULTS = {
-  spotlight: "Free",
-  in_article: "$15/day",
-  presenting: "$25/day",
-};
-
-async function getPrices() {
-  try {
-    const rows = await prisma.setting.findMany({
-      where: { key: { in: ["sponsorship_price_spotlight", "sponsorship_price_in_article", "sponsorship_price_presenting"] } },
-    });
-    const map = Object.fromEntries(rows.map((r) => [r.key, r.value]));
-    return {
-      spotlight: map["sponsorship_price_spotlight"] || TIER_DEFAULTS.spotlight,
-      in_article: map["sponsorship_price_in_article"] || TIER_DEFAULTS.in_article,
-      presenting: map["sponsorship_price_presenting"] || TIER_DEFAULTS.presenting,
-    };
-  } catch {
-    return TIER_DEFAULTS;
-  }
-}
-
 export default async function SponsorPage() {
-  const prices = await getPrices();
-
   const TIERS = [
     {
-      key: "spotlight",
-      name: "Community Partners",
-      price: prices.spotlight,
+      key: "community",
+      name: "Community Board",
+      price: "Free",
       description:
-        "Get your business in front of local readers every week. Your listing rotates in a group of up to 5 local businesses and appears in every newsletter we send.",
+        "Your business name, logo, one-line description, and link, rotating at the bottom of every newsletter. Accepted instantly, no payment needed.",
       includes: [
-        "Your logo, business name, and a 1-2 sentence description",
-        "A direct link to your website",
-        "Rotating placement, everyone gets equal visibility",
+        "Business name, logo, and a one-line description",
+        "Direct link to your website",
+        "Rotates at the bottom of every issue",
       ],
-      cta: "Apply for Free",
+      cta: "Join the Board",
+      ctaHref: "/sponsor/community",
       highlight: false,
     },
     {
-      key: "in_article",
-      name: "Standard Sponsorship",
-      price: prices.in_article,
+      key: "standard",
+      name: "Standard Sponsor",
+      price: "$75/week",
       description:
-        "Your message appears inline with the day's news, labeled as a sponsored post. Choose any available dates on the calendar.",
+        "Your logo and a short write-up placed mid-email, running in every issue for a full week, Monday through Friday.",
       includes: [
-        "Custom image, headline, and up to 250 characters of body copy",
-        "A call-to-action link",
-        "Up to 2 standard ad slots per day",
+        "Logo, short write-up, and link in every issue that week",
+        "Mid-email placement, sized for attention",
+        "Two Standard slots available each week",
       ],
-      cta: "Reserve Dates",
+      cta: "Book a Week",
+      ctaHref: "/sponsor/apply?tier=standard",
       highlight: false,
     },
     {
       key: "presenting",
       name: "Presenting Sponsor",
-      price: prices.presenting,
+      price: "$150/week",
       description:
-        "The top sponsorship slot. You're featured as the day's presenting sponsor with a mention in the opening, plus a full standard ad placement, outside the 2-slot limit — and the same placement carries over to Wordy and Gist Match.",
+        "The top sponsorship slot. Featured as the week's presenting sponsor at the very top of every issue, Monday through Friday.",
       includes: [
-        "\"Today's Gist is brought to you by [Your Business]\" opening mention",
-        "Full standard ad placement (does not count against the 2-slot cap)",
-        "Featured at the top of Wordy and Gist Match, every day you're booked",
-        "Exclusive: only 1 presenting sponsor per day",
+        "\"This issue is brought to you by [Your Business]\": top of the email",
+        "Your logo, a short write-up, and link",
+        "Exclusive: only 1 Presenting Sponsor per week",
       ],
-      cta: "Reserve Dates",
+      cta: "Book a Week",
+      ctaHref: "/sponsor/apply?tier=presenting",
       highlight: true,
     },
   ];
@@ -129,7 +106,7 @@ export default async function SponsorPage() {
                 ))}
               </ul>
               <Link
-                href={`/sponsor/apply?tier=${tier.key}`}
+                href={tier.ctaHref}
                 className={`block text-center py-2.5 rounded-xl text-sm font-semibold transition-colors ${
                   tier.highlight
                     ? "bg-green-700 text-white hover:bg-green-800"

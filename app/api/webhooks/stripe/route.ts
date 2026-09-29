@@ -1,9 +1,50 @@
 import { NextRequest, NextResponse } from "next/server";
 import { basePrisma } from "@/lib/db-base";
 import { DEFAULT_WORKSPACE_ID } from "@/lib/workspace-constants";
+import { withWorkspace } from "@/lib/workspace";
 import Stripe from "stripe";
+import { alertBookingFailureOnce } from "@/lib/sponsor-booking-alerts";
 
 export const dynamic = "force-dynamic";
+
+async function fulfillWeekBooking(workspaceId: string, session: Stripe.Checkout.Session) {
+  const booking = await basePrisma.sponsorWeekBooking.findFirst({
+    where: { workspaceId, stripeSessionId: session.id },
+    include: { week: { select: { weekStart: true } }, sponsor: { select: { magicToken: true } } },
+  });
+
+  const { getWorkspaceUrl } = await import("@/lib/workspace");
+  const workspace = await basePrisma.workspace.findUnique({ where: { id: workspaceId } });
+  const appUrl = workspace ? await withWorkspace(workspace, () => getWorkspaceUrl()) : "";
+
+  if (!booking) {
+    // The booking row is missing but Stripe says payment completed. This can
+    // happen if checkout.session.expired was processed out of order and
+    // deleted the pending row. Money is captured with no booking: alert loudly.
+    if (session.payment_status === "paid") {
+      console.error(`Sponsor week payment captured but no booking row for session ${session.id}`);
+      await alertBookingFailureOnce(
+        workspaceId,
+        {
+          id: session.id,
+          businessName: session.customer_details?.name || "Unknown business",
+          tier: session.metadata?.tier || "standard",
+          weekStart: session.metadata?.weekStart || "",
+          amountCents: session.amount_total ?? 0,
+          contactName: session.customer_details?.name || "",
+          email: session.customer_details?.email || "",
+          fulfillmentAlertSentAt: null,
+        },
+        `Stripe reports payment captured for checkout session ${session.id}, but no matching sponsor week booking exists. The slot was never locked and no ad was placed.`,
+        `${appUrl}/admin/sponsors?tab=weekly`,
+      );
+    }
+    return;
+  }
+
+  const { fulfillPaidWeekBooking } = await import("@/lib/sponsor-week-fulfillment");
+  await fulfillPaidWeekBooking(workspaceId, booking);
+}
 
 export async function POST(req: NextRequest) {
   if (!process.env.STRIPE_SECRET_KEY || !process.env.STRIPE_WEBHOOK_SECRET) {
@@ -27,10 +68,14 @@ export async function POST(req: NextRequest) {
 
   if (event.type === "checkout.session.completed") {
     const approvedAt = new Date();
-    await basePrisma.adBooking.updateMany({
-      where: { workspaceId, stripeSessionId: sessionId, status: "pending_payment" },
-      data: { isPaid: true, status: "approved", approvedAt },
-    });
+    if (session.metadata?.kind === "sponsor_week") {
+      await fulfillWeekBooking(workspaceId, session);
+    } else {
+      await basePrisma.adBooking.updateMany({
+        where: { workspaceId, stripeSessionId: sessionId, status: "pending_payment" },
+        data: { isPaid: true, status: "approved", approvedAt },
+      });
+    }
     await basePrisma.tip.updateMany({
       where: { workspaceId, stripeSessionId: sessionId, status: "pending_payment" },
       data: { status: "paid", paidAt: approvedAt },
@@ -38,6 +83,9 @@ export async function POST(req: NextRequest) {
   }
 
   if (event.type === "checkout.session.expired") {
+    await basePrisma.sponsorWeekBooking.deleteMany({
+      where: { workspaceId, stripeSessionId: sessionId, status: "pending_payment" },
+    });
     await basePrisma.adBooking.deleteMany({
       where: { workspaceId, stripeSessionId: sessionId, status: "pending_payment" },
     });

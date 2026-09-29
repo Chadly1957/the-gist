@@ -65,7 +65,12 @@ export async function POST(req: NextRequest) {
     (await prisma.setting.findMany()).map((r) => [r.key, r.value])
   );
   const spotlightCount = Math.max(1, parseInt(allSettings.spotlight_count || "5") || 5);
-  const inArticleCount = Math.max(1, parseInt(allSettings.in_article_count || "2") || 2);
+  // Standard slots are a soft cap (spec section 12): a per-issue override in
+  // SponsorDayConfig wins, otherwise fall back to the in_article_count setting.
+  const dayConfig = await prisma.sponsorDayConfig.findUnique({
+    where: await workspaceUnique("date", date),
+  });
+  const inArticleCount = Math.max(1, dayConfig?.maxInArticle ?? (parseInt(allSettings.in_article_count || "2") || 2));
 
   const dateEnd = new Date(date + "T00:00:00");
   dateEnd.setDate(dateEnd.getDate() + 30);

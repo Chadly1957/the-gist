@@ -3,7 +3,8 @@ import { WorkspaceAnchor } from "@/components/workspace/WorkspaceLink";
 
 import { workspaceFetch } from "@/lib/workspace-client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import SponsorPreview from "@/components/SponsorPreview";
 import UrlInput from "@/components/UrlInput";
 import MultiDateCalendar from "@/components/MultiDateCalendar";
@@ -28,6 +29,7 @@ interface Booking {
   date: string;
   status: string;
   isPaid: boolean;
+  isComp: boolean;
   headline: string;
   body: string;
   ctaUrl: string;
@@ -50,6 +52,52 @@ interface Profile {
   notes: string | null;
   createdAt: string;
   portalUrl: string;
+}
+
+interface WeekBooking {
+  id: string;
+  weekStart: string;
+  tier: string;
+  status: string;
+  amountCents: number;
+  businessName: string;
+  contactName: string;
+  email: string;
+  website: string | null;
+  logoUrl: string;
+  aboutText: string;
+  chadWritesCopy: boolean;
+  finalAdCopy: string | null;
+  copyFinalizedAt: string | null;
+  createdAt: string;
+}
+
+interface CopyTask extends WeekBooking {}
+
+interface TierAvailability {
+  tier: string;
+  state: string;
+  taken: number;
+  slots: number;
+}
+
+interface WeekAvail {
+  weekStart: string;
+  label: string;
+  tiers: TierAvailability[];
+}
+
+// "MMM d - MMM d" for a Monday weekStart, e.g. "Sep 28 - Oct 2".
+function formatWeekLabel(weekStart: string) {
+  const [y, m, d] = weekStart.split("-").map(Number);
+  const start = new Date(y, m - 1, d);
+  const end = new Date(y, m - 1, d + 4);
+  const opts: Intl.DateTimeFormatOptions = { month: "short", day: "numeric" };
+  return `${start.toLocaleDateString("en-US", opts)} - ${end.toLocaleDateString("en-US", opts)}`;
+}
+
+function tierLabel(tier: string) {
+  return tier === "presenting" ? "Presenting" : tier === "standard" ? "Standard" : tier;
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -178,11 +226,22 @@ function BookingsCalendar({
   );
 }
 
-export default function AdminSponsorsPage() {
-  const [tab, setTab] = useState<"spotlights" | "bookings" | "profiles" | "pricing">("spotlights");
+function AdminSponsorsContent() {
+  const searchParams = useSearchParams();
+  const validTabs = ["weekly", "spotlights", "bookings", "profiles", "pricing"] as const;
+  const initialTab = validTabs.includes(searchParams.get("tab") as (typeof validTabs)[number])
+    ? (searchParams.get("tab") as (typeof validTabs)[number])
+    : "weekly";
+  const highlightId = searchParams.get("highlight") || "";
+  const [tab, setTab] = useState<(typeof validTabs)[number]>(initialTab);
   const [spotlights, setSpotlights] = useState<Spotlight[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [weekBookings, setWeekBookings] = useState<WeekBooking[]>([]);
+  const [copyQueue, setCopyQueue] = useState<CopyTask[]>([]);
+  const [weekAvail, setWeekAvail] = useState<WeekAvail[]>([]);
+  const [copyDrafts, setCopyDrafts] = useState<Record<string, string>>({});
+  const [finalizingId, setFinalizingId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [previewId, setPreviewId] = useState<string | null>(null);
@@ -364,7 +423,7 @@ export default function AdminSponsorsPage() {
   const [editingSpotlightId, setEditingSpotlightId] = useState<string | null>(null);
   const [spotlightForm, setSpotlightForm] = useState({ businessName: "", logoUrl: "", description: "", ctaLabel: "", ctaUrl: "" });
   const [editingBookingId, setEditingBookingId] = useState<string | null>(null);
-  const [bookingForm, setBookingForm] = useState({ type: "in_article", date: "", headline: "", body: "", ctaUrl: "", ctaLabel: "", imageUrl: "", presentingBlurb: "" });
+  const [bookingForm, setBookingForm] = useState({ type: "in_article", date: "", headline: "", body: "", ctaUrl: "", ctaLabel: "", imageUrl: "", presentingBlurb: "", isComp: false });
   const [bookingAutoFilled, setBookingAutoFilled] = useState(false);
 
   // Pricing state
@@ -396,9 +455,177 @@ export default function AdminSponsorsPage() {
     } finally {
       setLoading(false);
     }
+    loadWeekly();
   }
 
   useEffect(() => { load(); }, []);
+
+  // Deep link from notification emails: ?tab=weekly&highlight=<bookingId>
+  useEffect(() => {
+    if (!highlightId || copyQueue.length === 0) return;
+    const el = document.getElementById(`booking-${highlightId}`);
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [highlightId, copyQueue]);
+
+  async function loadWeekly() {
+    try {
+      const [wbRes, cqRes, waRes] = await Promise.all([
+        workspaceFetch("/api/admin/sponsors/week-bookings"),
+        workspaceFetch("/api/admin/sponsors/copy-queue"),
+        workspaceFetch("/api/sponsor/weeks"),
+      ]);
+      const wb = await wbRes.json();
+      const cq = await cqRes.json();
+      const wa = await waRes.json();
+      setWeekBookings(Array.isArray(wb) ? wb : []);
+      setCopyQueue(Array.isArray(cq) ? cq : []);
+      setWeekAvail(wa.weeks || []);
+    } catch (err) {
+      console.error("[sponsors] weekly load failed:", err);
+    }
+  }
+
+  async function finalizeCopy(bookingId: string) {
+    const copy = (copyDrafts[bookingId] || "").trim();
+    if (!copy) { alert("Write the final ad copy first."); return; }
+    setFinalizingId(bookingId);
+    try {
+      const res = await workspaceFetch("/api/admin/sponsors/copy-queue", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bookingId, finalAdCopy: copy }),
+      });
+      if (!res.ok) { alert("Failed to finalize copy."); return; }
+      setCopyDrafts((d) => { const n = { ...d }; delete n[bookingId]; return n; });
+      await loadWeekly();
+    } finally {
+      setFinalizingId(null);
+    }
+  }
+
+  // Admin direct ad placement (spec section 12): book a full week or place
+  // ads on individual days, paid (offline) or $0 comp/house.
+  const [placeMode, setPlaceMode] = useState<"week" | "day">("week");
+  const [placeForm, setPlaceForm] = useState({
+    profileId: "",
+    tier: "standard",
+    weekStart: "",
+    date: "",
+    headline: "",
+    body: "",
+    ctaUrl: "",
+    ctaLabel: "",
+    imageUrl: "",
+    isComp: false,
+  });
+  const [placeSubmitting, setPlaceSubmitting] = useState(false);
+  const [placeError, setPlaceError] = useState<string | null>(null);
+  const [placeOk, setPlaceOk] = useState<string | null>(null);
+
+  function setPlace<K extends keyof typeof placeForm>(k: K, v: (typeof placeForm)[K]) {
+    setPlaceForm((f) => ({ ...f, [k]: v }));
+  }
+
+  async function submitPlaceAd() {
+    setPlaceError(null);
+    setPlaceOk(null);
+    if (!placeForm.profileId) { setPlaceError("Pick a business."); return; }
+    if (!placeForm.headline.trim() || !placeForm.body.trim() || !placeForm.ctaUrl.trim()) {
+      setPlaceError("Headline, body, and link are required.");
+      return;
+    }
+    setPlaceSubmitting(true);
+    try {
+      const type = placeForm.tier === "presenting" ? "presenting" : "in_article";
+      const res = placeMode === "week"
+        ? await workspaceFetch("/api/admin/sponsors/week-bookings", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              sponsorId: placeForm.profileId,
+              tier: placeForm.tier,
+              weekStart: placeForm.weekStart,
+              headline: placeForm.headline.trim(),
+              body: placeForm.body.trim(),
+              ctaUrl: placeForm.ctaUrl.trim(),
+              ctaLabel: placeForm.ctaLabel.trim(),
+              imageUrl: placeForm.imageUrl.trim(),
+              isComp: placeForm.isComp,
+            }),
+          })
+        : await workspaceFetch("/api/admin/sponsors/bookings", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              profileId: placeForm.profileId,
+              type,
+              date: placeForm.date,
+              headline: placeForm.headline.trim(),
+              body: placeForm.body.trim(),
+              ctaUrl: placeForm.ctaUrl.trim(),
+              ctaLabel: placeForm.ctaLabel.trim() || "Learn More",
+              imageUrl: placeForm.imageUrl.trim(),
+              isComp: placeForm.isComp,
+            }),
+          });
+      const data = await res.json();
+      if (!res.ok) {
+        setPlaceError(data.error || "Placement failed.");
+        setPlaceSubmitting(false);
+        return;
+      }
+      const n = placeMode === "week" ? 5 : 1;
+      setPlaceOk(
+        placeForm.isComp
+          ? `Comp placement created (${n} day${n > 1 ? "s" : ""}). Marked COMP in admin, renders like a normal ad.`
+          : `Ad placed for ${n} day${n > 1 ? "s" : ""}.`
+      );
+      setPlaceForm((f) => ({ ...f, headline: "", body: "", ctaUrl: "", ctaLabel: "", imageUrl: "", isComp: false }));
+      load();
+      loadWeekly();
+    } catch {
+      setPlaceError("Network error.");
+    }
+    setPlaceSubmitting(false);
+  }
+
+  // Record an offline payment for a week booking stuck in pending_payment
+  // (the BIG H case). Same fulfillment as the Stripe webhook.
+  const [markPaidId, setMarkPaidId] = useState<string | null>(null);
+  async function markWeekPaid(id: string) {
+    if (!confirm("Record this week booking as paid? This places the ad and sends the buyer confirmation.")) return;
+    setMarkPaidId(id);
+    try {
+      const res = await workspaceFetch(`/api/admin/sponsors/week-bookings/${id}/mark-paid`, { method: "POST" });
+      if (!res.ok) { alert("Mark as paid failed."); return; }
+      await loadWeekly();
+    } finally {
+      setMarkPaidId(null);
+    }
+  }
+
+  // Per-issue standard-slot override (soft cap).
+  const [slotDate, setSlotDate] = useState("");
+  const [slotCount, setSlotCount] = useState("3");
+  const [slotSaving, setSlotSaving] = useState(false);
+  const [slotMsg, setSlotMsg] = useState<string | null>(null);
+  async function saveSlotOverride() {
+    setSlotMsg(null);
+    if (!slotDate) { setSlotMsg("Pick a date."); return; }
+    setSlotSaving(true);
+    try {
+      const res = await workspaceFetch("/api/admin/sponsors/day-config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ date: slotDate, maxInArticle: parseInt(slotCount, 10) }),
+      });
+      const data = await res.json();
+      setSlotMsg(res.ok ? (data.cleared ? "Override cleared (back to 2)." : `Saved: ${slotDate} allows ${data.config.maxInArticle} standard ads.`) : (data.error || "Save failed."));
+    } catch {
+      setSlotMsg("Network error.");
+    }
+    setSlotSaving(false);
+  }
 
   async function savePrices() {
     setPriceSaving(true);
@@ -467,6 +694,7 @@ export default function AdminSponsorsPage() {
       ctaLabel: copy.ctaLabel,
       imageUrl: copy.imageUrl || "",
       presentingBlurb: copy.presentingBlurb || "",
+      isComp: copy.isComp === true,
     });
     setExpandedId(copy.id);
     setEditingBookingId(copy.id);
@@ -501,6 +729,7 @@ export default function AdminSponsorsPage() {
       ctaLabel: b.ctaLabel,
       imageUrl: b.imageUrl || "",
       presentingBlurb: b.presentingBlurb || "",
+      isComp: b.isComp === true,
     });
   }
 
@@ -522,16 +751,27 @@ export default function AdminSponsorsPage() {
 
       {/* Tabs */}
       <div className="flex gap-1 mb-6 border-b border-gray-200">
-        {(["spotlights", "bookings", "profiles", "pricing"] as const).map((t) => (
-          <button key={t} onClick={() => setTab(t)}
-            className={`px-4 py-2 text-sm font-medium capitalize transition-colors border-b-2 -mb-px ${tab === t ? "border-green-600 text-green-700" : "border-transparent text-gray-500 hover:text-gray-700"}`}>
-            {t}
-            {t === "spotlights" && spotlights.filter((s) => s.status === "pending").length > 0 && (
+        {([
+          { id: "weekly", label: "Weekly Packages" },
+          { id: "spotlights", label: "Spotlights" },
+          { id: "bookings", label: "Bookings" },
+          { id: "profiles", label: "Profiles" },
+          { id: "pricing", label: "Pricing" },
+        ] as const).map((t) => (
+          <button key={t.id} onClick={() => setTab(t.id)}
+            className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${tab === t.id ? "border-green-600 text-green-700" : "border-transparent text-gray-500 hover:text-gray-700"}`}>
+            {t.label}
+            {t.id === "weekly" && copyQueue.length > 0 && (
+              <span className="ml-1.5 bg-orange-100 text-orange-700 text-xs font-bold px-1.5 py-0.5 rounded-full">
+                {copyQueue.length}
+              </span>
+            )}
+            {t.id === "spotlights" && spotlights.filter((s) => s.status === "pending").length > 0 && (
               <span className="ml-1.5 bg-orange-100 text-orange-700 text-xs font-bold px-1.5 py-0.5 rounded-full">
                 {spotlights.filter((s) => s.status === "pending").length}
               </span>
             )}
-            {t === "bookings" && bookings.filter((b) => b.status === "pending_review").length > 0 && (
+            {t.id === "bookings" && bookings.filter((b) => b.status === "pending_review").length > 0 && (
               <span className="ml-1.5 bg-orange-100 text-orange-700 text-xs font-bold px-1.5 py-0.5 rounded-full">
                 {bookings.filter((b) => b.status === "pending_review").length}
               </span>
@@ -547,6 +787,227 @@ export default function AdminSponsorsPage() {
       ) : (
         <>
           {/* SPOTLIGHTS */}
+          {/* WEEKLY PACKAGES */}
+          {tab === "weekly" && (
+            <div className="space-y-8">
+              {/* Admin direct placement (spec section 12) */}
+              <section className="bg-white rounded-xl border border-gray-200 p-4">
+                <h2 className="text-lg font-semibold text-gray-900 mb-1">Place an ad</h2>
+                <p className="text-xs text-gray-500 mb-3">
+                  Book a full week or place a single day directly, for money already received offline or as a $0 comp/house placement.
+                  Presenting is capped at 1 per issue on every path.
+                </p>
+                <div className="flex gap-2 mb-3">
+                  {(["week", "day"] as const).map((m) => (
+                    <button
+                      key={m}
+                      onClick={() => setPlaceMode(m)}
+                      className={`px-3 py-1.5 text-sm font-medium rounded-lg border ${placeMode === m ? "bg-green-700 text-white border-green-700" : "border-gray-200 text-gray-600 hover:bg-gray-50"}`}
+                    >
+                      {m === "week" ? "Full week" : "Single day"}
+                    </button>
+                  ))}
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <label className="text-xs text-gray-600">Business
+                    <select value={placeForm.profileId} onChange={(e) => setPlace("profileId", e.target.value)}
+                      className="mt-1 w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm">
+                      <option value="">Select...</option>
+                      {profiles.filter((p) => p.active).map((p) => (
+                        <option key={p.id} value={p.id}>{p.businessName}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="text-xs text-gray-600">Tier
+                    <select value={placeForm.tier} onChange={(e) => setPlace("tier", e.target.value)}
+                      className="mt-1 w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm">
+                      <option value="standard">Standard ($75/wk)</option>
+                      <option value="presenting">Presenting ($150/wk)</option>
+                    </select>
+                  </label>
+                  {placeMode === "week" ? (
+                    <label className="text-xs text-gray-600">Week
+                      <select value={placeForm.weekStart} onChange={(e) => setPlace("weekStart", e.target.value)}
+                        className="mt-1 w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm">
+                        <option value="">Select...</option>
+                        {weekAvail.map((w) => (
+                          <option key={w.weekStart} value={w.weekStart}>{formatWeekLabel(w.weekStart)}</option>
+                        ))}
+                      </select>
+                    </label>
+                  ) : (
+                    <label className="text-xs text-gray-600">Date
+                      <input type="date" value={placeForm.date} onChange={(e) => setPlace("date", e.target.value)}
+                        className="mt-1 w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm" />
+                    </label>
+                  )}
+                  <label className="text-xs text-gray-600">Image URL
+                    <input value={placeForm.imageUrl} onChange={(e) => setPlace("imageUrl", e.target.value)}
+                      placeholder="https://..." className="mt-1 w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm" />
+                  </label>
+                  <label className="text-xs text-gray-600 col-span-2">Headline
+                    <input value={placeForm.headline} onChange={(e) => setPlace("headline", e.target.value)}
+                      className="mt-1 w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm" />
+                  </label>
+                  <label className="text-xs text-gray-600">Link URL
+                    <input value={placeForm.ctaUrl} onChange={(e) => setPlace("ctaUrl", e.target.value)}
+                      placeholder="https://..." className="mt-1 w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm" />
+                  </label>
+                  <label className="text-xs text-gray-600">Button label
+                    <input value={placeForm.ctaLabel} onChange={(e) => setPlace("ctaLabel", e.target.value)}
+                      placeholder="Learn More" className="mt-1 w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm" />
+                  </label>
+                  <label className="text-xs text-gray-600 col-span-2 md:col-span-4">Body
+                    <textarea value={placeForm.body} onChange={(e) => setPlace("body", e.target.value)} rows={2}
+                      className="mt-1 w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm" />
+                  </label>
+                </div>
+                <div className="mt-3 flex items-center gap-4 flex-wrap">
+                  <label className="flex items-center gap-2 text-sm text-gray-700">
+                    <input type="checkbox" checked={placeForm.isComp} onChange={(e) => setPlace("isComp", e.target.checked)}
+                      className="w-4 h-4 accent-green-700" />
+                    $0 comp / house placement <span className="text-xs text-gray-400">(marked COMP in admin, renders like a normal ad)</span>
+                  </label>
+                  <button onClick={submitPlaceAd} disabled={placeSubmitting}
+                    className="px-4 py-2 text-sm font-medium bg-green-700 text-white rounded-lg hover:bg-green-800 disabled:opacity-50">
+                    {placeSubmitting ? "Placing..." : placeMode === "week" ? "Place week" : "Place day"}
+                  </button>
+                  {placeError && <span className="text-sm text-red-600">{placeError}</span>}
+                  {placeOk && <span className="text-sm text-green-700">{placeOk}</span>}
+                </div>
+              </section>
+
+              {/* Copy queue */}
+              <section>
+                <h2 className="text-lg font-semibold text-gray-900 mb-3">Copy queue</h2>
+                {copyQueue.length === 0 ? (
+                  <p className="text-sm text-gray-500 bg-white rounded-xl border border-gray-200 p-4">Copy queue is clear.</p>
+                ) : (
+                  <div className="space-y-4">
+                    {copyQueue.map((task) => (
+                      <div
+                        key={task.id}
+                        id={`booking-${task.id}`}
+                        className={`bg-white rounded-xl border p-4 ${task.id === highlightId ? "border-amber-400 ring-2 ring-amber-200" : "border-gray-200"}`}
+                      >
+                        <div className="flex items-start gap-4">
+                          {task.logoUrl && (
+                            <img src={task.logoUrl} alt={task.businessName} className="w-16 h-16 object-contain rounded-lg border border-gray-100 shrink-0" />
+                          )}
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <h3 className="font-semibold text-gray-900">{task.businessName}</h3>
+                              <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-blue-50 text-blue-700">{tierLabel(task.tier)}</span>
+                              <span className="text-xs text-gray-500">{formatWeekLabel(task.weekStart)}</span>
+                            </div>
+                            <p className="text-sm text-gray-600 mt-2">{task.aboutText}</p>
+                            <div className="text-xs text-gray-500 mt-1 flex flex-wrap gap-x-3">
+                              <span>{task.contactName} &lt;{task.email}&gt;</span>
+                              {task.website && (
+                                <a href={task.website} target="_blank" rel="noreferrer" className="text-green-700 hover:underline">Website</a>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        <textarea
+                          value={copyDrafts[task.id] || ""}
+                          onChange={(e) => setCopyDrafts((d) => ({ ...d, [task.id]: e.target.value }))}
+                          placeholder="Write the final ad copy for this week's newsletter..."
+                          rows={3}
+                          className="w-full mt-3 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                        />
+                        <div className="mt-2 flex justify-end">
+                          <button
+                            onClick={() => finalizeCopy(task.id)}
+                            disabled={finalizingId === task.id}
+                            className="px-4 py-2 text-sm font-medium bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+                          >
+                            {finalizingId === task.id ? "Finalizing..." : "Mark copy finalized"}
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
+
+              {/* Upcoming weeks */}
+              <section>
+                <h2 className="text-lg font-semibold text-gray-900 mb-3">Upcoming weeks</h2>
+                <div className="bg-white rounded-xl border border-gray-200 divide-y divide-gray-100">
+                  {weekAvail.length === 0 && (
+                    <p className="text-sm text-gray-500 p-4">No upcoming weeks found.</p>
+                  )}
+                  {weekAvail.map((w) => (
+                    <div key={w.weekStart} className="p-4">
+                      <h3 className="text-sm font-semibold text-gray-800 mb-2">{formatWeekLabel(w.weekStart)}</h3>
+                      <div className="space-y-1.5">
+                        {w.tiers.map((t) => {
+                          const booked = weekBookings.filter(
+                            (b) => b.weekStart === w.weekStart && b.tier === t.tier && ["pending_payment", "paid", "comped", "completed"].includes(b.status)
+                          );
+                          return (
+                            <div key={t.tier} className="flex items-baseline gap-3 text-sm">
+                              <span className="w-40 shrink-0 font-medium text-gray-700">
+                                {tierLabel(t.tier)} {t.taken}/{t.slots}
+                              </span>
+                              <span className="text-gray-600 truncate flex-1">
+                                {booked.length > 0 ? booked.map((b) => (
+                                  <span key={b.id} className="mr-3 whitespace-nowrap">
+                                    {b.businessName}
+                                    {b.status === "comped" && (
+                                      <span className="ml-1 text-xs bg-purple-50 text-purple-700 px-1.5 py-0.5 rounded-full font-medium">COMP</span>
+                                    )}
+                                    {b.status === "pending_payment" && (
+                                      <span className="ml-1 text-xs bg-orange-50 text-orange-700 px-1.5 py-0.5 rounded-full font-medium">Awaiting payment</span>
+                                    )}
+                                  </span>
+                                )) : <span className="text-gray-400">Open</span>}
+                              </span>
+                              {booked.filter((b) => b.status === "pending_payment").map((b) => (
+                                <button key={b.id}
+                                  onClick={() => markWeekPaid(b.id)}
+                                  disabled={markPaidId === b.id}
+                                  title="Money received offline? Record it as paid: places the ad and sends confirmations."
+                                  className="shrink-0 text-xs px-2 py-1 border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-100 disabled:opacity-50">
+                                  {markPaidId === b.id ? "Saving..." : "Mark paid"}
+                                </button>
+                              ))}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+
+              {/* Per-issue standard-slot override (soft cap) */}
+              <section className="bg-white rounded-xl border border-gray-200 p-4">
+                <h2 className="text-lg font-semibold text-gray-900 mb-1">Issue controls</h2>
+                <p className="text-xs text-gray-500 mb-3">
+                  Standard slots are a soft cap (2 per issue). Raise the limit for a date to run extra standard ads that issue.
+                  Filling slots with house or free content needs no change here. Set below 2 to clear an override.
+                </p>
+                <div className="flex items-end gap-3 flex-wrap">
+                  <label className="text-xs text-gray-600">Issue date
+                    <input type="date" value={slotDate} onChange={(e) => setSlotDate(e.target.value)}
+                      className="mt-1 block border border-gray-300 rounded-lg px-2 py-1.5 text-sm" />
+                  </label>
+                  <label className="text-xs text-gray-600">Max standard ads
+                    <input type="number" min={0} max={10} value={slotCount} onChange={(e) => setSlotCount(e.target.value)}
+                      className="mt-1 block w-24 border border-gray-300 rounded-lg px-2 py-1.5 text-sm" />
+                  </label>
+                  <button onClick={saveSlotOverride} disabled={slotSaving}
+                    className="px-4 py-2 text-sm font-medium bg-green-700 text-white rounded-lg hover:bg-green-800 disabled:opacity-50">
+                    {slotSaving ? "Saving..." : "Save"}
+                  </button>
+                  {slotMsg && <span className="text-sm text-gray-600">{slotMsg}</span>}
+                </div>
+              </section>
+            </div>
+          )}
+
           {tab === "spotlights" && (
             <div className="space-y-3">
               {spotlights.length === 0 && <p className="text-sm text-gray-400">No spotlight listings yet.</p>}
@@ -685,7 +1146,9 @@ export default function AdminSponsorsPage() {
                         <p className="text-sm font-semibold text-gray-800">{b.date}</p>
                         <span className="text-xs text-gray-500 capitalize">{b.type === "in_article" ? "Standard" : "Presenting"}</span>
                         <StatusBadge status={b.status} />
-                        {b.isPaid ? (
+                        {b.isComp ? (
+                          <span className="text-xs bg-purple-50 text-purple-700 px-1.5 py-0.5 rounded-full font-medium">Comp</span>
+                        ) : b.isPaid ? (
                           <span className="text-xs bg-green-50 text-green-700 px-1.5 py-0.5 rounded-full font-medium">Paid</span>
                         ) : (
                           <span className="text-xs bg-orange-50 text-orange-600 px-1.5 py-0.5 rounded-full font-medium">Unpaid</span>
@@ -808,6 +1271,13 @@ export default function AdminSponsorsPage() {
                                 className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none" />
                             </div>
                           )}
+                          <label className="flex items-center gap-2 text-sm text-gray-700">
+                            <input type="checkbox"
+                              checked={bookingForm.isComp}
+                              onChange={(e) => setBookingForm((f) => ({ ...f, isComp: e.target.checked }))}
+                              className="w-4 h-4 accent-green-700" />
+                            $0 comp / house placement <span className="text-xs text-gray-400">(marked COMP in admin, renders like a normal ad)</span>
+                          </label>
                           <div className="flex gap-2">
                             <button onClick={() => saveBookingEdit(b.id)}
                               className="px-3 py-1.5 bg-green-700 text-white rounded-lg text-xs font-semibold hover:bg-green-800">
@@ -1095,6 +1565,14 @@ export default function AdminSponsorsPage() {
 
                 {newBookingError && <p className="text-sm text-red-600">{newBookingError}</p>}
 
+                <label className="flex items-center gap-2 text-sm text-gray-700">
+                  <input type="checkbox"
+                    checked={(newBookingForm as { isComp?: boolean }).isComp === true}
+                    onChange={(e) => setNewBookingForm((f) => ({ ...f, isComp: e.target.checked }))}
+                    className="w-4 h-4 accent-green-700" />
+                  $0 comp / house placement <span className="text-xs text-gray-400">(marked COMP in admin, renders like a normal ad)</span>
+                </label>
+
                 <div className="flex gap-2">
                   <button
                     onClick={submitNewBooking}
@@ -1278,5 +1756,13 @@ export default function AdminSponsorsPage() {
         </>
       )}
     </div>
+  );
+}
+
+export default function AdminSponsorsPage() {
+  return (
+    <Suspense>
+      <AdminSponsorsContent />
+    </Suspense>
   );
 }

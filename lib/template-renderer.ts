@@ -249,6 +249,9 @@ function renderPresentingSponsor(item: PresentingSponsorItem, tracking?: Trackin
   const blurb = item.presentingBlurb ||
     `Today&rsquo;s Gist is brought to you by <strong>${item.businessName}</strong>.`;
   const ctaUrl = trackedUrl(tracking, item.ctaUrl, "presenting_sponsor", item.businessName);
+  const ctaHtml = item.ctaUrl
+    ? `<a href="${ctaUrl}" style="display:inline-block;background:#166534;color:#ffffff;padding:10px 20px;border-radius:4px;text-decoration:none;font-size:13px;font-family:sans-serif;font-weight:600;">${item.ctaLabel}</a>`
+    : "";
   return `
     <div style="padding:20px 40px;">
       <div style="background:#fefce8;border:1px solid #fde047;border-radius:8px;padding:16px;margin-bottom:16px;">
@@ -257,13 +260,16 @@ function renderPresentingSponsor(item: PresentingSponsorItem, tracking?: Trackin
       </div>
       ${item.imageUrl ? `<img src="${item.imageUrl}" alt="" style="max-width:100%;height:auto;display:block;border-radius:6px;margin-bottom:14px;" />` : ""}
       <div style="font-size:18px;font-weight:700;color:#111827;margin:0 0 8px;font-family:Georgia,serif;line-height:1.3;">${item.headline}</div>
-      <div style="font-size:14px;color:#4b5563;line-height:1.6;margin:0 0 14px;font-family:sans-serif;">${item.body}</div>
-      <a href="${ctaUrl}" style="display:inline-block;background:#166534;color:#ffffff;padding:10px 20px;border-radius:4px;text-decoration:none;font-size:13px;font-family:sans-serif;font-weight:600;">${item.ctaLabel}</a>
+      <div style="font-size:14px;color:#4b5563;line-height:1.6;margin:0 0 ${ctaHtml ? "14px" : "0"};font-family:sans-serif;">${item.body}</div>
+      ${ctaHtml}
     </div>`;
 }
 
 function renderInArticleAd(ad: InArticleAdItem, tracking?: TrackingConfig): string {
   const ctaUrl = trackedUrl(tracking, ad.ctaUrl, "in_article_ad", ad.businessName);
+  const ctaHtml = ad.ctaUrl
+    ? `<a href="${ctaUrl}" style="display:inline-block;background:#166534;color:#ffffff;padding:8px 18px;border-radius:4px;text-decoration:none;font-size:13px;font-family:sans-serif;font-weight:600;">${ad.ctaLabel}</a>`
+    : "";
   return `
     <div style="border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;margin-bottom:24px;background:#fafafa;">
       <div style="padding:6px 14px;background:#f3f4f6;font-family:sans-serif;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#9ca3af;">
@@ -272,8 +278,8 @@ function renderInArticleAd(ad: InArticleAdItem, tracking?: TrackingConfig): stri
       ${ad.imageUrl ? `<img src="${ad.imageUrl}" alt="" style="width:100%;height:200px;object-fit:cover;display:block;" />` : ""}
       <div style="padding:16px;">
         <div style="font-size:18px;font-weight:700;color:#111827;margin:0 0 8px;font-family:Georgia,serif;line-height:1.3;">${ad.headline}</div>
-        <div style="font-size:14px;color:#4b5563;line-height:1.6;margin:0 0 14px;font-family:sans-serif;">${ad.body}</div>
-        <a href="${ctaUrl}" style="display:inline-block;background:#166534;color:#ffffff;padding:8px 18px;border-radius:4px;text-decoration:none;font-size:13px;font-family:sans-serif;font-weight:600;">${ad.ctaLabel}</a>
+        <div style="font-size:14px;color:#4b5563;line-height:1.6;margin:0 0 ${ctaHtml ? "14px" : "0"};font-family:sans-serif;">${ad.body}</div>
+        ${ctaHtml}
       </div>
     </div>`;
 }
