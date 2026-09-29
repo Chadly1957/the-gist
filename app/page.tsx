@@ -11,6 +11,9 @@ import RecentIssues from "@/components/RecentIssues";
 
 function CityLandingPage() {
   const { workspace } = useWorkspace();
+  // Key branding off the slug (human-chosen, e.g. "effingham"), falling back
+  // to the id. New workspaces get generated cuid ids, so id alone misses.
+  const brand = workspace.slug || workspace.id;
   const [email, setEmail] = useState("");
   const [firstName, setFirstName] = useState("");
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
@@ -212,8 +215,8 @@ function CityLandingPage() {
               <div className="relative w-full max-w-md">
                 <div className="rounded-3xl overflow-hidden">
                   <Image
-                    src={workspace.id === "effingham" ? "/hero-effingham.png" : "/hero-decatur.jpg"}
-                    alt={workspace.id === "effingham" ? "Effingham County Courthouse" : "Historic Decatur pavilion"}
+                    src={brand === "effingham" ? "/hero-effingham.png" : "/hero-decatur.jpg"}
+                    alt={brand === "effingham" ? "Effingham County Courthouse" : "Historic Decatur pavilion"}
                     width={640}
                     height={700}
                     className="w-full h-auto object-cover"
@@ -310,21 +313,21 @@ function CityLandingPage() {
               <div className="space-y-3">
                 {[
                   {
-                    name: "Community Partners",
+                    name: "Community Board",
                     price: "Free",
-                    desc: "Rotating listing with logo, description, and CTA in every issue.",
+                    desc: "Rotating listing with logo, description, and link in every issue.",
                     accent: "bg-green-800 border-green-700",
                   },
                   {
-                    name: "Standard Sponsorship",
-                    price: "$15 / day",
-                    desc: "Sponsored post mixed in with the day's news. Up to 2 slots per day.",
+                    name: "Standard Sponsor",
+                    price: "$75/week",
+                    desc: "Logo and write-up mid-email, running in every issue all week. Two slots per week.",
                     accent: "bg-green-800 border-green-700",
                   },
                   {
                     name: "Presenting Sponsor",
-                    price: "$25 / day",
-                    desc: "Opening mention + full standard ad placement. Exclusive: one per day.",
+                    price: "$150/week",
+                    desc: "Top of every issue all week, plus full standard placement. Exclusive: one per week.",
                     accent: "bg-green-800 border-green-600",
                   },
                 ].map((tier) => (
