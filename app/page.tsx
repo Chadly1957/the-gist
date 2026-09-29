@@ -2,7 +2,6 @@
 import { workspaceFetch } from "@/lib/workspace-client";
 
 import { useState, useEffect } from "react";
-import CommunityHome from "@/components/workspace/CommunityHome";
 import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
 import Image from "next/image";
 import Link from "@/components/workspace/WorkspaceLink";
@@ -396,6 +395,5 @@ function CityLandingPage() {
 }
 
 export default function LandingPage() {
-  const { workspace } = useWorkspace();
-  return ["decatur", "effingham"].includes(workspace.id) ? <CityLandingPage /> : <CommunityHome />;
+  return <CityLandingPage />;
 }
