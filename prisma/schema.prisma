@@ -339,6 +339,7 @@ model SponsorWeekBooking {
   rebookToken     String         @unique @default(cuid())
   resultsSentAt   DateTime?
   renewalSentAt   DateTime?
+  paidAt          DateTime?
   createdAt       DateTime       @default(now())
   adBookingRows   AdBooking[]
 

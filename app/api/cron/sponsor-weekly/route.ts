@@ -2,7 +2,8 @@ import { basePrisma } from "@/lib/db-base";
 import { withWorkspace, getWorkspace, getWorkspaceUrl } from "@/lib/workspace";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { addDaysISO, formatWeekRange } from "@/lib/sponsor-weeks";
+import { addDaysISO, formatWeekRange, upcomingSponsorWeeks } from "@/lib/sponsor-weeks";
+import { getWeekBookingStats } from "@/lib/sponsor-week-stats";
 import {
   sendCommunityBoardUpgradeNudge,
   sendRenewalNudge,
@@ -14,11 +15,6 @@ export const dynamic = "force-dynamic";
 function toISODate(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
-
-const SPONSOR_LINK_TYPES: Record<string, string[]> = {
-  presenting: ["presenting_sponsor"],
-  standard: ["in_article_ad"],
-};
 
 async function runWorkspace() {
   const workspace = await getWorkspace();
@@ -38,26 +34,11 @@ async function runWorkspace() {
     // The week is over once we reach the next Monday.
     if (addDaysISO(booking.week.weekStart, 7) > toISODate(now)) continue;
 
-    const rangeStart = new Date(`${booking.week.weekStart}T00:00:00Z`);
-    const rangeEnd = new Date(`${addDaysISO(booking.week.weekStart, 7)}T00:00:00Z`);
-    const sends = await prisma.newsletterSend.findMany({
-      where: { sentAt: { gte: rangeStart, lt: rangeEnd }, status: "sent" },
-      select: { id: true, recipientCount: true },
+    const { sends, opens, clicks } = await getWeekBookingStats({
+      businessName: booking.businessName,
+      tier: booking.tier,
+      weekStart: booking.week.weekStart,
     });
-    const sendIds = sends.map((s) => s.id);
-    const totalSends = sends.reduce((sum, s) => sum + s.recipientCount, 0);
-    const opens = sendIds.length
-      ? await prisma.newsletterRecipient.count({ where: { newsletterSendId: { in: sendIds }, openCount: { gt: 0 } } })
-      : 0;
-    const clicks = sendIds.length
-      ? await prisma.linkClick.count({
-          where: {
-            newsletterRecipient: { newsletterSendId: { in: sendIds } },
-            label: booking.businessName,
-            linkType: { in: SPONSOR_LINK_TYPES[booking.tier] ?? [] },
-          },
-        })
-      : 0;
 
     const tierLabel = booking.tier === "presenting" ? "Presenting Sponsor" : "Standard Sponsor";
     try {
@@ -67,7 +48,7 @@ async function runWorkspace() {
         businessName: booking.businessName,
         tierLabel,
         weekLabel: formatWeekRange(booking.week.weekStart),
-        sends: totalSends,
+        sends,
         opens,
         clicks,
         rebookUrl: `${appUrl}/sponsor/apply?rebook=${booking.rebookToken}`,
@@ -87,26 +68,21 @@ async function runWorkspace() {
   const twoDaysAgo = new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000);
   const dueRenewals = await prisma.sponsorWeekBooking.findMany({
     where: { status: "completed", renewalSentAt: null, resultsSentAt: { lte: twoDaysAgo } },
-    include: { week: { select: { weekStart: true } } },
+    include: { week: { select: { weekStart: true } }, sponsor: { select: { magicToken: true } } },
   });
 
   for (const booking of dueRenewals) {
-    const rangeStart = new Date(`${booking.week.weekStart}T00:00:00Z`);
-    const rangeEnd = new Date(`${addDaysISO(booking.week.weekStart, 7)}T00:00:00Z`);
-    const sends = await prisma.newsletterSend.findMany({
-      where: { sentAt: { gte: rangeStart, lt: rangeEnd }, status: "sent" },
-      select: { id: true },
+    const { clicks } = await getWeekBookingStats({
+      businessName: booking.businessName,
+      tier: booking.tier,
+      weekStart: booking.week.weekStart,
     });
-    const sendIds = sends.map((s) => s.id);
-    const clicks = sendIds.length
-      ? await prisma.linkClick.count({
-          where: {
-            newsletterRecipient: { newsletterSendId: { in: sendIds } },
-            label: booking.businessName,
-            linkType: { in: SPONSOR_LINK_TYPES[booking.tier] ?? [] },
-          },
-        })
-      : 0;
+
+    // Deep-link into the portal with the next bookable week pre-selected.
+    const suggestedWeek = upcomingSponsorWeeks().find((w) => w > booking.week.weekStart);
+    const rebookUrl = suggestedWeek
+      ? `${appUrl}/sponsor/portal?token=${booking.sponsor.magicToken}&bookWeek=${suggestedWeek}`
+      : `${appUrl}/sponsor/portal?token=${booking.sponsor.magicToken}`;
 
     const tierLabel = booking.tier === "presenting" ? "Presenting Sponsor" : "Standard Sponsor";
     try {
@@ -117,7 +93,7 @@ async function runWorkspace() {
         tierLabel,
         weekLabel: formatWeekRange(booking.week.weekStart),
         clicks,
-        rebookUrl: `${appUrl}/sponsor/apply?rebook=${booking.rebookToken}`,
+        rebookUrl,
       });
       renewalsSent++;
     } catch (err) {

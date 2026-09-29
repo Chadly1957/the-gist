@@ -27,6 +27,8 @@ export async function POST(req: NextRequest) {
     logoUrl,
     aboutText,
     chadWritesCopy,
+    portalToken,
+    returnTo,
   } = await req.json();
 
   if (!holdToken) return NextResponse.json({ error: "Your reservation expired. Please pick a week again." }, { status: 400 });
@@ -57,6 +59,20 @@ export async function POST(req: NextRequest) {
 
   const workspace = await getWorkspace();
   const workspaceId = workspace.id;
+
+  // Portal checkouts pin the booking to the sponsor's own profile instead of
+  // matching by email.
+  let portalProfile: { id: string } | null = null;
+  if (portalToken) {
+    portalProfile = await basePrisma.sponsorProfile.findFirst({
+      where: { workspaceId, magicToken: portalToken },
+      select: { id: true },
+    });
+    if (!portalProfile) {
+      return NextResponse.json({ error: "Your portal link is invalid. Please reload the portal and try again." }, { status: 401 });
+    }
+  }
+  const backToPortal = returnTo === "portal" && portalProfile;
 
   // Look up the hold outside the lock; re-verify inside it.
   const hold = await basePrisma.sponsorHold.findFirst({
@@ -95,8 +111,12 @@ export async function POST(req: NextRequest) {
         },
       ],
       customer_email: normalizedEmail,
-      success_url: `${appUrl}/sponsor/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${appUrl}/sponsor/apply?cancelled=1`,
+      success_url: backToPortal
+        ? `${appUrl}/sponsor/portal?token=${portalToken}&booking=success`
+        : `${appUrl}/sponsor/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: backToPortal
+        ? `${appUrl}/sponsor/portal?token=${portalToken}&booking=cancelled`
+        : `${appUrl}/sponsor/apply?cancelled=1`,
       metadata: { workspaceId, kind: "sponsor_week", tier, weekStart: hold.week.weekStart },
     });
   } catch (err) {
@@ -113,9 +133,11 @@ export async function POST(req: NextRequest) {
       const taken = await countTaken(tx, workspaceId, hold.week.id, tier, liveHold.id);
       if (taken >= WEEK_TIERS[tier].slots) throw new Error("That slot just sold.");
 
-      let profile = await tx.sponsorProfile.findUnique({
-        where: { workspaceId_email: { workspaceId, email: normalizedEmail } },
-      });
+      let profile = portalProfile
+        ? { id: portalProfile.id }
+        : await tx.sponsorProfile.findUnique({
+            where: { workspaceId_email: { workspaceId, email: normalizedEmail } },
+          });
       if (!profile) {
         profile = await tx.sponsorProfile.create({
           data: {

@@ -8,7 +8,7 @@ import { useSearchParams } from "next/navigation";
 import Logo from "@/components/Logo";
 import SponsorPreview from "@/components/SponsorPreview";
 import UrlInput from "@/components/UrlInput";
-import MultiDateCalendar from "@/components/MultiDateCalendar";
+import WeekBookingFlow, { WeekTier, WeekBookingPrefill } from "@/components/sponsor/WeekBookingFlow";
 
 interface Spotlight {
   id: string;
@@ -34,6 +34,39 @@ interface Booking {
   presentingBlurb: string | null;
 }
 
+interface WeekBookingStats {
+  sends: number;
+  opens: number;
+  clicks: number;
+}
+
+interface WeekBooking {
+  id: string;
+  tier: WeekTier;
+  weekStart: string;
+  weekLabel: string;
+  status: string;
+  amountCents: number;
+  paidAt: string | null;
+  businessName: string;
+  logoUrl: string;
+  website: string | null;
+  aboutText: string;
+  chadWritesCopy: boolean;
+  finalAdCopy: string | null;
+  creativeLocked: boolean;
+  stats: WeekBookingStats;
+}
+
+interface Payment {
+  id: string;
+  paidAt: string;
+  weekLabel: string;
+  tierLabel: string;
+  amountCents: number;
+  receiptUrl: string | null;
+}
+
 interface Profile {
   id: string;
   businessName: string;
@@ -54,7 +87,7 @@ interface Analytics {
   bookingGameStats: Record<string, { wordyImpressions: number; wordyClicks: number; matchImpressions: number; matchClicks: number }>;
 }
 
-type View = "overview" | "spotlight" | "booking" | "profile" | "event";
+type View = "overview" | "spotlight" | "booking" | "profile" | "event" | "billing" | "editWeek";
 
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
   pending: { label: "Pending Review", color: "bg-yellow-50 text-yellow-700" },
@@ -64,165 +97,56 @@ const STATUS_LABELS: Record<string, { label: string; color: string }> = {
   pending_payment: { label: "Awaiting Payment", color: "bg-orange-50 text-orange-700" },
   rejected: { label: "Not Approved", color: "bg-red-50 text-red-600" },
   completed: { label: "Completed", color: "bg-gray-100 text-gray-500" },
+  paid: { label: "Paid", color: "bg-green-50 text-green-700" },
 };
 
 function StatusBadge({ status }: { status: string }) {
   const s = STATUS_LABELS[status] || { label: status, color: "bg-gray-100 text-gray-500" };
-  return <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${s.color}`}>{s.label}</span>;
-}
-
-interface DayAvailability {
-  inArticle: number;
-  presenting: number;
-}
-
-function BookingDatePicker({
-  selectedDates,
-  onToggleDate,
-  adType,
-}: {
-  selectedDates: string[];
-  onToggleDate: (date: string) => void;
-  adType: "in_article" | "presenting";
-}) {
-  const [open, setOpen] = useState(false);
-  const [viewDate, setViewDate] = useState(() => {
-    const d = new Date();
-    return new Date(d.getFullYear(), d.getMonth(), 1);
-  });
-  const [availability, setAvailability] = useState<Record<string, Record<string, DayAvailability>>>({});
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  const year = viewDate.getFullYear();
-  const month = viewDate.getMonth();
-  const monthKey = `${year}-${month + 1}`;
-
-  useEffect(() => {
-    if (availability[monthKey]) return;
-    workspaceFetch(`/api/sponsor/calendar?year=${year}&month=${month + 1}`)
-      .then((r) => r.json())
-      .then((data) => setAvailability((prev) => ({ ...prev, [monthKey]: data.availability || {} })));
-  }, [monthKey, year, month, availability]);
-
-  useEffect(() => {
-    if (!open) return;
-    function handleClick(e: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) setOpen(false);
-    }
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, [open]);
-
-  const todayStr = new Date().toISOString().split("T")[0];
-
-  function isUnavailable(dateStr: string) {
-    if (dateStr < todayStr) return true;
-    const day = availability[monthKey]?.[dateStr];
-    if (!day) return false;
-    return adType === "in_article" ? day.inArticle >= 2 : day.presenting >= 1;
-  }
-
-  const firstDay = new Date(year, month, 1);
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const startOffset = firstDay.getDay();
-  const cells: (string | null)[] = [
-    ...Array(startOffset).fill(null),
-    ...Array.from(
-      { length: daysInMonth },
-      (_, i) => `${year}-${String(month + 1).padStart(2, "0")}-${String(i + 1).padStart(2, "0")}`
-    ),
-  ];
-
-  const summary =
-    selectedDates.length === 0
-      ? "Select date(s)…"
-      : selectedDates.length === 1
-      ? new Date(selectedDates[0] + "T00:00:00").toLocaleDateString(undefined, {
-          month: "short",
-          day: "numeric",
-          year: "numeric",
-        })
-      : `${selectedDates.length} dates selected`;
-
   return (
-    <div className="relative" ref={containerRef}>
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center justify-between px-3 py-2 border border-gray-200 rounded-lg text-sm text-left focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
-      >
-        <span className={selectedDates.length ? "text-gray-800" : "text-gray-400"}>{summary}</span>
-        <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-        </svg>
-      </button>
-
-      {open && (
-        <div className="absolute z-10 mt-2 w-72 bg-white border border-gray-200 rounded-xl shadow-lg p-3">
-          <div className="flex items-center justify-between mb-2">
-            <button
-              type="button"
-              onClick={() => setViewDate(new Date(year, month - 1, 1))}
-              className="p-1 text-gray-400 hover:text-gray-700"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-              </svg>
-            </button>
-            <p className="text-sm font-semibold text-gray-700">
-              {firstDay.toLocaleDateString(undefined, { month: "long", year: "numeric" })}
-            </p>
-            <button
-              type="button"
-              onClick={() => setViewDate(new Date(year, month + 1, 1))}
-              className="p-1 text-gray-400 hover:text-gray-700"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-              </svg>
-            </button>
-          </div>
-          <div className="grid grid-cols-7 gap-1 text-center text-[10px] text-gray-400 mb-1">
-            {["S", "M", "T", "W", "T", "F", "S"].map((d, i) => (
-              <div key={i}>{d}</div>
-            ))}
-          </div>
-          <div className="grid grid-cols-7 gap-1">
-            {cells.map((dateStr, i) => {
-              if (!dateStr) return <div key={i} />;
-              const disabled = isUnavailable(dateStr);
-              const selected = selectedDates.includes(dateStr);
-              const dayNum = parseInt(dateStr.split("-")[2], 10);
-              return (
-                <button
-                  key={dateStr}
-                  type="button"
-                  disabled={disabled}
-                  onClick={() => onToggleDate(dateStr)}
-                  className={`text-xs py-1.5 rounded-lg transition-colors ${
-                    disabled
-                      ? "text-gray-300 cursor-not-allowed"
-                      : selected
-                      ? "bg-green-600 text-white font-semibold"
-                      : "text-gray-700 hover:bg-green-50"
-                  }`}
-                >
-                  {dayNum}
-                </button>
-              );
-            })}
-          </div>
-          <div className="flex items-center justify-between mt-3 pt-2 border-t border-gray-100">
-            <p className="text-xs text-gray-400">{selectedDates.length} selected</p>
-            <button type="button" onClick={() => setOpen(false)} className="text-xs font-medium text-green-700 hover:underline">
-              Done
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
+    <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${s.color}`}>
+      {s.label}
+    </span>
   );
 }
+
+/** Legacy day-based bookings are read-only history: neutral badges, no dangling actions. */
+function LegacyStatusBadge({ status, isPaid }: { status: string; isPaid: boolean }) {
+  if (!isPaid) {
+    return (
+      <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-gray-100 text-gray-500">
+        Unpaid (previous system)
+      </span>
+    );
+  }
+  const s = STATUS_LABELS[status] || { label: status, color: "bg-gray-100 text-gray-500" };
+  return (
+    <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${s.color}`}>
+      {s.label}
+    </span>
+  );
+}
+
+/** Truncate at a word boundary so blurbs never cut mid-word. */
+function truncateWords(s: string, max: number): string {
+  if (!s || s.length <= max) return s || "";
+  const cut = s.slice(0, max);
+  const lastSpace = cut.lastIndexOf(" ");
+  return (lastSpace > 0 ? cut.slice(0, lastSpace) : cut) + "…";
+}
+
+function formatMoney(cents: number): string {
+  return `$${(cents / 100).toFixed(0)}`;
+}
+
+function ctr(clicks: number, impressions: number): string {
+  if (impressions <= 0) return "—";
+  return `${((clicks / impressions) * 100).toFixed(1)}%`;
+}
+
+const BOOK_TIER_META: Record<WeekTier, { label: string; price: string; blurb: string }> = {
+  presenting: { label: "Presenting Sponsor", price: "$150/week", blurb: "Top of the email · 1 slot per week" },
+  standard: { label: "Standard Sponsor", price: "$75/week", blurb: "Mid-email placement · 2 slots per week" },
+};
 
 function PortalContent() {
   const searchParams = useSearchParams();
@@ -230,6 +154,7 @@ function PortalContent() {
 
   const [profile, setProfile] = useState<Profile | null>(null);
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
+  const [weekBookings, setWeekBookings] = useState<WeekBooking[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [view, setView] = useState<View>("overview");
@@ -250,23 +175,26 @@ function PortalContent() {
   const [pSaved, setPSaved] = useState(false);
   const [pError, setPError] = useState("");
 
-  // Booking form
-  const [bType, setBType] = useState<"in_article" | "presenting">("in_article");
-  const [bDates, setBDates] = useState<string[]>([]);
-  const [bForm, setBForm] = useState({ headline: "", body: "", ctaUrl: "", ctaLabel: "Learn More", imageUrl: "", presentingBlurb: "" });
-  const [bUploading, setBUploading] = useState(false);
-  const [bSubmitting, setBSubmitting] = useState(false);
-  const [bError, setBError] = useState("");
-  const [bSuccess, setBSuccess] = useState(false);
-  const [bPartialErrors, setBPartialErrors] = useState<{ date: string; error: string }[]>([]);
-  const [bShowPreview, setBShowPreview] = useState(false);
-  const [bAutoFilled, setBAutoFilled] = useState(false);
-  const bFileRef = useRef<HTMLInputElement>(null);
-
-  // Callout bubble on "Book Ad Date" — shown after listing creation
-  const [showBookingCallout, setShowBookingCallout] = useState(false);
+  // Week booking (new flow)
+  const [bookTier, setBookTier] = useState<WeekTier>("standard");
+  const [suggestedWeek, setSuggestedWeek] = useState<string | null>(null);
   // Stripe return banners
   const [bookingBanner, setBookingBanner] = useState<"success" | "cancelled" | null>(null);
+
+  // Creative editing for an upcoming week
+  const [editingWeek, setEditingWeek] = useState<WeekBooking | null>(null);
+  const [wForm, setWForm] = useState({ logoUrl: "", aboutText: "", website: "" });
+  const [wUploading, setWUploading] = useState(false);
+  const [wSaving, setWSaving] = useState(false);
+  const [wError, setWError] = useState("");
+  const [wSaved, setWSaved] = useState(false);
+  const [wShowPreview, setWShowPreview] = useState(false);
+  const wFileRef = useRef<HTMLInputElement>(null);
+
+  // Billing
+  const [payments, setPayments] = useState<Payment[] | null>(null);
+  const [billingLoading, setBillingLoading] = useState(false);
+  const [billingError, setBillingError] = useState("");
 
   // Event form
   const [eForm, setEForm] = useState({ title: "", description: "", eventDate: "", startTime: "", endTime: "", location: "", url: "", cost: "" });
@@ -274,8 +202,18 @@ function PortalContent() {
   const [eError, setEError] = useState("");
   const [eSuccess, setESuccess] = useState(false);
 
-  function toggleBookingDate(date: string) {
-    setBDates((prev) => (prev.includes(date) ? prev.filter((d) => d !== date) : [...prev, date]));
+  function refreshPortalData() {
+    if (!token) return;
+    workspaceFetch(`/api/sponsor/portal?token=${encodeURIComponent(token)}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (!data.error) {
+          setProfile(data.profile);
+          setAnalytics(data.analytics ?? null);
+          setWeekBookings(data.weekBookings ?? []);
+        }
+      })
+      .catch(() => {});
   }
 
   useEffect(() => {
@@ -287,15 +225,18 @@ function PortalContent() {
         else {
           setProfile(data.profile);
           setAnalytics(data.analytics ?? null);
+          setWeekBookings(data.weekBookings ?? []);
           setSForm((f) => ({ ...f, businessName: data.profile.businessName }));
         }
       })
       .catch(() => setError("Failed to load. Please try again."))
       .finally(() => setLoading(false));
 
-    // Show callout if redirected here right after listing creation
-    if (searchParams.get("callout") === "booking") {
-      setShowBookingCallout(true);
+    // Renewal deep link: jump straight into booking with the suggested week.
+    const bookWeek = searchParams.get("bookWeek");
+    if (bookWeek) {
+      setSuggestedWeek(bookWeek);
+      setView("booking");
     }
     // Stripe return
     const bookingParam = searchParams.get("booking");
@@ -372,35 +313,53 @@ function PortalContent() {
     finally { setPSaving(false); }
   }
 
-  async function submitBooking(e: React.FormEvent) {
+  function openCreativeEditor(wb: WeekBooking) {
+    setEditingWeek(wb);
+    setWForm({ logoUrl: wb.logoUrl || "", aboutText: wb.aboutText || "", website: wb.website || "" });
+    setWError(""); setWSaved(false); setWShowPreview(false);
+    setView("editWeek");
+  }
+
+  async function saveCreative(e: React.FormEvent) {
     e.preventDefault();
-    if (bDates.length === 0) { setBError("Select at least one date."); return; }
-    setBSubmitting(true); setBError("");
+    if (!editingWeek) return;
+    setWSaving(true); setWError(""); setWSaved(false);
     try {
-      const res = await workspaceFetch("/api/sponsor/checkout", {
-        method: "POST",
+      const res = await workspaceFetch("/api/sponsor/portal/week-booking", {
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, bookingType: bType, dates: bDates, ...bForm }),
+        body: JSON.stringify({
+          token,
+          bookingId: editingWeek.id,
+          logoUrl: wForm.logoUrl,
+          aboutText: wForm.aboutText,
+          website: wForm.website,
+        }),
       });
       const data = await res.json();
-      if (res.ok && data.url) {
-        const subs: Array<{ original: string; replacement: string }> = data.substitutions || [];
-        if (subs.length > 0) {
-          const msg = subs.map((s) => `${s.original} → ${s.replacement}`).join(", ");
-          const proceed = confirm(
-            `${subs.length} date${subs.length !== 1 ? "s were" : " was"} unavailable and replaced with the next available slot${subs.length !== 1 ? "s" : ""}:\n${msg}\n\nYour discount is preserved. Proceed to checkout?`
-          );
-          if (!proceed) { setBSubmitting(false); return; }
-        }
-        window.location.href = data.url;
+      if (res.ok) {
+        setWSaved(true);
+        setWeekBookings((prev) => prev.map((w) => w.id === editingWeek.id ? { ...w, ...data.booking } : w));
+        setEditingWeek((prev) => prev ? { ...prev, ...data.booking } : prev);
       } else {
-        setBError(data.error || "Submission failed.");
-        setBSubmitting(false);
+        setWError(data.error || "Could not save changes.");
       }
-    } catch (_e) {
-      setBError("Connection error.");
-      setBSubmitting(false);
-    }
+    } catch (_e) { setWError("Connection error."); }
+    finally { setWSaving(false); }
+  }
+
+  function openBilling() {
+    setView("billing");
+    if (payments !== null || billingLoading) return;
+    setBillingLoading(true); setBillingError("");
+    workspaceFetch(`/api/sponsor/portal/billing?token=${encodeURIComponent(token)}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.error) setBillingError(data.error);
+        else setPayments(data.payments ?? []);
+      })
+      .catch(() => setBillingError("Could not load payment history."))
+      .finally(() => setBillingLoading(false));
   }
 
   async function submitEvent(e: React.FormEvent) {
@@ -436,6 +395,18 @@ function PortalContent() {
 
   if (!profile) return null;
 
+  const prefill: WeekBookingPrefill = {
+    businessName: profile.businessName || "",
+    contactName: profile.contactName || "",
+    email: profile.email || "",
+    website: profile.website || "",
+    logoUrl: profile.spotlights.find((s) => s.logoUrl)?.logoUrl || "",
+    aboutText: profile.spotlights.find((s) => s.description)?.description || "",
+  };
+
+  const upcomingWeeks = weekBookings.filter((w) => w.status === "paid" || w.status === "pending_payment");
+  const pastWeeks = weekBookings.filter((w) => w.status !== "paid" && w.status !== "pending_payment");
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -446,14 +417,16 @@ function PortalContent() {
             <span className="text-gray-300 mx-2">|</span>
             <span className="text-sm text-gray-600">{profile.businessName}</span>
           </div>
-          <WorkspaceAnchor href="/sponsor" className="text-xs text-gray-400 hover:text-gray-600">Sponsorship Info</WorkspaceAnchor>
+          <WorkspaceAnchor href="/sponsor" target="_blank" rel="noopener noreferrer" className="text-xs text-gray-400 hover:text-gray-600">
+            Sponsorship Info ↗
+          </WorkspaceAnchor>
         </div>
       </div>
 
       <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         {/* Navigation */}
         {view !== "overview" && (
-          <button onClick={() => { if (sSuccess) setShowBookingCallout(true); setView("overview"); setSSuccess(false); setBSuccess(false); setEditingSpotlight(null); }} className="text-sm text-green-700 hover:underline mb-6 inline-block">
+          <button onClick={() => { setView("overview"); setSSuccess(false); setEditingSpotlight(null); setEditingWeek(null); }} className="text-sm text-green-700 hover:underline mb-6 inline-block">
             ← Back to overview
           </button>
         )}
@@ -467,10 +440,10 @@ function PortalContent() {
                   <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
                 <div>
-                  <p className="text-sm font-semibold text-green-800">Payment received — booking confirmed!</p>
-                  <p className="text-xs text-green-700 mt-0.5">Your ad date(s) are secured. You&apos;ll see them in the list below.</p>
+                  <p className="text-sm font-semibold text-green-800">Payment received — week booked!</p>
+                  <p className="text-xs text-green-700 mt-0.5">Your sponsorship week is locked in. You&apos;ll see it below.</p>
                 </div>
-                <button onClick={() => setBookingBanner(null)} className="ml-auto text-green-500 hover:text-green-700">
+                <button onClick={() => { setBookingBanner(null); refreshPortalData(); }} className="ml-auto text-green-500 hover:text-green-700">
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                 </button>
               </div>
@@ -482,7 +455,7 @@ function PortalContent() {
                 </svg>
                 <div>
                   <p className="text-sm font-semibold text-amber-800">Payment cancelled</p>
-                  <p className="text-xs text-amber-700 mt-0.5">Your booking was not saved. You can try again anytime.</p>
+                  <p className="text-xs text-amber-700 mt-0.5">Your week was not booked. You can try again anytime.</p>
                 </div>
                 <button onClick={() => setBookingBanner(null)} className="ml-auto text-amber-500 hover:text-amber-700">
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
@@ -517,7 +490,7 @@ function PortalContent() {
                       {analytics.spotlightClicks > 0 && (
                         <p className="text-xs text-green-600 font-medium mt-1">
                           {analytics.spotlightClicks} clicks
-                          {analytics.spotlightImpressions > 0 && ` · ${((analytics.spotlightClicks / analytics.spotlightImpressions) * 100).toFixed(1)}% CTR`}
+                          {analytics.spotlightImpressions > 0 && ` · ${ctr(analytics.spotlightClicks, analytics.spotlightImpressions)} CTR`}
                         </p>
                       )}
                     </div>
@@ -529,7 +502,7 @@ function PortalContent() {
                       {analytics.adClicks > 0 && (
                         <p className="text-xs text-green-600 font-medium mt-1">
                           {analytics.adClicks} clicks
-                          {analytics.adImpressions > 0 && ` · ${((analytics.adClicks / analytics.adImpressions) * 100).toFixed(1)}% CTR`}
+                          {analytics.adImpressions > 0 && ` · ${ctr(analytics.adClicks, analytics.adImpressions)} CTR`}
                         </p>
                       )}
                     </div>
@@ -555,44 +528,17 @@ function PortalContent() {
                 </div>
               </button>
               <button
-                onClick={() => {
-                  const approved = profile?.spotlights.find(s => s.status === "approved");
-                  if (approved) {
-                    setBForm({
-                      headline: `Visit ${approved.businessName}`,
-                      body: approved.description,
-                      ctaUrl: approved.ctaUrl,
-                      ctaLabel: approved.ctaLabel || "Learn More",
-                      imageUrl: approved.logoUrl || "",
-                      presentingBlurb: "",
-                    });
-                    setBAutoFilled(true);
-                  } else {
-                    setBAutoFilled(false);
-                  }
-                  setShowBookingCallout(false);
-                  setView("booking");
-                  setBSuccess(false);
-                  setBError("");
-                }}
-                className="flex items-center gap-3 p-4 bg-white rounded-xl border border-gray-200 hover:border-green-400 hover:shadow-sm transition-all text-left relative"
+                onClick={() => { setSuggestedWeek(null); setView("booking"); }}
+                className="flex items-center gap-3 p-4 bg-white rounded-xl border border-gray-200 hover:border-green-400 hover:shadow-sm transition-all text-left"
               >
-                {showBookingCallout && (
-                  <div className="absolute -top-12 left-0 right-0 flex justify-center pointer-events-none z-10">
-                    <div className="bg-green-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg shadow-lg whitespace-nowrap animate-bounce">
-                      Schedule an ad now for maximum engagement!
-                      <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-green-700" />
-                    </div>
-                  </div>
-                )}
                 <div className="w-9 h-9 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
                   <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                   </svg>
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-gray-800">Book Ad Date</p>
-                  <p className="text-xs text-gray-400">Standard or presenting sponsor</p>
+                  <p className="text-sm font-semibold text-gray-800">Book a Week</p>
+                  <p className="text-xs text-gray-400">Presenting $150 · Standard $75</p>
                 </div>
               </button>
               <button
@@ -609,7 +555,96 @@ function PortalContent() {
                   <p className="text-xs text-gray-400">Free — appears in the newsletter calendar</p>
                 </div>
               </button>
+              <button
+                onClick={openBilling}
+                className="flex items-center gap-3 p-4 bg-white rounded-xl border border-gray-200 hover:border-green-400 hover:shadow-sm transition-all text-left"
+              >
+                <div className="w-9 h-9 rounded-lg bg-amber-50 flex items-center justify-center shrink-0">
+                  <svg className="w-5 h-5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-gray-800">Payment History</p>
+                  <p className="text-xs text-gray-400">Receipts for your sponsorships</p>
+                </div>
+              </button>
             </div>
+
+            {/* YOUR WEEKS */}
+            {weekBookings.length > 0 && (
+              <div>
+                <h2 className="text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide">Your Weeks</h2>
+                <div className="space-y-2">
+                  {upcomingWeeks.map((w) => (
+                    <div key={w.id} className="bg-white rounded-xl border border-gray-200 p-4">
+                      <div className="flex items-center gap-4">
+                        {w.logoUrl && (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={w.logoUrl} alt="" className="w-10 h-10 rounded-lg object-contain border border-gray-100 shrink-0" />
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-0.5 flex-wrap">
+                            <p className="text-sm font-semibold text-gray-800">{w.weekLabel}</p>
+                            <span className="text-xs text-gray-400">{w.tier === "presenting" ? "Presenting Sponsor" : "Standard Sponsor"}</span>
+                          </div>
+                          <p className="text-xs text-gray-400" title={w.aboutText}>{truncateWords(w.aboutText, 90)}</p>
+                        </div>
+                        <div className="flex flex-col items-end gap-1.5 shrink-0">
+                          <StatusBadge status={w.status} />
+                          {w.status === "pending_payment" ? (
+                            <span className="text-xs text-gray-400 text-right" title="If checkout wasn't completed, this reservation releases on its own.">
+                              Finish checkout in your<br />open tab, or book again.
+                            </span>
+                          ) : !w.creativeLocked ? (
+                            <button onClick={() => openCreativeEditor(w)} className="text-xs text-green-700 hover:underline font-medium">
+                              Edit creative
+                            </button>
+                          ) : (
+                            <span className="text-xs text-gray-400" title="Creative locks 24 hours before your week starts">Creative locked</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  {pastWeeks.map((w) => {
+                    const s = w.stats;
+                    return (
+                      <div key={w.id} className="bg-white rounded-xl border border-gray-200 p-4">
+                        <div className="flex items-center gap-4">
+                          {w.logoUrl && (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={w.logoUrl} alt="" className="w-10 h-10 rounded-lg object-contain border border-gray-100 shrink-0" />
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-0.5 flex-wrap">
+                              <p className="text-sm font-semibold text-gray-800">{w.weekLabel}</p>
+                              <span className="text-xs text-gray-400">{w.tier === "presenting" ? "Presenting Sponsor" : "Standard Sponsor"}</span>
+                            </div>
+                            {(s.sends > 0 || s.clicks > 0) ? (
+                              <p className="text-xs text-green-700 font-medium">
+                                {s.sends.toLocaleString()} sends · {s.opens.toLocaleString()} opens · {s.clicks} clicks · {ctr(s.clicks, s.opens)} CTR
+                              </p>
+                            ) : (
+                              <p className="text-xs text-gray-400">Results coming after your week runs.</p>
+                            )}
+                          </div>
+                          <div className="flex flex-col items-end gap-1.5 shrink-0">
+                            <StatusBadge status={w.status} />
+                            <button
+                              onClick={() => { setSuggestedWeek(null); setBookTier(w.tier); setView("booking"); }}
+                              className="text-xs text-green-700 hover:underline font-medium"
+                            >
+                              Book again
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* Spotlights */}
             {profile.spotlights.length > 0 && (
@@ -621,7 +656,7 @@ function PortalContent() {
                       {s.logoUrl && <img src={s.logoUrl} alt="" className="w-10 h-10 rounded-lg object-contain border border-gray-100" />}
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold text-gray-800">{s.businessName}</p>
-                        <p className="text-xs text-gray-400 truncate">{s.description}</p>
+                        <p className="text-xs text-gray-400" title={s.description}>{truncateWords(s.description, 90)}</p>
                       </div>
                       <div className="flex flex-col items-end gap-1.5 shrink-0">
                         <StatusBadge status={s.status} />
@@ -648,10 +683,11 @@ function PortalContent() {
               </div>
             )}
 
-            {/* Bookings */}
+            {/* Legacy day-based bookings: read-only history */}
             {profile.bookings.length > 0 && (
               <div>
-                <h2 className="text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide">Ad Bookings</h2>
+                <h2 className="text-sm font-bold text-gray-700 mb-1 uppercase tracking-wide">Past Ad Bookings</h2>
+                <p className="text-xs text-gray-400 mb-3">Booked under our previous daily system — kept here for your records.</p>
                 <div className="space-y-2">
                   {profile.bookings.map((b) => {
                     const clicks = analytics?.bookingClicks?.[b.id] ?? 0;
@@ -666,10 +702,10 @@ function PortalContent() {
                             <p className="text-sm font-semibold text-gray-800">{b.date}</p>
                             <span className="text-xs text-gray-400 capitalize">{b.type === "in_article" ? "Standard" : "Presenting"}</span>
                           </div>
-                          <p className="text-xs text-gray-400 truncate">{b.headline}</p>
+                          <p className="text-xs text-gray-400" title={b.headline}>{truncateWords(b.headline, 80)}</p>
                         </div>
                         <div className="flex flex-col items-end gap-1 shrink-0">
-                          <StatusBadge status={b.status} />
+                          <LegacyStatusBadge status={b.status} isPaid={b.isPaid} />
                           {impressions > 0 && (
                             <span className="text-xs text-green-700 font-medium">
                               {impressions.toLocaleString()} newsletter impressions
@@ -677,7 +713,7 @@ function PortalContent() {
                           )}
                           {clicks > 0 && (
                             <span className="text-xs text-green-700 font-medium">
-                              {clicks} newsletter click{clicks !== 1 ? "s" : ""}
+                              {clicks} newsletter click{clicks !== 1 ? "s" : ""} · {ctr(clicks, impressions)} CTR
                             </span>
                           )}
                           {gameImpressions > 0 && (
@@ -689,9 +725,6 @@ function PortalContent() {
                             <span className="text-xs text-blue-700 font-medium">
                               {gameClicks} game click{gameClicks !== 1 ? "s" : ""}
                             </span>
-                          )}
-                          {!b.isPaid && b.status !== "rejected" && (
-                            <span className="text-xs text-orange-600 font-medium">Payment pending</span>
                           )}
                         </div>
                       </div>
@@ -707,12 +740,12 @@ function PortalContent() {
         {view === "spotlight" && (
           <div>
             <h1 className="text-2xl font-bold text-gray-900 mb-1">{editingSpotlight ? "Edit Listing" : "Community Partners"}</h1>
-            <p className="text-sm text-gray-500 mb-6">{editingSpotlight ? "Update your listing details below." : "Free rotating placement in every newsletter. Submit your listing and we’ll review it within 1-2 business days."}</p>
+            <p className="text-sm text-gray-500 mb-6">{editingSpotlight ? "Update your listing details below." : "Free rotating placement in every newsletter. Your logo also feeds the homepage marquee — upload a good one."}</p>
 
             {sSuccess ? (
               <div className="bg-green-50 border border-green-100 rounded-xl p-6 text-center">
                 <p className="text-green-800 font-semibold mb-1">Listing submitted!</p>
-                <p className="text-sm text-green-600">We&apos;ll review it and reach out if we have any questions.</p>
+                <p className="text-sm text-green-600">It&apos;s live in the rotation now.</p>
                 <button onClick={() => { setSSuccess(false); setView("overview"); }} className="mt-4 text-sm text-green-700 underline">
                   Back to portal
                 </button>
@@ -726,7 +759,9 @@ function PortalContent() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-1">Logo</label>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">
+                    Logo <span className="font-normal text-gray-400">(shows in the newsletter and the homepage marquee)</span>
+                  </label>
                   <div className="flex gap-2">
                     <UrlInput value={sForm.logoUrl} onChange={(val) => setSForm((f) => ({ ...f, logoUrl: val }))} placeholder="https://... or upload below"
                       className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
@@ -737,6 +772,12 @@ function PortalContent() {
                       {sUploading ? "Uploading…" : "Upload"}
                     </label>
                   </div>
+                  {sForm.logoUrl && (
+                    <div className="mt-2 flex items-center gap-3">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={sForm.logoUrl} alt="Logo preview" className="h-14 w-14 object-contain rounded-lg bg-gray-50 border border-gray-100" />
+                    </div>
+                  )}
                 </div>
 
                 <div>
@@ -778,150 +819,156 @@ function PortalContent() {
 
                 <button type="submit" disabled={sSubmitting}
                   className="w-full bg-green-700 hover:bg-green-800 disabled:opacity-50 text-white font-semibold py-2.5 rounded-xl text-sm transition-colors">
-                  {sSubmitting ? (editingSpotlight ? "Saving…" : "Submitting…") : (editingSpotlight ? "Save Changes" : "Submit Listing for Review")}
+                  {sSubmitting ? (editingSpotlight ? "Saving…" : "Submitting…") : (editingSpotlight ? "Save Changes" : "Submit Listing")}
                 </button>
               </form>
             )}
           </div>
         )}
 
-        {/* BOOKING FORM */}
+        {/* BOOK A WEEK */}
         {view === "booking" && (
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-1">Book an Ad Date</h1>
-            <p className="text-sm text-gray-500 mb-1">Choose your ad type, pick a date, and fill in your ad content. You&apos;ll pay securely at checkout — your date is confirmed instantly.</p>
-            {bAutoFilled && (
-              <p className="text-xs text-green-600 mb-5">✓ Pre-filled from your Community Partners listing — edit as needed.</p>
-            )}
-            {!bAutoFilled && <div className="mb-5" />}
+            <h1 className="text-2xl font-bold text-gray-900 mb-1">Book a Week</h1>
+            <p className="text-sm text-gray-500 mb-6">Your details are pre-filled from your profile. Pick a week and check out — under a minute.</p>
 
-            {bSuccess ? (
-              <div className="bg-green-50 border border-green-100 rounded-xl p-6 text-center">
-                <p className="text-green-800 font-semibold mb-1">Booking submitted!</p>
-                <p className="text-sm text-green-600">We&apos;ll review it and reach out to confirm and collect payment.</p>
-                {bPartialErrors.length > 0 && (
-                  <div className="mt-3 text-left bg-amber-50 border border-amber-100 rounded-lg p-3">
-                    <p className="text-xs font-semibold text-amber-700 mb-1">Some dates couldn&apos;t be booked:</p>
-                    {bPartialErrors.map((f) => (
-                      <p key={f.date} className="text-xs text-amber-700">{f.date}: {f.error}</p>
-                    ))}
-                  </div>
-                )}
-                <div className="flex gap-3 justify-center mt-4">
-                  <button onClick={() => { setBSuccess(false); setBPartialErrors([]); setBForm({ headline: "", body: "", ctaUrl: "", ctaLabel: "Learn More", imageUrl: "", presentingBlurb: "" }); setBDates([]); setBAutoFilled(false); }}
-                    className="text-sm text-green-700 underline">Book another date</button>
-                  <button onClick={() => { setBSuccess(false); setView("overview"); }} className="text-sm text-gray-500 underline">Back to portal</button>
+            <div className="mb-5">
+              <label className="block text-xs font-semibold text-gray-600 mb-2">Package</label>
+              <div className="grid grid-cols-2 gap-2">
+                {(["standard", "presenting"] as WeekTier[]).map((t) => (
+                  <button key={t} type="button" onClick={() => setBookTier(t)}
+                    className={`p-3 rounded-xl border text-left transition-colors ${bookTier === t ? "border-green-500 bg-green-50" : "border-gray-200 hover:border-gray-300 bg-white"}`}>
+                    <p className="text-sm font-semibold text-gray-800">{BOOK_TIER_META[t].label}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">{BOOK_TIER_META[t].price}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">{BOOK_TIER_META[t].blurb}</p>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <WeekBookingFlow
+              key={bookTier}
+              tier={bookTier}
+              prefill={prefill}
+              portalToken={token}
+              suggestedWeek={suggestedWeek}
+              onBack={() => { setView("overview"); setSuggestedWeek(null); }}
+            />
+          </div>
+        )}
+
+        {/* EDIT WEEK CREATIVE */}
+        {view === "editWeek" && editingWeek && (
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900 mb-1">Edit Your Ad</h1>
+            <p className="text-sm text-gray-500 mb-6">
+              {editingWeek.tier === "presenting" ? "Presenting Sponsor" : "Standard Sponsor"} · {editingWeek.weekLabel}
+              {editingWeek.chadWritesCopy && !editingWeek.finalAdCopy && (
+                <span className="block mt-1 text-xs text-amber-700">Chad is writing your ad copy — you can update the logo, description, and website below.</span>
+              )}
+            </p>
+
+            {wSaved && (
+              <div className="bg-green-50 border border-green-200 rounded-xl p-3 mb-5 text-sm text-green-800">
+                Saved! Your updated creative will run that week.
+              </div>
+            )}
+
+            <form onSubmit={saveCreative} className="space-y-4 bg-white rounded-xl border border-gray-200 p-6">
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">Logo</label>
+                <div className="flex gap-2 items-center">
+                  <input ref={wFileRef} type="file" accept="image/png,image/jpeg" className="hidden"
+                    onChange={(e) => { const f = e.target.files?.[0]; if (f) handleImageUpload(f, setWUploading, (url) => setWForm((fm) => ({ ...fm, logoUrl: url })), setWError); }} />
+                  {wForm.logoUrl && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={wForm.logoUrl} alt="Logo preview" className="h-12 w-12 object-contain rounded-lg bg-gray-50 border border-gray-100" />
+                  )}
+                  <button type="button" onClick={() => wFileRef.current?.click()} disabled={wUploading}
+                    className="px-3 py-2 border border-gray-200 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-50">
+                    {wUploading ? "Uploading…" : wForm.logoUrl ? "Replace logo" : "Upload logo"}
+                  </button>
                 </div>
               </div>
-            ) : (
-              <form onSubmit={submitBooking} className="space-y-5 bg-white rounded-xl border border-gray-200 p-6">
-                {/* Type selector */}
-                <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-2">Ad Type *</label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {(["in_article", "presenting"] as const).map((t) => (
-                      <button key={t} type="button" onClick={() => { setBType(t); setBDates([]); }}
-                        className={`p-3 rounded-xl border text-left transition-colors ${bType === t ? "border-green-500 bg-green-50" : "border-gray-200 hover:border-gray-300"}`}>
-                        <p className="text-sm font-semibold text-gray-800">{t === "in_article" ? "Standard: $15/day" : "Presenting Sponsor: $25/day"}</p>
-                        <p className="text-xs text-gray-400 mt-0.5">{t === "in_article" ? "Mixed in with the newsletter" : "Opening mention + standard ad"}</p>
-                      </button>
-                    ))}
-                  </div>
-                </div>
 
-                <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-2">Newsletter Date(s) *</label>
-                  <MultiDateCalendar
-                    bookingType={bType}
-                    selectedDates={bDates}
-                    onChange={setBDates}
-                    pricePerDay={bType === "presenting" ? 25 : 15}
-                  />
-                </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">What should readers know about your business?</label>
+                <textarea value={wForm.aboutText} onChange={(e) => setWForm((f) => ({ ...f, aboutText: e.target.value }))} rows={4}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none" />
+              </div>
 
-                <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-1">Ad Image</label>
-                  <div className="flex gap-2">
-                    <UrlInput value={bForm.imageUrl} onChange={(val) => setBForm((f) => ({ ...f, imageUrl: val }))} placeholder="https://... or upload"
-                      className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
-                    <input ref={bFileRef} type="file" accept="image/*" className="hidden"
-                      onChange={(e) => { const f = e.target.files?.[0]; if (f) handleImageUpload(f, setBUploading, (url) => setBForm((fm) => ({ ...fm, imageUrl: url })), setBError); }} />
-                    <label onClick={() => bFileRef.current?.click()}
-                      className={`cursor-pointer flex items-center gap-1 px-3 py-2 border border-gray-200 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-50 whitespace-nowrap ${bUploading ? "opacity-60 pointer-events-none" : ""}`}>
-                      {bUploading ? "Uploading…" : "Upload"}
-                    </label>
-                  </div>
-                </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">Website <span className="text-gray-400 font-normal">(optional)</span></label>
+                <UrlInput value={wForm.website} onChange={(val) => setWForm((f) => ({ ...f, website: val }))} placeholder="https://"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+              </div>
 
-                <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-1">Headline *</label>
-                  <input type="text" value={bForm.headline} onChange={(e) => setBForm((f) => ({ ...f, headline: e.target.value }))} required placeholder="Grab readers' attention"
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
-                </div>
+              {wError && <p className="text-sm text-red-600">{wError}</p>}
 
-                <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-1">Body Copy * <span className="font-normal text-gray-400">({bForm.body.length}/400)</span></label>
-                  <textarea value={bForm.body} onChange={(e) => setBForm((f) => ({ ...f, body: e.target.value }))} required rows={4} maxLength={400}
-                    placeholder="Tell readers what you offer and why they should click."
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none" />
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">CTA Label</label>
-                    <input type="text" value={bForm.ctaLabel} onChange={(e) => setBForm((f) => ({ ...f, ctaLabel: e.target.value }))}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">CTA Link *</label>
-                    <UrlInput value={bForm.ctaUrl} onChange={(val) => setBForm((f) => ({ ...f, ctaUrl: val }))} required placeholder="https://"
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
-                  </div>
-                </div>
-
-                {bType === "presenting" && (
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">
-                      Custom Intro Blurb <span className="font-normal text-gray-400">(optional)</span>
-                    </label>
-                    <textarea value={bForm.presentingBlurb} onChange={(e) => setBForm((f) => ({ ...f, presentingBlurb: e.target.value }))} rows={2}
-                      placeholder={`e.g. "Today's Gist is brought to you by Decatur Coffee Co., your neighborhood spot for great coffee and community." Leave blank to use the default.`}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none" />
+              <div className="border-t border-gray-100 pt-4">
+                <button type="button" onClick={() => setWShowPreview((v) => !v)}
+                  className="flex items-center gap-1.5 text-sm font-medium text-green-700 hover:text-green-800 mb-3">
+                  <svg className={`w-4 h-4 transition-transform ${wShowPreview ? "rotate-90" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                  </svg>
+                  {wShowPreview ? "Hide preview" : "Preview how it looks in the newsletter"}
+                </button>
+                {wShowPreview && (
+                  <div className="mb-4">
+                    <SponsorPreview data={
+                      editingWeek.tier === "presenting"
+                        ? { type: "presenting", businessName: editingWeek.businessName, imageUrl: wForm.logoUrl || undefined, headline: editingWeek.businessName, body: editingWeek.finalAdCopy || wForm.aboutText, ctaLabel: "Learn More", ctaUrl: wForm.website || undefined }
+                        : { type: "in_article", imageUrl: wForm.logoUrl || undefined, headline: editingWeek.businessName, body: editingWeek.finalAdCopy || wForm.aboutText, ctaLabel: "Learn More", ctaUrl: wForm.website || undefined }
+                    } />
                   </div>
                 )}
+              </div>
 
-                {bError && <p className="text-sm text-red-600">{bError}</p>}
+              <button type="submit" disabled={wSaving || wUploading}
+                className="w-full bg-green-700 hover:bg-green-800 disabled:opacity-50 text-white font-semibold py-2.5 rounded-xl text-sm transition-colors">
+                {wSaving ? "Saving…" : "Save Changes"}
+              </button>
+              <p className="text-xs text-gray-400 text-center">Creative locks 24 hours before your week starts.</p>
+            </form>
+          </div>
+        )}
 
-                <div className="border-t border-gray-100 pt-4">
-                  <button type="button" onClick={() => setBShowPreview((v) => !v)}
-                    className="flex items-center gap-1.5 text-sm font-medium text-green-700 hover:text-green-800 mb-3">
-                    <svg className={`w-4 h-4 transition-transform ${bShowPreview ? "rotate-90" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                    </svg>
-                    {bShowPreview ? "Hide preview" : "Preview how it looks in the newsletter"}
-                  </button>
-                  {bShowPreview && (
-                    <div className="mb-4">
-                      <SponsorPreview data={bType === "presenting"
-                        ? { type: "presenting", businessName: profile?.businessName, imageUrl: bForm.imageUrl || undefined, headline: bForm.headline, body: bForm.body, ctaLabel: bForm.ctaLabel, ctaUrl: bForm.ctaUrl, presentingBlurb: bForm.presentingBlurb || undefined }
-                        : { type: "in_article", imageUrl: bForm.imageUrl || undefined, headline: bForm.headline, body: bForm.body, ctaLabel: bForm.ctaLabel, ctaUrl: bForm.ctaUrl }
-                      } />
+        {/* BILLING */}
+        {view === "billing" && (
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900 mb-1">Payment History</h1>
+            <p className="text-sm text-gray-500 mb-6">Every payment for your sponsorship weeks, with receipts.</p>
+
+            {billingLoading && <p className="text-sm text-gray-500 py-8 text-center">Loading payments…</p>}
+            {billingError && <p className="text-sm text-red-600 py-4">{billingError}</p>}
+            {!billingLoading && !billingError && payments && payments.length === 0 && (
+              <p className="text-sm text-gray-500 py-8 text-center">No payments yet. Book a week to get started.</p>
+            )}
+            {!billingLoading && !billingError && payments && payments.length > 0 && (
+              <div className="bg-white rounded-xl border border-gray-200 divide-y divide-gray-100">
+                {payments.map((p) => (
+                  <div key={p.id} className="p-4 flex items-center gap-4">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-gray-800">{p.weekLabel}</p>
+                      <p className="text-xs text-gray-400">
+                        {p.tierLabel} · {new Date(p.paidAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
+                      </p>
                     </div>
-                  )}
-                </div>
-
-                <button type="submit" disabled={bSubmitting || bDates.length === 0}
-                  className="w-full bg-green-700 hover:bg-green-800 disabled:opacity-50 text-white font-semibold py-2.5 rounded-xl text-sm transition-colors">
-                  {bSubmitting
-                    ? "Redirecting to checkout…"
-                    : bDates.length > 1
-                    ? `Pay & Book ${bDates.length} Dates →`
-                    : "Pay & Book →"}
-                </button>
-              </form>
+                    <p className="text-sm font-semibold text-gray-800">{formatMoney(p.amountCents)}</p>
+                    {p.receiptUrl ? (
+                      <a href={p.receiptUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-green-700 hover:underline font-medium shrink-0">
+                        Receipt ↗
+                      </a>
+                    ) : (
+                      <span className="text-xs text-gray-300 shrink-0">Paid</span>
+                    )}
+                  </div>
+                ))}
+              </div>
             )}
           </div>
         )}
+
         {/* PROFILE EDIT */}
         {view === "profile" && (
           <div>

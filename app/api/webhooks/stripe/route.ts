@@ -26,7 +26,7 @@ async function fulfillWeekBooking(workspaceId: string, session: Stripe.Checkout.
   const didFulfill = await basePrisma.$transaction(async (tx) => {
     const updated = await tx.sponsorWeekBooking.updateMany({
       where: { workspaceId, id: booking.id, status: "pending_payment" },
-      data: { status: "paid" },
+      data: { status: "paid", paidAt: new Date() },
     });
     if (updated.count === 0) return false;
     await tx.adBooking.createMany({ data: rows });

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { getWeekBookingStats, shapePortalWeekBooking } from "@/lib/sponsor-week-stats";
 
 export const dynamic = "force-dynamic";
 
@@ -110,6 +111,41 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  // -- Weekly bookings (new system) -------------------------------------------
+  // Stripe session IDs are never exposed; the portal shows payment state only.
+  const weekBookingsRaw = await prisma.sponsorWeekBooking.findMany({
+    where: { sponsorId: profile.id },
+    include: { week: { select: { weekStart: true } } },
+    orderBy: { week: { weekStart: "desc" } },
+  });
+  const weekBookings = [];
+  for (const b of weekBookingsRaw) {
+    const stats = await getWeekBookingStats({
+      businessName: b.businessName,
+      tier: b.tier,
+      weekStart: b.week.weekStart,
+    });
+    weekBookings.push(
+      shapePortalWeekBooking(
+        {
+          id: b.id,
+          tier: b.tier,
+          weekStart: b.week.weekStart,
+          status: b.status,
+          amountCents: b.amountCents,
+          paidAt: b.paidAt,
+          businessName: b.businessName,
+          logoUrl: b.logoUrl,
+          website: b.website,
+          aboutText: b.aboutText,
+          chadWritesCopy: b.chadWritesCopy,
+          finalAdCopy: b.finalAdCopy,
+        },
+        stats
+      )
+    );
+  }
+
   return NextResponse.json({
     profile,
     analytics: {
@@ -121,6 +157,7 @@ export async function GET(req: NextRequest) {
       bookingImpressions,
       bookingGameStats,
     },
+    weekBookings,
   });
 }
 
