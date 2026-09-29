@@ -4,8 +4,22 @@ import Image from "next/image";
 
 export default function Logo({ className = "h-7 w-auto" }: { className?: string }) {
   const { workspace } = useWorkspace();
-  // Key branding off the slug (human-chosen, e.g. "effingham"), falling back
-  // to the id. New workspaces get generated cuid ids, so id alone misses.
+  // Uploaded branding wins. Falls back to the bundled per-city assets, then
+  // the workspace name as text for cities without branding yet.
+  if (workspace.logoUrl)
+    return (
+      <Image
+        src={workspace.logoUrl}
+        alt={`${workspace.name} logo`}
+        width={160}
+        height={64}
+        className={`object-contain ${className}`}
+        priority
+      />
+    );
+  // Key bundled branding off the slug (human-chosen, e.g. "effingham"),
+  // falling back to the id. New workspaces get generated cuid ids, so id
+  // alone misses.
   const brand = workspace.slug || workspace.id;
   if (brand === "effingham")
     return (

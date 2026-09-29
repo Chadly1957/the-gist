@@ -20,6 +20,52 @@ function tzLabel(value: string | null) {
   return TIMEZONES.find((t) => t.value === value)?.label || value || "—";
 }
 
+function BrandingPicker({
+  label,
+  hint,
+  currentUrl,
+  preview,
+  removed,
+  onPick,
+  onRemove,
+  onUndo,
+}: {
+  label: string;
+  hint: string;
+  currentUrl: string | null;
+  preview: string | null;
+  removed: boolean;
+  onPick: (file: File | null) => void;
+  onRemove: () => void;
+  onUndo: () => void;
+}) {
+  const shown = preview ?? (!removed ? currentUrl : null);
+  return (
+    <div>
+      <span className="text-xs font-medium text-gray-600">{label}</span>
+      <div className="mt-1 flex h-16 items-center justify-center overflow-hidden rounded-lg border border-gray-200 bg-white p-1">
+        {shown ? (
+          <img src={shown} alt={`${label} preview`} className="max-h-full w-auto object-contain" />
+        ) : (
+          <span className="text-[11px] text-gray-400">None uploaded</span>
+        )}
+      </div>
+      <input
+        type="file"
+        accept="image/png,image/jpeg,image/webp"
+        onChange={(e) => onPick(e.target.files?.[0] ?? null)}
+        className="mt-1 block w-full text-[11px] text-gray-500"
+      />
+      {shown && !removed ? (
+        <button type="button" onClick={onRemove} className="mt-1 text-[11px] text-red-600 hover:underline">Remove</button>
+      ) : removed ? (
+        <button type="button" onClick={onUndo} className="mt-1 text-[11px] text-green-700 hover:underline">Undo remove</button>
+      ) : null}
+      <span className="block mt-1 text-[11px] font-normal text-gray-400">{hint}</span>
+    </div>
+  );
+}
+
 function WorkspaceEditor({
   workspace,
   onSaved,
@@ -35,22 +81,58 @@ function WorkspaceEditor({
   const [timezone, setTimezone] = useState(workspace.timezone ?? "America/Chicago");
   const [primaryColor, setPrimaryColor] = useState(workspace.primaryColor);
   const [secondaryColor, setSecondaryColor] = useState(workspace.secondaryColor);
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [logoRemoved, setLogoRemoved] = useState(false);
+  const [heroFile, setHeroFile] = useState<File | null>(null);
+  const [heroPreview, setHeroPreview] = useState<string | null>(null);
+  const [heroRemoved, setHeroRemoved] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+
+  function pickFile(kind: "logo" | "hero", file: File | null) {
+    if (kind === "logo") {
+      if (logoPreview) URL.revokeObjectURL(logoPreview);
+      setLogoFile(file);
+      setLogoPreview(file ? URL.createObjectURL(file) : null);
+      if (file) setLogoRemoved(false);
+    } else {
+      if (heroPreview) URL.revokeObjectURL(heroPreview);
+      setHeroFile(file);
+      setHeroPreview(file ? URL.createObjectURL(file) : null);
+      if (file) setHeroRemoved(false);
+    }
+  }
+
+  async function uploadBranding(kind: "logo" | "hero", file: File): Promise<string> {
+    const form = new FormData();
+    form.append("workspaceId", workspace.id);
+    form.append("kind", kind);
+    form.append("file", file);
+    const res = await workspaceFetch("/api/admin/workspaces/branding-upload", { method: "POST", body: form });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || "Image upload failed.");
+    return data.url as string;
+  }
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
     setError("");
     try {
+      const body: Record<string, unknown> = { id: workspace.id, name, area, latitude, longitude, timezone, primaryColor, secondaryColor };
+      if (logoFile) body.logoUrl = await uploadBranding("logo", logoFile);
+      else if (logoRemoved) body.logoUrl = "";
+      if (heroFile) body.heroImageUrl = await uploadBranding("hero", heroFile);
+      else if (heroRemoved) body.heroImageUrl = "";
       const res = await workspaceFetch("/api/admin/workspaces", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: workspace.id, name, area, latitude, longitude, timezone, primaryColor, secondaryColor }),
+        body: JSON.stringify(body),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Could not save workspace.");
-      onSaved({ ...workspace, name: data.workspace.name, area: data.workspace.area, latitude: data.workspace.latitude, longitude: data.workspace.longitude, timezone: data.workspace.timezone, primaryColor: data.workspace.primaryColor, secondaryColor: data.workspace.secondaryColor });
+      onSaved({ ...workspace, name: data.workspace.name, area: data.workspace.area, latitude: data.workspace.latitude, longitude: data.workspace.longitude, timezone: data.workspace.timezone, primaryColor: data.workspace.primaryColor, secondaryColor: data.workspace.secondaryColor, logoUrl: data.workspace.logoUrl, heroImageUrl: data.workspace.heroImageUrl });
       setOpen(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not save workspace.");
@@ -105,6 +187,28 @@ function WorkspaceEditor({
           </span>
           <span className="block mt-1 text-[11px] font-normal text-gray-400">Darker headings, email header</span>
         </label>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <BrandingPicker
+          label="Logo"
+          hint="Nav logo. PNG/JPG/WebP, under 5MB."
+          currentUrl={workspace.logoUrl}
+          preview={logoPreview}
+          removed={logoRemoved}
+          onPick={(f) => pickFile("logo", f)}
+          onRemove={() => { pickFile("logo", null); setLogoRemoved(true); }}
+          onUndo={() => setLogoRemoved(false)}
+        />
+        <BrandingPicker
+          label="Hero image"
+          hint="Homepage hero photo. PNG/JPG/WebP, under 5MB."
+          currentUrl={workspace.heroImageUrl}
+          preview={heroPreview}
+          removed={heroRemoved}
+          onPick={(f) => pickFile("hero", f)}
+          onRemove={() => { pickFile("hero", null); setHeroRemoved(true); }}
+          onUndo={() => setHeroRemoved(false)}
+        />
       </div>
       {error && <p className="text-xs text-red-600">{error}</p>}
       <div className="flex gap-2">

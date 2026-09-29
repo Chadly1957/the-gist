@@ -8,7 +8,7 @@ export async function GET() {
   if (!await getAdminSession()) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const workspaces = await basePrisma.workspace.findMany({
     orderBy: { createdAt: "asc" },
-    select: { id: true, name: true, slug: true, area: true, domain: true, latitude: true, longitude: true, timezone: true, primaryColor: true, secondaryColor: true, _count: { select: { subscriberRows: true, sourceRows: true, newsletterSendRows: true } } },
+    select: { id: true, name: true, slug: true, area: true, domain: true, latitude: true, longitude: true, timezone: true, primaryColor: true, secondaryColor: true, logoUrl: true, heroImageUrl: true, _count: { select: { subscriberRows: true, sourceRows: true, newsletterSendRows: true } } },
   });
   return NextResponse.json({ workspaces, currentId: (await getWorkspace()).id });
 }
@@ -26,6 +26,22 @@ function parseColor(value: unknown): string | null | undefined {
   if (value === undefined || value === null || String(value).trim() === "") return undefined;
   const v = String(value).trim();
   return /^#[0-9a-fA-F]{6}$/.test(v) ? v : null;
+}
+
+function parseBrandingUrl(value: unknown): string | undefined {
+  // Returns undefined when absent. Otherwise the trimmed value ("" clears).
+  if (value === undefined || value === null) return undefined;
+  return String(value).trim();
+}
+
+function isBrandingUrl(value: string): boolean {
+  if (!value || value.length > 2048) return false;
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" || url.protocol === "http:";
+  } catch {
+    return false;
+  }
 }
 
 const US_TIMEZONES = new Set([
@@ -84,7 +100,7 @@ export async function PATCH(req: NextRequest) {
   const existing = await basePrisma.workspace.findUnique({ where: { id }, select: { id: true } });
   if (!existing) return NextResponse.json({ error: "Workspace not found." }, { status: 404 });
 
-  const data: { name?: string; area?: string; domain?: string | null; latitude?: number; longitude?: number; timezone?: string; primaryColor?: string; secondaryColor?: string } = {};
+  const data: { name?: string; area?: string; domain?: string | null; latitude?: number; longitude?: number; timezone?: string; primaryColor?: string; secondaryColor?: string; logoUrl?: string | null; heroImageUrl?: string | null } = {};
   const name = typeof body?.name === "string" ? body.name.trim() : undefined;
   const area = typeof body?.area === "string" ? body.area.trim() : undefined;
   if (name !== undefined) {
@@ -143,6 +159,20 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: "Secondary color must be a hex value like #166534." }, { status: 400 });
   }
   if (secondaryColor !== undefined) data.secondaryColor = secondaryColor;
+  const logoUrl = parseBrandingUrl(body?.logoUrl);
+  if (logoUrl !== undefined) {
+    if (logoUrl !== "" && !isBrandingUrl(logoUrl)) {
+      return NextResponse.json({ error: "Logo must be a valid image URL, or blank to clear it." }, { status: 400 });
+    }
+    data.logoUrl = logoUrl === "" ? null : logoUrl;
+  }
+  const heroImageUrl = parseBrandingUrl(body?.heroImageUrl);
+  if (heroImageUrl !== undefined) {
+    if (heroImageUrl !== "" && !isBrandingUrl(heroImageUrl)) {
+      return NextResponse.json({ error: "Hero image must be a valid image URL, or blank to clear it." }, { status: 400 });
+    }
+    data.heroImageUrl = heroImageUrl === "" ? null : heroImageUrl;
+  }
   if (Object.keys(data).length === 0) {
     return NextResponse.json({ error: "Nothing to update." }, { status: 400 });
   }

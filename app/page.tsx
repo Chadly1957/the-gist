@@ -147,10 +147,12 @@ function CityLandingPage() {
           <div className="grid lg:grid-cols-2 gap-12 lg:gap-20 items-center">
             {/* Left: copy + form */}
             <div>
-              <div className="inline-flex items-center gap-2 bg-green-50 text-green-700 text-xs font-bold px-3 py-1.5 rounded-full mb-6 border border-green-100">
-                <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block animate-pulse" />
-                Join {subCount !== null ? `${subCount.toLocaleString()}+` : "hundreds of"} {workspace.area} neighbors
-              </div>
+              {subCount !== null && subCount >= 10 && (
+                <div className="inline-flex items-center gap-2 bg-green-50 text-green-700 text-xs font-bold px-3 py-1.5 rounded-full mb-6 border border-green-100">
+                  <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block animate-pulse" />
+                  Join {subCount.toLocaleString()}+ {workspace.area} neighbors
+                </div>
+              )}
 
               <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-gray-900 leading-[1.08] tracking-tight mb-5 sm:mb-6">
                 If it&apos;s happening<br />
@@ -159,7 +161,7 @@ function CityLandingPage() {
               </h1>
 
               <p className="text-base sm:text-lg text-gray-500 leading-relaxed mb-8 sm:mb-10 max-w-md">
-                Join hundreds of neighbors who start their morning with {workspace.name}, the one email that tells you what actually matters in {workspace.area} today.
+                Start your morning with {workspace.name}, the one email that tells you what actually matters in {workspace.area} today.
               </p>
 
               {status === "success" ? (
@@ -215,8 +217,8 @@ function CityLandingPage() {
               <div className="relative w-full max-w-md">
                 <div className="rounded-3xl overflow-hidden">
                   <Image
-                    src={brand === "effingham" ? "/hero-effingham.png" : "/hero-decatur.jpg"}
-                    alt={brand === "effingham" ? "Effingham County Courthouse" : "Historic Decatur pavilion"}
+                    src={workspace.heroImageUrl ?? (brand === "effingham" ? "/hero-effingham.png" : "/hero-decatur.jpg")}
+                    alt={workspace.heroImageUrl ? `${workspace.name} hero image` : brand === "effingham" ? "Effingham County Courthouse" : "Historic Decatur pavilion"}
                     width={640}
                     height={700}
                     className="w-full h-auto object-cover"
