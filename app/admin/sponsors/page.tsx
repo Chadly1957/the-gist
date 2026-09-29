@@ -3,7 +3,8 @@ import { WorkspaceAnchor } from "@/components/workspace/WorkspaceLink";
 
 import { workspaceFetch } from "@/lib/workspace-client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import SponsorPreview from "@/components/SponsorPreview";
 import UrlInput from "@/components/UrlInput";
 import MultiDateCalendar from "@/components/MultiDateCalendar";
@@ -224,8 +225,14 @@ function BookingsCalendar({
   );
 }
 
-export default function AdminSponsorsPage() {
-  const [tab, setTab] = useState<"weekly" | "spotlights" | "bookings" | "profiles" | "pricing">("weekly");
+function AdminSponsorsContent() {
+  const searchParams = useSearchParams();
+  const validTabs = ["weekly", "spotlights", "bookings", "profiles", "pricing"] as const;
+  const initialTab = validTabs.includes(searchParams.get("tab") as (typeof validTabs)[number])
+    ? (searchParams.get("tab") as (typeof validTabs)[number])
+    : "weekly";
+  const highlightId = searchParams.get("highlight") || "";
+  const [tab, setTab] = useState<(typeof validTabs)[number]>(initialTab);
   const [spotlights, setSpotlights] = useState<Spotlight[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
@@ -452,6 +459,13 @@ export default function AdminSponsorsPage() {
 
   useEffect(() => { load(); }, []);
 
+  // Deep link from notification emails: ?tab=weekly&highlight=<bookingId>
+  useEffect(() => {
+    if (!highlightId || copyQueue.length === 0) return;
+    const el = document.getElementById(`booking-${highlightId}`);
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [highlightId, copyQueue]);
+
   async function loadWeekly() {
     try {
       const [wbRes, cqRes, waRes] = await Promise.all([
@@ -657,7 +671,11 @@ export default function AdminSponsorsPage() {
                 ) : (
                   <div className="space-y-4">
                     {copyQueue.map((task) => (
-                      <div key={task.id} className="bg-white rounded-xl border border-gray-200 p-4">
+                      <div
+                        key={task.id}
+                        id={`booking-${task.id}`}
+                        className={`bg-white rounded-xl border p-4 ${task.id === highlightId ? "border-amber-400 ring-2 ring-amber-200" : "border-gray-200"}`}
+                      >
                         <div className="flex items-start gap-4">
                           {task.logoUrl && (
                             <img src={task.logoUrl} alt={task.businessName} className="w-16 h-16 object-contain rounded-lg border border-gray-100 shrink-0" />
@@ -1464,5 +1482,13 @@ export default function AdminSponsorsPage() {
         </>
       )}
     </div>
+  );
+}
+
+export default function AdminSponsorsPage() {
+  return (
+    <Suspense>
+      <AdminSponsorsContent />
+    </Suspense>
   );
 }

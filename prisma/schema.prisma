@@ -340,6 +340,9 @@ model SponsorWeekBooking {
   resultsSentAt   DateTime?
   renewalSentAt   DateTime?
   paidAt          DateTime?
+  ownerNotifiedAt   DateTime?
+  buyerNotifiedAt   DateTime?
+  fulfillmentAlertSentAt DateTime?
   createdAt       DateTime       @default(now())
   adBookingRows   AdBooking[]
 

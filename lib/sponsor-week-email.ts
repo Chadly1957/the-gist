@@ -47,10 +47,10 @@ async function loadClient() {
 export async function sendWeekBookingConfirmation(args: {
   to: string; contactName: string; businessName: string; tierLabel: string;
   weekLabel: string; portalUrl: string; chadWritesCopy: boolean;
-}): Promise<void> {
+}): Promise<boolean> {
   try {
     const { workspace, client } = await loadClient();
-    if (!client) return;
+    if (!client) return false;
     const a = accent(workspace);
     const nextStep = args.chadWritesCopy
       ? "Chad is writing your ad copy now. It will be reviewed and live before your week starts, no action needed from you."
@@ -83,35 +83,72 @@ export async function sendWeekBookingConfirmation(args: {
       subject: `Booking confirmed: ${args.tierLabel}, ${args.weekLabel}`,
       htmlBody: html,
     });
+    return true;
   } catch (err) {
     console.error("Failed to send week booking confirmation email:", err);
+    return false;
   }
 }
 
-export async function sendOwnerCopyTask(args: {
-  businessName: string; tierLabel: string; weekLabel: string; aboutText: string;
-  logoUrl: string; chadWritesCopy: boolean; adminUrl: string;
-}): Promise<void> {
+/**
+ * Owner FYI notification: the instant a week locks in, Chad gets the booking
+ * details. This is informational, not an approval gate: the ad auto-places
+ * and runs without any review. The only action item is the optional ~10-min
+ * copy polish when the sponsor asked Chad to write the ad, flagged by the
+ * subject line. Returns true when the email was accepted for sending.
+ */
+export async function sendOwnerBookingNotification(args: {
+  businessName: string; tierLabel: string; weekLabel: string; amountCents: number;
+  contactName: string; buyerEmail: string; aboutText: string; logoUrl: string;
+  chadWritesCopy: boolean; adminUrl: string;
+}): Promise<boolean> {
   try {
     const { settings, client } = await loadClient();
-    if (!client) return;
+    if (!client) return false;
     const to = settings["owner_email"] || process.env.ADMIN_EMAIL || "";
     if (!to) {
-      console.log("Skipping owner copy-task email: no owner_email setting or ADMIN_EMAIL configured.");
-      return;
+      console.log("Skipping owner booking notification: no owner_email setting or ADMIN_EMAIL configured.");
+      return false;
     }
 
-    const copyStatus = args.chadWritesCopy
-      ? "<strong>Action needed:</strong> the buyer asked Chad to write the ad copy. Write it in the admin queue and mark it finalized before the week starts."
-      : "The buyer provided their own copy, so the ad is already live-ready. Review it in the admin queue.";
+    const amount = `$${(args.amountCents / 100).toFixed(0)}`;
+    const subject = args.chadWritesCopy
+      ? `Copy needed: ${args.businessName} booked ${args.weekLabel}`
+      : `Booked: ${args.businessName} - ${args.weekLabel} (no action)`;
+
+    const actionBlock = args.chadWritesCopy
+      ? `
+      <div style="background: #fffbeb; border: 1px solid #fcd34d; border-radius: 12px; padding: 16px; margin: 20px 0;">
+        <p style="color: #92400e; font-size: 14px; font-weight: 700; margin: 0 0 8px;">Action needed: write the ad copy (about 10 minutes)</p>
+        <p style="color: #92400e; font-size: 14px; line-height: 1.5; margin: 0;">
+          The buyer asked you to write their ad. Open the booking in admin, write the copy in the queue,
+          and mark it finalized before the week starts. Nothing else needs your review.
+        </p>
+      </div>`
+      : `
+      <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: 16px; margin: 20px 0;">
+        <p style="color: #166534; font-size: 14px; font-weight: 700; margin: 0 0 8px;">No action needed</p>
+        <p style="color: #166534; font-size: 14px; line-height: 1.5; margin: 0;">
+          The buyer provided their own copy, so the ad auto-placed and will run as scheduled.
+          You do not need to review, adjust, or approve anything.
+        </p>
+      </div>`;
 
     const html = shell(`
       <h2 style="color: #111827; margin: 0 0 12px;">New paid booking: ${escapeHtml(args.businessName)}</h2>
-      <p style="color: #4b5563; font-size: 14px; line-height: 1.5;">
-        <strong>Package:</strong> ${escapeHtml(args.tierLabel)}<br />
-        <strong>Week:</strong> ${escapeHtml(args.weekLabel)}
-      </p>
-      <p style="color: #4b5563; font-size: 14px; line-height: 1.5;">${copyStatus}</p>
+      <table style="width: 100%; border-collapse: collapse; margin: 20px 0; background: #f9fafb; border-radius: 12px;">
+        <tr>
+          <td style="padding: 16px; font-size: 14px; color: #4b5563; line-height: 1.9;">
+            <strong style="color: #111827;">Business:</strong> ${escapeHtml(args.businessName)}<br />
+            <strong style="color: #111827;">Package:</strong> ${escapeHtml(args.tierLabel)}<br />
+            <strong style="color: #111827;">Week:</strong> ${escapeHtml(args.weekLabel)}<br />
+            <strong style="color: #111827;">Amount paid:</strong> ${escapeHtml(amount)}<br />
+            <strong style="color: #111827;">Buyer:</strong> ${escapeHtml(args.contactName)} &lt;${escapeHtml(args.buyerEmail)}&gt;<br />
+            <strong style="color: #111827;">Ad copy:</strong> ${args.chadWritesCopy ? "Chad writes it" : "Buyer provided it"}
+          </td>
+        </tr>
+      </table>
+      ${actionBlock}
       <p style="color: #111827; font-size: 14px; font-weight: 600; margin-bottom: 4px;">What the buyer told readers:</p>
       <blockquote style="border-left: 3px solid #e5e7eb; margin: 0 0 16px; padding: 4px 0 4px 12px; color: #4b5563; font-size: 14px; line-height: 1.5;">
         ${escapeHtml(args.aboutText)}
@@ -121,16 +158,75 @@ export async function sendOwnerCopyTask(args: {
           <img src="${escapeHtml(args.logoUrl)}" alt="${escapeHtml(args.businessName)} logo" style="max-width: 240px; max-height: 120px; border-radius: 8px;" />
         </a>
       </p>
-      ${button(FALLBACK_COLOR, args.adminUrl, "Open Admin Copy Queue")}
+      ${button(FALLBACK_COLOR, args.adminUrl, "Open Booking in Admin")}
     `);
 
-    await client.sendEmail({
+    const result = await client.sendEmail({ to, subject, htmlBody: html });
+    return result.success;
+  } catch (err) {
+    console.error("Failed to send owner booking notification:", err);
+    return false;
+  }
+}
+
+/**
+ * Loud failure alarm: payment was captured but something downstream failed
+ * (slot not locked, confirmation unsent, ad not placed). This is the alarm
+ * that prevents another silent September-style miss. Returns true when the
+ * alarm email was accepted for sending.
+ */
+export async function sendFulfillmentAlert(args: {
+  businessName: string; tierLabel: string; weekLabel: string; amountCents: number;
+  contactName: string; buyerEmail: string; failureSummary: string; adminUrl: string;
+}): Promise<boolean> {
+  try {
+    const { settings, client } = await loadClient();
+    if (!client) return false;
+    const to = settings["owner_email"] || process.env.ADMIN_EMAIL || "";
+    if (!to) {
+      console.error("ALERT UNSENDABLE: no owner_email setting or ADMIN_EMAIL configured.", args.failureSummary);
+      return false;
+    }
+
+    const amount = `$${(args.amountCents / 100).toFixed(0)}`;
+    const when = new Date().toLocaleString("en-US", { timeZone: "America/Chicago" });
+
+    const html = shell(`
+      <div style="background: #fef2f2; border: 2px solid #ef4444; border-radius: 12px; padding: 16px; margin-bottom: 20px;">
+        <p style="color: #991b1b; font-size: 16px; font-weight: 700; margin: 0 0 8px;">A paid booking did not complete cleanly</p>
+        <p style="color: #991b1b; font-size: 14px; line-height: 1.5; margin: 0;">${escapeHtml(args.failureSummary)}</p>
+      </div>
+      <table style="width: 100%; border-collapse: collapse; margin: 20px 0; background: #f9fafb; border-radius: 12px;">
+        <tr>
+          <td style="padding: 16px; font-size: 14px; color: #4b5563; line-height: 1.9;">
+            <strong style="color: #111827;">Business:</strong> ${escapeHtml(args.businessName)}<br />
+            <strong style="color: #111827;">Package:</strong> ${escapeHtml(args.tierLabel)}<br />
+            <strong style="color: #111827;">Week:</strong> ${escapeHtml(args.weekLabel)}<br />
+            <strong style="color: #111827;">Amount paid:</strong> ${escapeHtml(amount)}<br />
+            <strong style="color: #111827;">Buyer:</strong> ${escapeHtml(args.contactName)} &lt;${escapeHtml(args.buyerEmail)}&gt;<br />
+            <strong style="color: #111827;">Detected:</strong> ${escapeHtml(when)} CT
+          </td>
+        </tr>
+      </table>
+      <p style="color: #4b5563; font-size: 14px; line-height: 1.5;">
+        Check the booking in admin to see its current state. If the slot is not locked or the ad rows are
+        missing, the payment is in Stripe and the booking can be repaired or refunded from there.
+      </p>
+      ${button("#b91c1c", args.adminUrl, "Open Booking in Admin")}
+    `);
+
+    const result = await client.sendEmail({
       to,
-      subject: `[Sponsor] New paid booking: ${args.businessName} (${args.tierLabel}, ${args.weekLabel})`,
+      subject: `ALERT: Sponsor booking needs attention - ${args.businessName} (${args.weekLabel})`,
       htmlBody: html,
     });
+    if (!result.success) {
+      console.error("ALERT UNSENDABLE via email:", result.error, args.failureSummary);
+    }
+    return result.success;
   } catch (err) {
-    console.error("Failed to send owner copy-task email:", err);
+    console.error("Failed to send fulfillment alert:", err, args.failureSummary);
+    return false;
   }
 }
 

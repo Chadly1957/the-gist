@@ -2,8 +2,10 @@ import { basePrisma } from "@/lib/db-base";
 import { withWorkspace, getWorkspace, getWorkspaceUrl } from "@/lib/workspace";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import Stripe from "stripe";
 import { addDaysISO, formatWeekRange, upcomingSponsorWeeks } from "@/lib/sponsor-weeks";
 import { getWeekBookingStats } from "@/lib/sponsor-week-stats";
+import { alertBookingFailureOnce, toAlertShape } from "@/lib/sponsor-booking-alerts";
 import {
   sendCommunityBoardUpgradeNudge,
   sendRenewalNudge,
@@ -133,7 +135,68 @@ async function runWorkspace() {
     await prisma.spotlightListing.update({ where: { id: listing.id }, data: { upgradeNudgeSentAt: now } });
   }
 
-  return NextResponse.json({ ok: true, resultsSent, renewalsSent, upgradesSent });
+  // -- 4. Fulfillment watchdog: no silent partial failures ------------------
+  // Backstop for the webhook's immediate alarms. Catches bookings where
+  // payment was captured but the owner was never notified, or that are stuck
+  // in pending_payment with money actually taken. Alerts at most once per
+  // booking (fulfillmentAlertSentAt).
+  let fulfillmentAlerts = 0;
+  const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+  const twoHoursAgo = new Date(now.getTime() - 2 * 60 * 60 * 1000);
+
+  const unnotified = await prisma.sponsorWeekBooking.findMany({
+    where: {
+      status: "paid",
+      ownerNotifiedAt: null,
+      paidAt: { lt: oneHourAgo },
+      fulfillmentAlertSentAt: null,
+    },
+    include: { week: { select: { weekStart: true } } },
+  });
+  for (const booking of unnotified) {
+    const sent = await alertBookingFailureOnce(
+      workspace.id,
+      toAlertShape(booking),
+      "This booking is marked paid and the slot is locked, but the owner notification never went out. The ad was placed; only the notification is missing.",
+      `${appUrl}/admin/sponsors?tab=weekly&highlight=${booking.id}`,
+    );
+    if (sent) fulfillmentAlerts++;
+  }
+
+  const stuckPending = await prisma.sponsorWeekBooking.findMany({
+    where: {
+      status: "pending_payment",
+      createdAt: { lt: twoHoursAgo },
+      stripeSessionId: { not: null },
+      fulfillmentAlertSentAt: null,
+    },
+    include: { week: { select: { weekStart: true } } },
+  });
+  for (const booking of stuckPending) {
+    // Verify with Stripe before alarming: the buyer may simply have abandoned
+    // checkout (the expired-session handler cleans those up).
+    let sessionPaid = false;
+    try {
+      if (process.env.STRIPE_SECRET_KEY && booking.stripeSessionId) {
+        const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+        const s = await stripe.checkout.sessions.retrieve(booking.stripeSessionId);
+        sessionPaid = s.payment_status === "paid";
+      }
+    } catch (err) {
+      console.error(`Watchdog: could not check Stripe session for booking ${booking.id}:`, err);
+      continue;
+    }
+    if (!sessionPaid) continue;
+    const sent = await alertBookingFailureOnce(
+      workspace.id,
+      toAlertShape(booking),
+      "Stripe reports payment captured for this booking, but it is still pending payment in the database. The slot was never locked and no ad was placed.",
+      `${appUrl}/admin/sponsors?tab=weekly&highlight=${booking.id}`,
+    );
+    if (sent) fulfillmentAlerts++;
+  }
+
+  return NextResponse.json({ ok: true, resultsSent, renewalsSent, upgradesSent, fulfillmentAlerts });
 }
 
 export async function GET(req: NextRequest) {
