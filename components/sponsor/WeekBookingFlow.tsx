@@ -92,7 +92,7 @@ export default function WeekBookingFlow({
     website: "",
     logoUrl: "",
     aboutText: "",
-    chadWritesCopy: true,
+    chadWritesCopy: false,
   });
   const [uploading, setUploading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -454,14 +454,13 @@ export default function WeekBookingFlow({
                   placeholder="Family-owned coffee shop downtown since 2012. Fresh-roasted beans, homemade pastries, and the friendliest baristas in Decatur."
                   className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
               </div>
-              <label className="flex items-start gap-2.5 bg-green-50 border border-green-200 rounded-xl p-3 cursor-pointer">
+              <label className="flex items-start gap-2.5 rounded-xl p-1 cursor-pointer">
                 <input type="checkbox" checked={form.chadWritesCopy} onChange={(e) => update("chadWritesCopy", e.target.checked)}
-                  className="mt-0.5 h-4 w-4 accent-green-700" />
+                  className="mt-0.5 h-4 w-4 accent-gray-600" />
                 <span className="text-sm text-gray-700">
                   <span className="font-semibold">Have Chad write my ad for free</span>
-                  <span className="text-green-700 font-medium"> (recommended)</span>
                   <br />
-                  <span className="text-xs text-gray-500">He&apos;ll turn your description above into ad copy that fits the newsletter.</span>
+                  <span className="text-xs text-gray-500">Optional. Leave this unchecked and you&apos;ll write your own headline and body text.</span>
                 </span>
               </label>
 
