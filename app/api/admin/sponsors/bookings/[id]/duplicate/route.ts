@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getAdminSession } from "@/lib/auth";
+import { presentingSlotFree } from "@/lib/sponsor-weeks";
 
 export async function POST(_req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getAdminSession();
@@ -8,6 +9,14 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
 
   const original = await prisma.adBooking.findUnique({ where: { id: params.id } });
   if (!original) return NextResponse.json({ error: "Booking not found." }, { status: 404 });
+
+  // Presenting is a hard cap: 1 per issue, no exceptions, on any path.
+  if (original.type === "presenting" && !(await presentingSlotFree(original.workspaceId, original.date))) {
+    return NextResponse.json(
+      { error: `Presenting slot is already taken for ${original.date}. Hard cap: 1 per issue, no exceptions.` },
+      { status: 409 }
+    );
+  }
 
   const copy = await prisma.adBooking.create({
     data: {

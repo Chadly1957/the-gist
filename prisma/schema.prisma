@@ -34,6 +34,7 @@ model Workspace {
   sponsorWeekRows             SponsorWeek[]
   sponsorHoldRows             SponsorHold[]
   sponsorWeekBookingRows      SponsorWeekBooking[]
+  sponsorDayConfigRows        SponsorDayConfig[]
   gameSponsorEventRows        GameSponsorEvent[]
   eventRows                   Event[]
   referralSprintRows          ReferralSprint[]
@@ -259,6 +260,9 @@ model AdBooking {
   date              String
   status            String             @default("pending_review")
   isPaid            Boolean            @default(false)
+  // $0 comp/house placement (spec section 12). Marked in admin only; the
+  // newsletter renders it like any other ad.
+  isComp            Boolean            @default(false)
   discountPct       Int                @default(0)
   stripeSessionId   String?
   imageUrl          String?
@@ -279,6 +283,17 @@ model AdBooking {
   @@index([stripeSessionId])
   @@index([workspaceId])
   @@index([sponsorWeekBookingId])
+}
+
+model SponsorDayConfig {
+  workspaceId  String    @default("decatur")
+  workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  date         String    // YYYY-MM-DD of the newsletter issue
+  maxInArticle Int       @default(2) // per-issue standard-slot override (soft cap)
+  createdAt    DateTime  @default(now())
+
+  @@id([workspaceId, date])
+  @@index([workspaceId])
 }
 
 // Week-based sponsor packages (Presenting $150/wk, Standard $75/wk).

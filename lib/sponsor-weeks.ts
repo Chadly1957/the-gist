@@ -9,8 +9,9 @@ export const WEEK_TIERS = {
 export type WeekTier = keyof typeof WEEK_TIERS;
 
 export const HOLD_MINUTES = 10;
-// Bookings that occupy a slot: the buyer is mid-checkout or has paid.
-const OCCUPYING_STATUSES = ["pending_payment", "paid"];
+// Bookings that occupy a slot: the buyer is mid-checkout, has paid, or the
+// slot was filled by an admin comp/house placement.
+const OCCUPYING_STATUSES = ["pending_payment", "paid", "comped"];
 
 function toISODate(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -119,7 +120,9 @@ export async function countTaken(
 export async function getWeeksAvailability(workspaceId: string): Promise<WeekAvailability[]> {
   const now = new Date();
   const weeks = upcomingSponsorWeeks();
-  const [holds, bookings] = await Promise.all([
+  // All Mon-Fri issue dates across the upcoming weeks.
+  const issueDates = weeks.flatMap((w) => [0, 1, 2, 3, 4].map((o) => addDaysISO(w, o)));
+  const [holds, bookings, dayRows] = await Promise.all([
     basePrisma.sponsorHold.findMany({
       where: { workspaceId, week: { weekStart: { in: weeks } }, expiresAt: { gt: now } },
       select: { tier: true, week: { select: { weekStart: true } } },
@@ -128,17 +131,46 @@ export async function getWeeksAvailability(workspaceId: string): Promise<WeekAva
       where: { workspaceId, week: { weekStart: { in: weeks } }, status: { in: OCCUPYING_STATUSES } },
       select: { tier: true, week: { select: { weekStart: true } } },
     }),
+    // Standalone day-level admin placements (sponsorWeekBookingId IS NULL).
+    // Projected week rows carry sponsorWeekBookingId, so they are excluded
+    // here and counted once via the weekly bookings above.
+    basePrisma.adBooking.findMany({
+      where: {
+        workspaceId,
+        date: { in: issueDates },
+        sponsorWeekBookingId: null,
+        type: { in: ["in_article", "presenting"] },
+        status: { in: ["approved", "pending_review", "pending_payment"] },
+      },
+      select: { date: true, type: true },
+    }),
   ]);
   const takenByWeekTier = new Map<string, number>();
   for (const r of [...holds, ...bookings]) {
     const key = `${r.week.weekStart}:${r.tier}`;
     takenByWeekTier.set(key, (takenByWeekTier.get(key) ?? 0) + 1);
   }
+  // A public weekly package needs one free slot on EVERY weekday Mon-Fri.
+  // Fold day-level fills in as: weeklyTaken + max over the week's days of
+  // standalone day usage, so a single-day admin fill shows real scarcity.
+  const dayUsageByDate = new Map<string, Map<string, number>>();
+  for (const r of dayRows) {
+    const tier = r.type === "presenting" ? "presenting" : "standard";
+    let m = dayUsageByDate.get(r.date);
+    if (!m) { m = new Map(); dayUsageByDate.set(r.date, m); }
+    m.set(tier, (m.get(tier) ?? 0) + 1);
+  }
   return weeks.map((weekStart) => ({
     weekStart,
     label: formatWeekRange(weekStart),
     tiers: (Object.keys(WEEK_TIERS) as WeekTier[]).map((tier) => {
-      const taken = takenByWeekTier.get(`${weekStart}:${tier}`) ?? 0;
+      const weeklyTaken = takenByWeekTier.get(`${weekStart}:${tier}`) ?? 0;
+      let maxDay = 0;
+      for (let o = 0; o < 5; o++) {
+        const m = dayUsageByDate.get(addDaysISO(weekStart, o));
+        if (m) maxDay = Math.max(maxDay, m.get(tier) ?? 0);
+      }
+      const taken = weeklyTaken + maxDay;
       const slots = WEEK_TIERS[tier].slots;
       const state: WeekState = taken >= slots ? "sold" : taken === slots - 1 ? "one_left" : "available";
       return { tier, state, taken, slots };
@@ -164,6 +196,8 @@ export interface WeekBookingProjectionInput {
   aboutText: string;
   finalAdCopy: string | null;
   chadWritesCopy: boolean;
+  // $0 comp/house placement: projected rows are unpaid but marked comp.
+  isComp?: boolean;
 }
 
 /** Build the 5 Mon-Fri AdBooking rows for a paid week booking (pure). */
@@ -177,7 +211,8 @@ export function buildWeekProjectionRows(booking: WeekBookingProjectionInput) {
     type: adType,
     date: addDaysISO(booking.weekStart, offset),
     status: approved ? "approved" : "pending_review",
-    isPaid: true,
+    isPaid: !booking.isComp,
+    isComp: booking.isComp ?? false,
     headline: booking.businessName,
     body: copy,
     // Website is optional for paid buyers; the template omits the CTA button
@@ -194,4 +229,17 @@ export function buildWeekProjectionRows(booking: WeekBookingProjectionInput) {
 
 export async function projectWeekBooking(booking: WeekBookingProjectionInput): Promise<void> {
   await basePrisma.adBooking.createMany({ data: buildWeekProjectionRows(booking) });
+}
+
+/**
+ * Presenting slot is a HARD cap: exactly 1 per newsletter issue, no
+ * exceptions, on every path including admin. Returns true when a presenting
+ * ad may be placed for the given date.
+ */
+export async function presentingSlotFree(workspaceId: string, date: string): Promise<boolean> {
+  const existing = await basePrisma.adBooking.findFirst({
+    where: { workspaceId, date, type: "presenting", status: { in: ["approved", "pending_review", "pending_payment"] } },
+    select: { id: true },
+  });
+  return !existing;
 }
