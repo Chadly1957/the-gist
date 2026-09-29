@@ -4,6 +4,17 @@ import Image from "next/image";
 
 export default function Logo({ className = "h-7 w-auto" }: { className?: string }) {
   const { workspace } = useWorkspace();
+  if (workspace.id === "effingham")
+    return (
+      <Image
+        src="/effingham-logo.png"
+        alt="The Gist Effingham"
+        width={160}
+        height={134}
+        className={`object-contain ${className}`}
+        priority
+      />
+    );
   if (workspace.id !== "decatur") return <span className={`inline-flex items-center font-bold text-green-800 ${className}`}>{workspace.name}</span>;
   return (
     <Image

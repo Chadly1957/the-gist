@@ -11,6 +11,7 @@ import SponsorsMarquee from "@/components/SponsorsMarquee";
 import RecentIssues from "@/components/RecentIssues";
 
 function DecaturLandingPage() {
+  const { workspace } = useWorkspace();
   const [email, setEmail] = useState("");
   const [firstName, setFirstName] = useState("");
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
@@ -207,13 +208,13 @@ function DecaturLandingPage() {
               )}
             </div>
 
-            {/* Right: Decatur photo */}
+            {/* Right: hero photo (per-workspace) */}
             <div className="hidden lg:flex items-center justify-center">
               <div className="relative w-full max-w-md">
                 <div className="rounded-3xl overflow-hidden">
                   <Image
-                    src="/hero-decatur.jpg"
-                    alt="Historic Decatur pavilion"
+                    src={workspace.id === "effingham" ? "/hero-effingham.png" : "/hero-decatur.jpg"}
+                    alt={workspace.id === "effingham" ? "Effingham County Courthouse" : "Historic Decatur pavilion"}
                     width={640}
                     height={700}
                     className="w-full h-auto object-cover"
