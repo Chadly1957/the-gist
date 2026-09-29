@@ -2,7 +2,6 @@
 import { workspaceFetch } from "@/lib/workspace-client";
 
 import { useState, useEffect } from "react";
-import CommunityHome from "@/components/workspace/CommunityHome";
 import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
 import Image from "next/image";
 import Link from "@/components/workspace/WorkspaceLink";
@@ -10,7 +9,8 @@ import Logo from "@/components/Logo";
 import SponsorsMarquee from "@/components/SponsorsMarquee";
 import RecentIssues from "@/components/RecentIssues";
 
-function DecaturLandingPage() {
+function CityLandingPage() {
+  const { workspace } = useWorkspace();
   const [email, setEmail] = useState("");
   const [firstName, setFirstName] = useState("");
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
@@ -40,7 +40,7 @@ function DecaturLandingPage() {
       const data = await res.json();
       if (res.ok) {
         setStatus("success");
-        setMessage(data.message || "You're in! Welcome to The Gist Decatur.");
+        setMessage(data.message || "You're in! Welcome to " + workspace.name + ".");
         setEmail("");
         setFirstName("");
       } else {
@@ -146,17 +146,17 @@ function DecaturLandingPage() {
             <div>
               <div className="inline-flex items-center gap-2 bg-green-50 text-green-700 text-xs font-bold px-3 py-1.5 rounded-full mb-6 border border-green-100">
                 <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block animate-pulse" />
-                Join {subCount !== null ? `${subCount.toLocaleString()}+` : "hundreds of"} Decatur neighbors
+                Join {subCount !== null ? `${subCount.toLocaleString()}+` : "hundreds of"} {workspace.area} neighbors
               </div>
 
               <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-gray-900 leading-[1.08] tracking-tight mb-5 sm:mb-6">
                 If it&apos;s happening<br />
-                in Decatur,<br />
+                in {workspace.area},<br />
                 <span className="text-green-700">you&apos;ll hear it here first.</span>
               </h1>
 
               <p className="text-base sm:text-lg text-gray-500 leading-relaxed mb-8 sm:mb-10 max-w-md">
-                Join hundreds of neighbors who start their morning with The Gist Decatur, the one email that tells you what actually matters in Decatur today.
+                Join hundreds of neighbors who start their morning with {workspace.name}, the one email that tells you what actually matters in {workspace.area} today.
               </p>
 
               {status === "success" ? (
@@ -207,13 +207,13 @@ function DecaturLandingPage() {
               )}
             </div>
 
-            {/* Right: Decatur photo */}
+            {/* Right: hero photo (per-workspace) */}
             <div className="hidden lg:flex items-center justify-center">
               <div className="relative w-full max-w-md">
                 <div className="rounded-3xl overflow-hidden">
                   <Image
-                    src="/hero-decatur.jpg"
-                    alt="Historic Decatur pavilion"
+                    src={workspace.id === "effingham" ? "/hero-effingham.png" : "/hero-decatur.jpg"}
+                    alt={workspace.id === "effingham" ? "Effingham County Courthouse" : "Historic Decatur pavilion"}
                     width={640}
                     height={700}
                     className="w-full h-auto object-cover"
@@ -235,7 +235,7 @@ function DecaturLandingPage() {
                 What&apos;s in each issue?
               </h2>
               <p className="text-gray-500 max-w-md mx-auto">
-                Everything you need to know about Decatur, delivered in under two minutes.
+                Everything you need to know about {workspace.area}, delivered in under two minutes.
               </p>
             </div>
             <div className="grid sm:grid-cols-3 gap-5">
@@ -247,7 +247,7 @@ function DecaturLandingPage() {
                     </svg>
                   ),
                   title: "Top Local Stories",
-                  desc: "Curated articles from trusted Decatur sources, delivered fresh each morning.",
+                  desc: `Curated articles from trusted ${workspace.area} sources, delivered fresh each morning.`,
                 },
                 {
                   icon: (
@@ -265,7 +265,7 @@ function DecaturLandingPage() {
                     </svg>
                   ),
                   title: "Straight to Inbox",
-                  desc: "No algorithms. No doomscrolling. Just your daily Decatur digest, right in your email.",
+                  desc: `No algorithms. No doomscrolling. Just your daily ${workspace.area} digest, right in your email.`,
                 },
               ].map((item) => (
                 <div key={item.title} className="bg-white rounded-2xl p-7 border border-gray-100 shadow-sm">
@@ -290,7 +290,7 @@ function DecaturLandingPage() {
               <div>
                 <p className="text-green-400 text-xs font-bold uppercase tracking-widest mb-4">For Local Businesses</p>
                 <h2 className="text-4xl font-extrabold text-white tracking-tight leading-tight mb-4">
-                  Reach Decatur<br />readers every day.
+                  Reach {workspace.area}<br />readers every day.
                 </h2>
                 <p className="text-green-200 text-base leading-relaxed mb-8 max-w-md">
                   Connect your business with engaged, local subscribers who actually read their newsletter. Three tiers designed for every budget, starting free.
@@ -345,7 +345,7 @@ function DecaturLandingPage() {
         <section className="py-14 sm:py-20">
           <div className="max-w-xl mx-auto px-6 text-center">
             <h2 className="text-3xl font-extrabold text-gray-900 tracking-tight mb-3">
-              Join Decatur&apos;s daily briefing.
+              Join {workspace.area}&apos;s daily briefing.
             </h2>
             <p className="text-gray-500 mb-8">Free forever. One email a day. No fluff.</p>
             {status === "success" ? (
@@ -386,7 +386,7 @@ function DecaturLandingPage() {
             <Link href="/games" className="hover:text-gray-600 transition-colors">Games</Link>
             <Link href="/sponsor" className="hover:text-gray-600 transition-colors">Advertise</Link>
             <Link href="/unsubscribe" className="hover:text-gray-600 transition-colors">Unsubscribe</Link>
-            <span>&copy; {new Date().getFullYear()} The Gist Decatur</span>
+            <span>&copy; {new Date().getFullYear()} {workspace.name}</span>
           </div>
         </div>
       </footer>
@@ -395,6 +395,5 @@ function DecaturLandingPage() {
 }
 
 export default function LandingPage() {
-  const { workspace } = useWorkspace();
-  return workspace.id === "decatur" ? <DecaturLandingPage /> : <CommunityHome />;
+  return <CityLandingPage />;
 }
