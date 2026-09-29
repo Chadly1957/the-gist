@@ -84,7 +84,7 @@ export async function PATCH(req: NextRequest) {
   const existing = await basePrisma.workspace.findUnique({ where: { id }, select: { id: true } });
   if (!existing) return NextResponse.json({ error: "Workspace not found." }, { status: 404 });
 
-  const data: { name?: string; area?: string; latitude?: number; longitude?: number; timezone?: string; primaryColor?: string; secondaryColor?: string } = {};
+  const data: { name?: string; area?: string; domain?: string | null; latitude?: number; longitude?: number; timezone?: string; primaryColor?: string; secondaryColor?: string } = {};
   const name = typeof body?.name === "string" ? body.name.trim() : undefined;
   const area = typeof body?.area === "string" ? body.area.trim() : undefined;
   if (name !== undefined) {
@@ -114,6 +114,24 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: "Pick a valid timezone for this workspace." }, { status: 400 });
     }
     data.timezone = timezone;
+  }
+  if (body?.domain !== undefined) {
+    // Custom hostname for this workspace (must already be added to the
+    // hosting provider). Empty string clears it.
+    const raw = typeof body.domain === "string" ? body.domain.trim().toLowerCase() : "";
+    if (raw === "") {
+      data.domain = null;
+    } else {
+      const host = raw.replace(/^https?:\/\//, "").split("/")[0];
+      if (!/^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$/.test(host)) {
+        return NextResponse.json({ error: "Enter a valid domain like thegisteffingham.com." }, { status: 400 });
+      }
+      const clash = await basePrisma.workspace.findUnique({ where: { domain: host }, select: { id: true } });
+      if (clash && clash.id !== id) {
+        return NextResponse.json({ error: "That domain is already attached to another workspace." }, { status: 409 });
+      }
+      data.domain = host;
+    }
   }
   const primaryColor = parseColor(body?.primaryColor);
   if (primaryColor === null) {
