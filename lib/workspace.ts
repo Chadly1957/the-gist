@@ -11,7 +11,10 @@ export function withWorkspace<T>(workspace: WorkspaceInfo, task: () => T): T {
 const requestWorkspaces = new WeakMap<ReturnType<typeof headers>, Promise<WorkspaceInfo>>();
 async function resolveRequestWorkspace(h: ReturnType<typeof headers>): Promise<WorkspaceInfo> {
   const slug = h.get("x-gist-workspace");
-  const host = (h.get("host") || "").split(":")[0].toLowerCase();
+  const rawHost = (h.get("host") || "").split(":")[0].toLowerCase();
+  // Strip a leading www. so www.thegisteffingham.com resolves to the
+  // Effingham workspace instead of silently falling back to Decatur.
+  const host = rawHost.startsWith("www.") ? rawHost.slice(4) : rawHost;
   const workspace = slug
     ? await basePrisma.workspace.findUnique({ where: { slug } })
     : await basePrisma.workspace.findUnique({ where: { domain: host } })
