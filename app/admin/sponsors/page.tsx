@@ -52,6 +52,52 @@ interface Profile {
   portalUrl: string;
 }
 
+interface WeekBooking {
+  id: string;
+  weekStart: string;
+  tier: string;
+  status: string;
+  amountCents: number;
+  businessName: string;
+  contactName: string;
+  email: string;
+  website: string | null;
+  logoUrl: string;
+  aboutText: string;
+  chadWritesCopy: boolean;
+  finalAdCopy: string | null;
+  copyFinalizedAt: string | null;
+  createdAt: string;
+}
+
+interface CopyTask extends WeekBooking {}
+
+interface TierAvailability {
+  tier: string;
+  state: string;
+  taken: number;
+  slots: number;
+}
+
+interface WeekAvail {
+  weekStart: string;
+  label: string;
+  tiers: TierAvailability[];
+}
+
+// "MMM d - MMM d" for a Monday weekStart, e.g. "Sep 28 - Oct 2".
+function formatWeekLabel(weekStart: string) {
+  const [y, m, d] = weekStart.split("-").map(Number);
+  const start = new Date(y, m - 1, d);
+  const end = new Date(y, m - 1, d + 4);
+  const opts: Intl.DateTimeFormatOptions = { month: "short", day: "numeric" };
+  return `${start.toLocaleDateString("en-US", opts)} - ${end.toLocaleDateString("en-US", opts)}`;
+}
+
+function tierLabel(tier: string) {
+  return tier === "presenting" ? "Presenting" : tier === "standard" ? "Standard" : tier;
+}
+
 const STATUS_COLORS: Record<string, string> = {
   pending: "bg-yellow-50 text-yellow-700",
   pending_review: "bg-yellow-50 text-yellow-700",
@@ -179,10 +225,15 @@ function BookingsCalendar({
 }
 
 export default function AdminSponsorsPage() {
-  const [tab, setTab] = useState<"spotlights" | "bookings" | "profiles" | "pricing">("spotlights");
+  const [tab, setTab] = useState<"weekly" | "spotlights" | "bookings" | "profiles" | "pricing">("weekly");
   const [spotlights, setSpotlights] = useState<Spotlight[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [weekBookings, setWeekBookings] = useState<WeekBooking[]>([]);
+  const [copyQueue, setCopyQueue] = useState<CopyTask[]>([]);
+  const [weekAvail, setWeekAvail] = useState<WeekAvail[]>([]);
+  const [copyDrafts, setCopyDrafts] = useState<Record<string, string>>({});
+  const [finalizingId, setFinalizingId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [previewId, setPreviewId] = useState<string | null>(null);
@@ -396,9 +447,46 @@ export default function AdminSponsorsPage() {
     } finally {
       setLoading(false);
     }
+    loadWeekly();
   }
 
   useEffect(() => { load(); }, []);
+
+  async function loadWeekly() {
+    try {
+      const [wbRes, cqRes, waRes] = await Promise.all([
+        workspaceFetch("/api/admin/sponsors/week-bookings"),
+        workspaceFetch("/api/admin/sponsors/copy-queue"),
+        workspaceFetch("/api/sponsor/weeks"),
+      ]);
+      const wb = await wbRes.json();
+      const cq = await cqRes.json();
+      const wa = await waRes.json();
+      setWeekBookings(Array.isArray(wb) ? wb : []);
+      setCopyQueue(Array.isArray(cq) ? cq : []);
+      setWeekAvail(wa.weeks || []);
+    } catch (err) {
+      console.error("[sponsors] weekly load failed:", err);
+    }
+  }
+
+  async function finalizeCopy(bookingId: string) {
+    const copy = (copyDrafts[bookingId] || "").trim();
+    if (!copy) { alert("Write the final ad copy first."); return; }
+    setFinalizingId(bookingId);
+    try {
+      const res = await workspaceFetch("/api/admin/sponsors/copy-queue", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bookingId, finalAdCopy: copy }),
+      });
+      if (!res.ok) { alert("Failed to finalize copy."); return; }
+      setCopyDrafts((d) => { const n = { ...d }; delete n[bookingId]; return n; });
+      await loadWeekly();
+    } finally {
+      setFinalizingId(null);
+    }
+  }
 
   async function savePrices() {
     setPriceSaving(true);
@@ -522,16 +610,27 @@ export default function AdminSponsorsPage() {
 
       {/* Tabs */}
       <div className="flex gap-1 mb-6 border-b border-gray-200">
-        {(["spotlights", "bookings", "profiles", "pricing"] as const).map((t) => (
-          <button key={t} onClick={() => setTab(t)}
-            className={`px-4 py-2 text-sm font-medium capitalize transition-colors border-b-2 -mb-px ${tab === t ? "border-green-600 text-green-700" : "border-transparent text-gray-500 hover:text-gray-700"}`}>
-            {t}
-            {t === "spotlights" && spotlights.filter((s) => s.status === "pending").length > 0 && (
+        {([
+          { id: "weekly", label: "Weekly Packages" },
+          { id: "spotlights", label: "Spotlights" },
+          { id: "bookings", label: "Bookings" },
+          { id: "profiles", label: "Profiles" },
+          { id: "pricing", label: "Pricing" },
+        ] as const).map((t) => (
+          <button key={t.id} onClick={() => setTab(t.id)}
+            className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${tab === t.id ? "border-green-600 text-green-700" : "border-transparent text-gray-500 hover:text-gray-700"}`}>
+            {t.label}
+            {t.id === "weekly" && copyQueue.length > 0 && (
+              <span className="ml-1.5 bg-orange-100 text-orange-700 text-xs font-bold px-1.5 py-0.5 rounded-full">
+                {copyQueue.length}
+              </span>
+            )}
+            {t.id === "spotlights" && spotlights.filter((s) => s.status === "pending").length > 0 && (
               <span className="ml-1.5 bg-orange-100 text-orange-700 text-xs font-bold px-1.5 py-0.5 rounded-full">
                 {spotlights.filter((s) => s.status === "pending").length}
               </span>
             )}
-            {t === "bookings" && bookings.filter((b) => b.status === "pending_review").length > 0 && (
+            {t.id === "bookings" && bookings.filter((b) => b.status === "pending_review").length > 0 && (
               <span className="ml-1.5 bg-orange-100 text-orange-700 text-xs font-bold px-1.5 py-0.5 rounded-full">
                 {bookings.filter((b) => b.status === "pending_review").length}
               </span>
@@ -547,6 +646,93 @@ export default function AdminSponsorsPage() {
       ) : (
         <>
           {/* SPOTLIGHTS */}
+          {/* WEEKLY PACKAGES */}
+          {tab === "weekly" && (
+            <div className="space-y-8">
+              {/* Copy queue */}
+              <section>
+                <h2 className="text-lg font-semibold text-gray-900 mb-3">Copy queue</h2>
+                {copyQueue.length === 0 ? (
+                  <p className="text-sm text-gray-500 bg-white rounded-xl border border-gray-200 p-4">Copy queue is clear.</p>
+                ) : (
+                  <div className="space-y-4">
+                    {copyQueue.map((task) => (
+                      <div key={task.id} className="bg-white rounded-xl border border-gray-200 p-4">
+                        <div className="flex items-start gap-4">
+                          {task.logoUrl && (
+                            <img src={task.logoUrl} alt={task.businessName} className="w-16 h-16 object-contain rounded-lg border border-gray-100 shrink-0" />
+                          )}
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <h3 className="font-semibold text-gray-900">{task.businessName}</h3>
+                              <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-blue-50 text-blue-700">{tierLabel(task.tier)}</span>
+                              <span className="text-xs text-gray-500">{formatWeekLabel(task.weekStart)}</span>
+                            </div>
+                            <p className="text-sm text-gray-600 mt-2">{task.aboutText}</p>
+                            <div className="text-xs text-gray-500 mt-1 flex flex-wrap gap-x-3">
+                              <span>{task.contactName} &lt;{task.email}&gt;</span>
+                              {task.website && (
+                                <a href={task.website} target="_blank" rel="noreferrer" className="text-green-700 hover:underline">Website</a>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        <textarea
+                          value={copyDrafts[task.id] || ""}
+                          onChange={(e) => setCopyDrafts((d) => ({ ...d, [task.id]: e.target.value }))}
+                          placeholder="Write the final ad copy for this week's newsletter..."
+                          rows={3}
+                          className="w-full mt-3 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                        />
+                        <div className="mt-2 flex justify-end">
+                          <button
+                            onClick={() => finalizeCopy(task.id)}
+                            disabled={finalizingId === task.id}
+                            className="px-4 py-2 text-sm font-medium bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+                          >
+                            {finalizingId === task.id ? "Finalizing..." : "Mark copy finalized"}
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
+
+              {/* Upcoming weeks */}
+              <section>
+                <h2 className="text-lg font-semibold text-gray-900 mb-3">Upcoming weeks</h2>
+                <div className="bg-white rounded-xl border border-gray-200 divide-y divide-gray-100">
+                  {weekAvail.length === 0 && (
+                    <p className="text-sm text-gray-500 p-4">No upcoming weeks found.</p>
+                  )}
+                  {weekAvail.map((w) => (
+                    <div key={w.weekStart} className="p-4">
+                      <h3 className="text-sm font-semibold text-gray-800 mb-2">{formatWeekLabel(w.weekStart)}</h3>
+                      <div className="space-y-1.5">
+                        {w.tiers.map((t) => {
+                          const booked = weekBookings.filter(
+                            (b) => b.weekStart === w.weekStart && b.tier === t.tier && ["pending_payment", "paid", "completed"].includes(b.status)
+                          );
+                          return (
+                            <div key={t.tier} className="flex items-baseline gap-3 text-sm">
+                              <span className="w-40 shrink-0 font-medium text-gray-700">
+                                {tierLabel(t.tier)} {t.taken}/{t.slots}
+                              </span>
+                              <span className="text-gray-600 truncate">
+                                {booked.length > 0 ? booked.map((b) => b.businessName).join(", ") : <span className="text-gray-400">Open</span>}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            </div>
+          )}
+
           {tab === "spotlights" && (
             <div className="space-y-3">
               {spotlights.length === 0 && <p className="text-sm text-gray-400">No spotlight listings yet.</p>}

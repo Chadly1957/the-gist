@@ -1,256 +1,239 @@
 "use client";
-import { WorkspaceAnchor } from "@/components/workspace/WorkspaceLink";
 
-import { workspaceFetch } from "@/lib/workspace-client";
-
-import { useState, Suspense, useRef } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "@/components/workspace/WorkspaceLink";
 import Logo from "@/components/Logo";
-import UrlInput from "@/components/UrlInput";
-import MultiDateCalendar from "@/components/MultiDateCalendar";
+import { workspaceFetch } from "@/lib/workspace-client";
 import { normalizeUrl } from "@/lib/url";
 
-type Step = "apply" | "listing" | "booking" | "done";
-type Tier = "spotlight" | "in_article" | "presenting";
+type Step = "week" | "business";
+type Tier = "presenting" | "standard";
 
-const TIER_META: Record<Tier, { label: string; step2Heading: string; step2Sub: string }> = {
-  spotlight: {
-    label: "Community Partners",
-    step2Heading: "Set up your free listing",
-    step2Sub: "This is how you'll appear in every newsletter. Takes 2 minutes.",
-  },
-  in_article: {
-    label: "Standard Sponsorship",
-    step2Heading: "Reserve your ad dates",
-    step2Sub: "Enter your ad details and pick your date. We'll confirm within 1–2 business days.",
-  },
+interface TierAvailability {
+  tier: Tier;
+  state: "available" | "one_left" | "sold";
+  taken: number;
+  slots: number;
+}
+interface WeekAvailability {
+  weekStart: string;
+  label: string;
+  tiers: TierAvailability[];
+}
+
+const TIER_META: Record<Tier, { label: string; price: string; blurb: string }> = {
   presenting: {
     label: "Presenting Sponsor",
-    step2Heading: "Reserve your presenting dates",
-    step2Sub: "Enter your ad details and pick your date. We'll confirm within 1–2 business days.",
+    price: "$150/week",
+    blurb: "Top of the email. Your logo, a short write-up, and link. Exclusive: only one per week.",
+  },
+  standard: {
+    label: "Standard Sponsor",
+    price: "$75/week",
+    blurb: "Mid-email placement. Your logo and a short write-up. Two slots per week.",
   },
 };
 
 function ApplyContent() {
   const searchParams = useSearchParams();
   const tierParam = searchParams.get("tier");
-  const tier: Tier = tierParam && tierParam in TIER_META ? (tierParam as Tier) : "spotlight";
+  const tier: Tier = tierParam === "presenting" ? "presenting" : "standard";
+  const cancelled = searchParams.get("cancelled") === "1";
+  const rebookParam = searchParams.get("rebook");
   const meta = TIER_META[tier];
 
-  const [step, setStep] = useState<Step>("apply");
-  const [token, setToken] = useState("");
-  const [portalUrl, setPortalUrl] = useState("");
-  const [doneMessage, setDoneMessage] = useState("");
-  const [listingCreated, setListingCreated] = useState(false);
+  const [step, setStep] = useState<Step>("week");
+  const [weeks, setWeeks] = useState<WeekAvailability[]>([]);
+  const [weeksLoading, setWeeksLoading] = useState(true);
+  const [weeksError, setWeeksError] = useState("");
 
-  // Step 1 — apply
-  const [form, setForm] = useState({ businessName: "", contactName: "", email: "", phone: "", website: "" });
-  const [submitting, setSubmitting] = useState(false);
-  const [applyError, setApplyError] = useState("");
-  const [showResend, setShowResend] = useState(false);
-  const [resendEmail, setResendEmail] = useState("");
-  const [resendSubmitting, setResendSubmitting] = useState(false);
-  const [resendMessage, setResendMessage] = useState("");
+  // Hold state
+  const [holdToken, setHoldToken] = useState("");
+  const [heldWeekLabel, setHeldWeekLabel] = useState("");
+  const [expiresAt, setExpiresAt] = useState(0);
+  const [secondsLeft, setSecondsLeft] = useState(0);
+  const [holding, setHolding] = useState(false);
+  const [holdError, setHoldError] = useState("");
 
-  // Step 2a — listing (spotlight)
-  const [lForm, setLForm] = useState({ businessName: "", description: "", ctaUrl: "", ctaLabel: "Visit Website", logoUrl: "" });
-  const [lSubmitting, setLSubmitting] = useState(false);
-  const [lError, setLError] = useState("");
-  const [lUploading, setLUploading] = useState(false);
-  const lFileRef = useRef<HTMLInputElement>(null);
-
-  // Step 2b — booking (in_article / presenting)
-  const [bDates, setBDates] = useState<string[]>([]);
-  const [bForm, setBForm] = useState({
-    type: "in_article" as "in_article" | "presenting",
-    headline: "",
-    body: "",
-    ctaUrl: "",
-    ctaLabel: "Learn More",
-    imageUrl: "",
-    presentingBlurb: "",
+  // Business form
+  const [form, setForm] = useState({
+    businessName: "",
+    contactName: "",
+    email: "",
+    website: "",
+    logoUrl: "",
+    aboutText: "",
+    chadWritesCopy: true,
   });
-  const [bSubmitting, setBSubmitting] = useState(false);
-  const [bError, setBError] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [formError, setFormError] = useState("");
+  const [rebooked, setRebooked] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
 
-  function update(key: string, val: string) {
+  function update(key: keyof typeof form, val: string | boolean) {
     setForm((f) => ({ ...f, [key]: val }));
   }
 
-  async function handleResend() {
-    if (!resendEmail.trim()) return;
-    setResendSubmitting(true);
-    setResendMessage("");
+  async function loadWeeks() {
+    setWeeksLoading(true);
+    setWeeksError("");
     try {
-      const res = await workspaceFetch("/api/sponsor/resend", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: resendEmail }),
-      });
+      const res = await workspaceFetch("/api/sponsor/weeks");
       const data = await res.json();
-      setResendMessage(res.ok ? data.message : data.error || "Something went wrong.");
+      if (!res.ok) throw new Error(data.error || "Could not load weeks.");
+      setWeeks(data.weeks);
     } catch {
-      setResendMessage("Connection error. Please try again.");
+      setWeeksError("Could not load availability. Please refresh and try again.");
     } finally {
-      setResendSubmitting(false);
+      setWeeksLoading(false);
     }
   }
 
-  async function handleApply(e: React.FormEvent) {
-    e.preventDefault();
-    setSubmitting(true);
-    setApplyError("");
+  useEffect(() => {
+    loadWeeks();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Rebook prefill
+  useEffect(() => {
+    if (!rebookParam) return;
+    (async () => {
+      try {
+        const res = await workspaceFetch(`/api/sponsor/week-bookings/by-token?token=${encodeURIComponent(rebookParam)}`);
+        const data = await res.json();
+        if (res.ok) {
+          setForm((f) => ({
+            ...f,
+            businessName: data.businessName || "",
+            contactName: data.contactName || "",
+            email: data.email || "",
+            website: data.website || "",
+            logoUrl: data.logoUrl || "",
+            aboutText: data.aboutText || "",
+          }));
+          setRebooked(true);
+        }
+      } catch {
+        /* ignore invalid token */
+      }
+    })();
+  }, [rebookParam]);
+
+  // Hold countdown
+  useEffect(() => {
+    if (step !== "business" || !expiresAt) return;
+    const id = setInterval(() => {
+      const left = Math.max(0, Math.round((expiresAt - Date.now()) / 1000));
+      setSecondsLeft(left);
+      if (left <= 0) {
+        clearInterval(id);
+        handleHoldExpired();
+      }
+    }, 1000);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, expiresAt]);
+
+  async function handleHoldExpired() {
+    if (holdToken) {
+      try {
+        await workspaceFetch("/api/sponsor/week-holds", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ holdToken }),
+        });
+      } catch {
+        /* best effort */
+      }
+    }
+    setHoldToken("");
+    setStep("week");
+    setHoldError("Your 10-minute reservation expired. Please pick a week again.");
+    loadWeeks();
+  }
+
+  async function pickWeek(week: WeekAvailability) {
+    setHolding(true);
+    setHoldError("");
     try {
-      const res = await workspaceFetch("/api/sponsor/apply", {
+      const res = await workspaceFetch("/api/sponsor/week-holds", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...form, website: normalizeUrl(form.website) }),
+        body: JSON.stringify({ tier, weekStart: week.weekStart }),
       });
       const data = await res.json();
-      if (!res.ok) { setApplyError(data.error || "Something went wrong."); return; }
+      if (!res.ok) throw new Error(data.error || "Could not reserve that week.");
+      setHoldToken(data.holdToken);
+      setHeldWeekLabel(week.label);
+      setExpiresAt(new Date(data.expiresAt).getTime());
+      setSecondsLeft(Math.round((new Date(data.expiresAt).getTime() - Date.now()) / 1000));
+      setStep("business");
+      window.scrollTo(0, 0);
+    } catch (e) {
+      setHoldError(e instanceof Error ? e.message : "Could not reserve that week.");
+      loadWeeks();
+    } finally {
+      setHolding(false);
+    }
+  }
 
-      const url: string = data.portalUrl;
-      setPortalUrl(url);
-      const match = url.match(/token=([^&]+)/);
-      const t = match ? match[1] : "";
-      setToken(t);
+  function backToWeeks() {
+    handleHoldExpired();
+  }
 
-      if (tier === "spotlight") {
-        setLForm({
-          businessName: form.businessName,
-          description: "",
-          ctaUrl: normalizeUrl(form.website),
-          ctaLabel: "Visit Website",
-          logoUrl: "",
-        });
-        setStep("listing");
+  async function handleLogoUpload(file: File) {
+    setUploading(true);
+    setFormError("");
+    const fd = new FormData();
+    fd.append("file", file);
+    fd.append("holdToken", holdToken);
+    try {
+      const res = await workspaceFetch("/api/sponsor/week-upload", { method: "POST", body: fd });
+      const data = await res.json();
+      if (res.ok) {
+        update("logoUrl", data.url);
       } else {
-        setBForm({
-          type: tier === "presenting" ? "presenting" : "in_article",
-          headline: `Visit ${form.businessName}`,
-          body: "",
-          ctaUrl: normalizeUrl(form.website),
-          ctaLabel: "Learn More",
-          imageUrl: "",
-          presentingBlurb: tier === "presenting" ? `Today's Gist is brought to you by ${form.businessName}.` : "",
-        });
-        setBDates([]);
-        setStep("booking");
+        setFormError(data.error || "Logo upload failed.");
       }
     } catch {
-      setApplyError("Connection error. Please try again.");
+      setFormError("Logo upload failed. Please try again.");
     } finally {
+      setUploading(false);
+    }
+  }
+
+  async function handleCheckout(e: React.FormEvent) {
+    e.preventDefault();
+    setSubmitting(true);
+    setFormError("");
+    try {
+      const res = await workspaceFetch("/api/sponsor/week-checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          holdToken,
+          businessName: form.businessName,
+          contactName: form.contactName,
+          email: form.email,
+          website: form.website ? normalizeUrl(form.website) : "",
+          logoUrl: form.logoUrl,
+          aboutText: form.aboutText,
+          chadWritesCopy: form.chadWritesCopy,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Checkout failed.");
+      window.location.href = data.url;
+    } catch (e) {
+      setFormError(e instanceof Error ? e.message : "Checkout failed. Please try again.");
       setSubmitting(false);
     }
   }
 
-  async function handleLogoUpload(file: File) {
-    setLUploading(true);
-    setLError("");
-    const fd = new FormData();
-    fd.append("file", file);
-    fd.append("token", token);
-    try {
-      const res = await workspaceFetch("/api/sponsor/upload", { method: "POST", body: fd });
-      const data = await res.json();
-      if (res.ok) {
-        setLForm((f) => ({ ...f, logoUrl: data.url }));
-      } else {
-        setLError(data.error || "Logo upload failed.");
-      }
-    } catch {
-      setLError("Logo upload failed. Please try again.");
-    } finally {
-      setLUploading(false);
-    }
-  }
-
-  async function submitListing(e: React.FormEvent) {
-    e.preventDefault();
-    setLSubmitting(true);
-    setLError("");
-    try {
-      const res = await workspaceFetch("/api/sponsor/spotlight", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, ...lForm }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setListingCreated(true);
-        setDoneMessage("Your listing has been submitted for review — we'll approve it within 1–2 business days.");
-        setStep("done");
-      } else {
-        setLError(data.error || "Submission failed.");
-      }
-    } catch {
-      setLError("Connection error.");
-    } finally {
-      setLSubmitting(false);
-    }
-  }
-
-  async function submitBooking(e: React.FormEvent) {
-    e.preventDefault();
-    if (bDates.length === 0) { setBError("Please select at least one date."); return; }
-    setBSubmitting(true);
-    setBError("");
-    try {
-      const res = await workspaceFetch("/api/sponsor/booking", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, dates: bDates, date: bDates[0], ...bForm }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        const subs: Array<{ original: string; replacement: string }> = data.substitutions || [];
-        const subNote = subs.length > 0
-          ? ` Note: ${subs.length} date${subs.length !== 1 ? "s were" : " was"} unavailable and substituted with the next available slot${subs.length !== 1 ? "s" : ""} — your discount is preserved.`
-          : "";
-        setDoneMessage(`Your booking request has been submitted — we'll confirm within 1–2 business days and collect payment then.${subNote}`);
-        setStep("done");
-      } else {
-        setBError(data.error || "Submission failed.");
-      }
-    } catch {
-      setBError("Connection error.");
-    } finally {
-      setBSubmitting(false);
-    }
-  }
-
-  // ── DONE ──
-  if (step === "done") {
-    const calloutSuffix = listingCreated ? "&callout=booking" : "";
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 max-w-md w-full text-center">
-          <div className="w-14 h-14 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg className="w-7 h-7 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-            </svg>
-          </div>
-          <h2 className="text-xl font-bold text-gray-900 mb-2">You&apos;re all set!</h2>
-          {doneMessage && <p className="text-gray-600 text-sm mb-3">{doneMessage}</p>}
-          <p className="text-gray-400 text-sm mb-6">
-            Your sponsor portal is ready — bookmark it to manage your sponsorship, check status, and book more dates.
-          </p>
-          <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mb-6 text-left">
-            <p className="text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wide">Your Portal Link</p>
-            <p className="text-sm break-all text-green-700 font-medium">{portalUrl}</p>
-          </div>
-          <WorkspaceAnchor
-            href={`${portalUrl}${calloutSuffix}`}
-            className="block w-full bg-green-700 hover:bg-green-800 text-white text-sm font-semibold py-3 rounded-xl transition-colors"
-          >
-            Go to My Sponsor Portal →
-          </WorkspaceAnchor>
-          <p className="text-xs text-gray-400 mt-4">We also emailed this link to you. Save it — you&apos;ll need it to manage your sponsorship.</p>
-        </div>
-      </div>
-    );
-  }
+  const mm = String(Math.floor(secondsLeft / 60)).padStart(1, "0");
+  const ss = String(secondsLeft % 60).padStart(2, "0");
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-start justify-center p-4 pt-6 sm:pt-12">
@@ -266,225 +249,155 @@ function ApplyContent() {
         {/* Step progress bar */}
         <div className="flex items-center gap-1.5 mb-6">
           <div className="h-1.5 rounded-full flex-1 bg-green-600" />
-          <div className={`h-1.5 rounded-full flex-1 ${step !== "apply" ? "bg-green-600" : "bg-gray-200"}`} />
+          <div className={`h-1.5 rounded-full flex-1 ${step === "business" ? "bg-green-600" : "bg-gray-200"}`} />
+          <div className="h-1.5 rounded-full flex-1 bg-gray-200" />
         </div>
 
-        {/* ── STEP 1: APPLY ── */}
-        {step === "apply" && (
-          <>
-            <h1 className="text-2xl font-bold text-gray-900 mb-1">
-              {tier === "spotlight" ? "Apply for Free" : "Reserve Dates"}
-            </h1>
-            <p className="text-sm text-gray-500 mb-0.5">
-              {tier === "spotlight"
-                ? "Tell us about your business and we'll get your free Community Partners listing set up."
-                : `Create your sponsor profile, then we'll set up your ${meta.label} right away.`}
-            </p>
-            <p className="text-xs text-green-600 font-medium mb-6">Step 1 of 2 — Your Info</p>
+        {cancelled && step === "week" && (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 mb-5 text-sm text-amber-800">
+            Your payment was cancelled (no charge was made). Pick a week to try again.
+          </div>
+        )}
 
-            <form onSubmit={handleApply} className="space-y-4">
+        {/* ── STEP 1: PICK A WEEK ── */}
+        {step === "week" && (
+          <>
+            <h1 className="text-2xl font-bold text-gray-900 mb-1">{meta.label}</h1>
+            <p className="text-sm text-gray-500 mb-0.5">{meta.blurb}</p>
+            <p className="text-xs text-green-600 font-medium mb-1">Step 1 of 3: Pick your week</p>
+            <p className="text-sm font-semibold text-gray-900 mb-4">{meta.price} · runs Monday to Friday</p>
+
+            {weeksLoading && <p className="text-sm text-gray-500 py-8 text-center">Loading weeks…</p>}
+            {weeksError && <p className="text-sm text-red-600 py-4">{weeksError}</p>}
+
+            {!weeksLoading && !weeksError && (
+              <div className="space-y-2">
+                {weeks.map((week) => {
+                  const t = week.tiers.find((x) => x.tier === tier)!;
+                  const sold = t.state === "sold";
+                  return (
+                    <button
+                      key={week.weekStart}
+                      type="button"
+                      disabled={sold || holding}
+                      onClick={() => pickWeek(week)}
+                      className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border text-left transition-colors ${
+                        sold
+                          ? "border-gray-100 bg-gray-50 text-gray-400 cursor-not-allowed"
+                          : "border-gray-200 hover:border-green-500 hover:bg-green-50"
+                      }`}
+                    >
+                      <span className="text-sm font-semibold text-gray-900">{week.label}</span>
+                      {sold ? (
+                        <span className="text-xs font-semibold text-gray-400 bg-gray-100 px-2.5 py-1 rounded-full">Sold</span>
+                      ) : t.state === "one_left" ? (
+                        <span className="text-xs font-semibold text-amber-700 bg-amber-100 px-2.5 py-1 rounded-full">
+                          1 slot left
+                        </span>
+                      ) : (
+                        <span className="text-xs font-semibold text-green-700 bg-green-100 px-2.5 py-1 rounded-full">
+                          Available
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+            {holdError && <p className="text-sm text-red-600 mt-4">{holdError}</p>}
+            <p className="text-xs text-gray-400 mt-5 text-center">
+              Picking a week reserves your slot for 10 minutes while you tell us about your business.
+            </p>
+          </>
+        )}
+
+        {/* ── STEP 2: ABOUT THE BUSINESS ── */}
+        {step === "business" && (
+          <>
+            <h1 className="text-2xl font-bold text-gray-900 mb-1">About your business</h1>
+            <p className="text-sm text-gray-500 mb-0.5">
+              {meta.label} · {heldWeekLabel} · {meta.price}
+            </p>
+            <p className="text-xs text-green-600 font-medium mb-1">Step 2 of 3 — Your info</p>
+            <p className={`text-xs font-semibold mb-5 ${secondsLeft < 120 ? "text-red-600" : "text-gray-500"}`}>
+              ⏱ Your slot is reserved for {mm}:{ss}
+            </p>
+            {rebooked && (
+              <div className="bg-green-50 border border-green-200 rounded-xl p-3 mb-5 text-sm text-green-800">
+                Welcome back! We pre-filled your details from last time — just confirm them and check out.
+              </div>
+            )}
+
+            <form onSubmit={handleCheckout} className="space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-1">Business Name *</label>
                 <input type="text" value={form.businessName} onChange={(e) => update("businessName", e.target.value)} required placeholder="Decatur Coffee Co."
                   className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
               </div>
-              <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1">Your Name *</label>
-                <input type="text" value={form.contactName} onChange={(e) => update("contactName", e.target.value)} required placeholder="Jane Smith"
-                  className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1">Email Address *</label>
-                <input type="email" value={form.email} onChange={(e) => update("email", e.target.value)} required placeholder="jane@decaturcoffee.com"
-                  className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
-              </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-1">Phone</label>
-                  <input type="tel" value={form.phone} onChange={(e) => update("phone", e.target.value)} placeholder="256-555-0100"
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Your Name *</label>
+                  <input type="text" value={form.contactName} onChange={(e) => update("contactName", e.target.value)} required placeholder="Jane Smith"
                     className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-1">Website</label>
-                  <input type="text" value={form.website} onChange={(e) => update("website", e.target.value)} onBlur={(e) => update("website", normalizeUrl(e.target.value))} placeholder="decaturcoffee.com"
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Email *</label>
+                  <input type="email" value={form.email} onChange={(e) => update("email", e.target.value)} required placeholder="jane@decaturcoffee.com"
                     className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
                 </div>
               </div>
-              {applyError && <p className="text-sm text-red-600">{applyError}</p>}
-              <button type="submit" disabled={submitting}
-                className="w-full bg-green-700 hover:bg-green-800 disabled:opacity-50 text-white font-semibold py-3 rounded-xl text-sm transition-colors">
-                {submitting ? "Setting up your account…" : "Continue →"}
-              </button>
-            </form>
-
-            <div className="mt-5 text-center">
-              <button type="button" onClick={() => { setShowResend((v) => !v); setResendMessage(""); }}
-                className="text-xs text-gray-400 hover:text-gray-600">
-                Already applied? Resend my portal link
-              </button>
-            </div>
-            {showResend && (
-              <div className="mt-3 flex gap-2">
-                <input type="email" value={resendEmail} onChange={(e) => setResendEmail(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleResend(); } }}
-                  placeholder="you@business.com"
-                  className="flex-1 px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
-                <button type="button" onClick={handleResend} disabled={resendSubmitting}
-                  className="px-4 py-2 border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 whitespace-nowrap">
-                  {resendSubmitting ? "Sending…" : "Send Link"}
-                </button>
-              </div>
-            )}
-            {resendMessage && <p className="text-xs text-gray-500 mt-2 text-center">{resendMessage}</p>}
-          </>
-        )}
-
-        {/* ── STEP 2a: LISTING ── */}
-        {step === "listing" && (
-          <>
-            <h1 className="text-2xl font-bold text-gray-900 mb-1">{meta.step2Heading}</h1>
-            <p className="text-sm text-gray-500 mb-0.5">{meta.step2Sub}</p>
-            <p className="text-xs text-green-600 font-medium mb-6">Step 2 of 2 — Community Partners Listing</p>
-
-            <form onSubmit={submitListing} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1">Business Name *</label>
-                <input type="text" value={lForm.businessName} onChange={(e) => setLForm((f) => ({ ...f, businessName: e.target.value }))} required
-                  className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+                <label className="block text-xs font-semibold text-gray-600 mb-1">Website <span className="text-gray-400 font-normal">(optional)</span></label>
+                <input type="text" value={form.website} onChange={(e) => update("website", e.target.value)} onBlur={(e) => update("website", normalizeUrl(e.target.value))} placeholder="decaturcoffee.com"
+                  className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1">Logo</label>
-                <div className="flex gap-2">
-                  <UrlInput value={lForm.logoUrl} onChange={(v) => setLForm((f) => ({ ...f, logoUrl: v }))} placeholder="https://… or upload"
-                    className="flex-1 px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
-                  <input ref={lFileRef} type="file" accept="image/*" className="hidden"
-                    onChange={(e) => { const f = e.target.files?.[0]; if (f) handleLogoUpload(f); e.target.value = ""; }} />
-                  <button type="button" onClick={() => lFileRef.current?.click()} disabled={lUploading}
-                    className="px-3 py-2 border border-gray-200 rounded-xl text-xs font-medium text-gray-600 hover:bg-gray-50 whitespace-nowrap disabled:opacity-60">
-                    {lUploading ? "Uploading…" : "Upload Logo"}
-                  </button>
-                </div>
-                {lForm.logoUrl ? (
-                  <div className="mt-2 flex items-center gap-2">
-                    <img src={lForm.logoUrl} alt="Logo preview" className="w-12 h-12 rounded-lg object-contain border border-gray-100 bg-white" />
-                    <button type="button" onClick={() => setLForm((f) => ({ ...f, logoUrl: "" }))}
-                      className="text-xs text-gray-400 hover:text-red-600">Remove</button>
-                  </div>
-                ) : null}
-                <p className="text-[11px] text-gray-400 mt-1">PNG or JPG, under 5MB. Appears next to your listing in the newsletter.</p>
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1">
-                  About Your Business * <span className="font-normal text-gray-400">({lForm.description.length}/300)</span>
-                </label>
-                <textarea value={lForm.description} onChange={(e) => setLForm((f) => ({ ...f, description: e.target.value }))} required rows={3} maxLength={300}
-                  placeholder="1–2 sentences about what you offer and why Decatur readers should visit."
-                  className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none" />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-1">Button Label</label>
-                  <input type="text" value={lForm.ctaLabel} onChange={(e) => setLForm((f) => ({ ...f, ctaLabel: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-1">Website / Link *</label>
-                  <UrlInput value={lForm.ctaUrl} onChange={(v) => setLForm((f) => ({ ...f, ctaUrl: v }))} required placeholder="https://"
-                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
-                </div>
-              </div>
-              {lError && <p className="text-sm text-red-600">{lError}</p>}
-              <button type="submit" disabled={lSubmitting}
-                className="w-full bg-green-700 hover:bg-green-800 disabled:opacity-50 text-white font-semibold py-3 rounded-xl text-sm transition-colors">
-                {lSubmitting ? "Submitting…" : "Submit Listing for Review"}
-              </button>
-              <button type="button" onClick={() => { setStep("done"); setDoneMessage(""); }}
-                className="w-full text-center text-xs text-gray-400 hover:text-gray-600 py-1">
-                Skip for now — I&apos;ll do this from my portal
-              </button>
-            </form>
-          </>
-        )}
-
-        {/* ── STEP 2b: BOOKING ── */}
-        {step === "booking" && (
-          <>
-            <h1 className="text-2xl font-bold text-gray-900 mb-1">{meta.step2Heading}</h1>
-            <p className="text-sm text-gray-500 mb-0.5">{meta.step2Sub}</p>
-            <p className="text-xs text-green-600 font-medium mb-6">Step 2 of 2 — {meta.label}</p>
-
-            <form onSubmit={submitBooking} className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-2">Ad Type</label>
-                <div className="grid grid-cols-2 gap-2">
-                  {(["in_article", "presenting"] as const).map((t) => (
-                    <button key={t} type="button" onClick={() => setBForm((f) => ({ ...f, type: t }))}
-                      className={`p-3 rounded-xl border text-left transition-colors ${bForm.type === t ? "border-green-500 bg-green-50" : "border-gray-200 hover:border-gray-300"}`}>
-                      <p className="text-xs font-semibold text-gray-800">{t === "in_article" ? "Standard" : "Presenting"}</p>
-                      <p className="text-xs text-gray-400 mt-0.5">{t === "in_article" ? "$15/day" : "$25/day"}</p>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">Logo *</label>
+                <input ref={fileRef} type="file" accept="image/png,image/jpeg" className="hidden"
+                  onChange={(e) => { const f = e.target.files?.[0]; if (f) handleLogoUpload(f); }} />
+                {form.logoUrl ? (
+                  <div className="flex items-center gap-3 border border-gray-200 rounded-xl p-3">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={form.logoUrl} alt="Logo preview" className="h-12 w-12 object-contain rounded-lg bg-gray-50" />
+                    <button type="button" onClick={() => fileRef.current?.click()} disabled={uploading}
+                      className="text-xs text-green-700 font-semibold hover:underline">
+                      {uploading ? "Uploading…" : "Replace logo"}
                     </button>
-                  ))}
-                </div>
+                  </div>
+                ) : (
+                  <button type="button" onClick={() => fileRef.current?.click()} disabled={uploading}
+                    className="w-full border-2 border-dashed border-gray-200 rounded-xl py-6 text-sm text-gray-500 hover:border-green-500 hover:text-green-700 transition-colors">
+                    {uploading ? "Uploading…" : "Upload your logo (PNG or JPG, under 5MB)"}
+                  </button>
+                )}
               </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-2">Newsletter Date(s) *</label>
-                <MultiDateCalendar
-                  bookingType={bForm.type as "in_article" | "presenting"}
-                  selectedDates={bDates}
-                  onChange={setBDates}
-                  pricePerDay={bForm.type === "presenting" ? 25 : 15}
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1">Headline *</label>
-                <input type="text" value={bForm.headline} onChange={(e) => setBForm((f) => ({ ...f, headline: e.target.value }))} required
-                  className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
-              </div>
-
               <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-1">
-                  Body Copy * <span className="font-normal text-gray-400">({bForm.body.length}/400)</span>
+                  What should readers know about your business? *
                 </label>
-                <textarea value={bForm.body} onChange={(e) => setBForm((f) => ({ ...f, body: e.target.value }))} required rows={3} maxLength={400}
-                  placeholder="Tell readers what you offer and why they should click."
-                  className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none" />
+                <textarea value={form.aboutText} onChange={(e) => update("aboutText", e.target.value)} required rows={4}
+                  placeholder="Family-owned coffee shop downtown since 2012. Fresh-roasted beans, homemade pastries, and the friendliest baristas in Decatur."
+                  className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
               </div>
+              <label className="flex items-start gap-2.5 bg-green-50 border border-green-200 rounded-xl p-3 cursor-pointer">
+                <input type="checkbox" checked={form.chadWritesCopy} onChange={(e) => update("chadWritesCopy", e.target.checked)}
+                  className="mt-0.5 h-4 w-4 accent-green-700" />
+                <span className="text-sm text-gray-700">
+                  <span className="font-semibold">Have Chad write my ad for free</span>
+                  <span className="text-green-700 font-medium"> (recommended)</span>
+                  <br />
+                  <span className="text-xs text-gray-500">He&apos;ll turn your description above into ad copy that fits the newsletter.</span>
+                </span>
+              </label>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-1">CTA Label</label>
-                  <input type="text" value={bForm.ctaLabel} onChange={(e) => setBForm((f) => ({ ...f, ctaLabel: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-1">CTA Link *</label>
-                  <UrlInput value={bForm.ctaUrl} onChange={(v) => setBForm((f) => ({ ...f, ctaUrl: v }))} required placeholder="https://"
-                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
-                </div>
-              </div>
+              {formError && <p className="text-sm text-red-600">{formError}</p>}
 
-              {bForm.type === "presenting" && (
-                <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-1">
-                    Custom Intro Blurb <span className="font-normal text-gray-400">(optional)</span>
-                  </label>
-                  <textarea value={bForm.presentingBlurb} onChange={(e) => setBForm((f) => ({ ...f, presentingBlurb: e.target.value }))} rows={2}
-                    placeholder={`"Today's Gist is brought to you by ${form.businessName}."`}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none" />
-                </div>
-              )}
-
-              {bError && <p className="text-sm text-red-600">{bError}</p>}
-
-              <button type="submit" disabled={bSubmitting}
+              <button type="submit" disabled={submitting || uploading || !form.logoUrl}
                 className="w-full bg-green-700 hover:bg-green-800 disabled:opacity-50 text-white font-semibold py-3 rounded-xl text-sm transition-colors">
-                {bSubmitting ? "Submitting…" : "Submit Booking Request"}
+                {submitting ? "Starting secure checkout…" : `Continue to payment — ${meta.price}`}
               </button>
-              <button type="button" onClick={() => { setStep("done"); setDoneMessage(""); }}
-                className="w-full text-center text-xs text-gray-400 hover:text-gray-600 py-1">
-                Skip for now — I&apos;ll do this from my portal
+              <button type="button" onClick={backToWeeks} className="w-full text-xs text-gray-400 hover:text-gray-600 py-1">
+                ← Pick a different week
               </button>
             </form>
           </>
@@ -494,9 +407,9 @@ function ApplyContent() {
   );
 }
 
-export default function SponsorApplyPage() {
+export default function ApplyPage() {
   return (
-    <Suspense>
+    <Suspense fallback={<div className="min-h-screen bg-gray-50 flex items-center justify-center"><p className="text-sm text-gray-500">Loading…</p></div>}>
       <ApplyContent />
     </Suspense>
   );
