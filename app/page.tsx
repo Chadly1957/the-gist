@@ -11,6 +11,9 @@ import RecentIssues from "@/components/RecentIssues";
 
 function CityLandingPage() {
   const { workspace } = useWorkspace();
+  // Key branding off the slug (human-chosen, e.g. "effingham"), falling back
+  // to the id. New workspaces get generated cuid ids, so id alone misses.
+  const brand = workspace.slug || workspace.id;
   const [email, setEmail] = useState("");
   const [firstName, setFirstName] = useState("");
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
@@ -144,10 +147,12 @@ function CityLandingPage() {
           <div className="grid lg:grid-cols-2 gap-12 lg:gap-20 items-center">
             {/* Left: copy + form */}
             <div>
-              <div className="inline-flex items-center gap-2 bg-green-50 text-green-700 text-xs font-bold px-3 py-1.5 rounded-full mb-6 border border-green-100">
-                <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block animate-pulse" />
-                Join {subCount !== null ? `${subCount.toLocaleString()}+` : "hundreds of"} {workspace.area} neighbors
-              </div>
+              {subCount !== null && subCount >= 10 && (
+                <div className="inline-flex items-center gap-2 bg-green-50 text-green-700 text-xs font-bold px-3 py-1.5 rounded-full mb-6 border border-green-100">
+                  <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block animate-pulse" />
+                  Join {subCount.toLocaleString()}+ {workspace.area} neighbors
+                </div>
+              )}
 
               <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-gray-900 leading-[1.08] tracking-tight mb-5 sm:mb-6">
                 If it&apos;s happening<br />
@@ -156,7 +161,7 @@ function CityLandingPage() {
               </h1>
 
               <p className="text-base sm:text-lg text-gray-500 leading-relaxed mb-8 sm:mb-10 max-w-md">
-                Join hundreds of neighbors who start their morning with {workspace.name}, the one email that tells you what actually matters in {workspace.area} today.
+                Start your morning with {workspace.name}, the one email that tells you what actually matters in {workspace.area} today.
               </p>
 
               {status === "success" ? (
@@ -212,8 +217,8 @@ function CityLandingPage() {
               <div className="relative w-full max-w-md">
                 <div className="rounded-3xl overflow-hidden">
                   <Image
-                    src={workspace.id === "effingham" ? "/hero-effingham.png" : "/hero-decatur.jpg"}
-                    alt={workspace.id === "effingham" ? "Effingham County Courthouse" : "Historic Decatur pavilion"}
+                    src={workspace.heroImageUrl ?? (brand === "effingham" ? "/hero-effingham.png" : "/hero-decatur.jpg")}
+                    alt={workspace.heroImageUrl ? `${workspace.name} hero image` : brand === "effingham" ? "Effingham County Courthouse" : "Historic Decatur pavilion"}
                     width={640}
                     height={700}
                     className="w-full h-auto object-cover"
@@ -310,21 +315,21 @@ function CityLandingPage() {
               <div className="space-y-3">
                 {[
                   {
-                    name: "Community Partners",
+                    name: "Community Board",
                     price: "Free",
-                    desc: "Rotating listing with logo, description, and CTA in every issue.",
+                    desc: "Rotating listing with logo, description, and link in every issue.",
                     accent: "bg-green-800 border-green-700",
                   },
                   {
-                    name: "Standard Sponsorship",
-                    price: "$15 / day",
-                    desc: "Sponsored post mixed in with the day's news. Up to 2 slots per day.",
+                    name: "Standard Sponsor",
+                    price: "$75/week",
+                    desc: "Logo and write-up mid-email, running in every issue all week. Two slots per week.",
                     accent: "bg-green-800 border-green-700",
                   },
                   {
                     name: "Presenting Sponsor",
-                    price: "$25 / day",
-                    desc: "Opening mention + full standard ad placement. Exclusive: one per day.",
+                    price: "$150/week",
+                    desc: "Top of every issue all week, plus full standard placement. Exclusive: one per week.",
                     accent: "bg-green-800 border-green-600",
                   },
                 ].map((tier) => (

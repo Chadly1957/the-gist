@@ -4,7 +4,24 @@ import Image from "next/image";
 
 export default function Logo({ className = "h-7 w-auto" }: { className?: string }) {
   const { workspace } = useWorkspace();
-  if (workspace.id === "effingham")
+  // Uploaded branding wins. Falls back to the bundled per-city assets, then
+  // the workspace name as text for cities without branding yet.
+  if (workspace.logoUrl)
+    return (
+      <Image
+        src={workspace.logoUrl}
+        alt={`${workspace.name} logo`}
+        width={160}
+        height={64}
+        className={`object-contain ${className}`}
+        priority
+      />
+    );
+  // Key bundled branding off the slug (human-chosen, e.g. "effingham"),
+  // falling back to the id. New workspaces get generated cuid ids, so id
+  // alone misses.
+  const brand = workspace.slug || workspace.id;
+  if (brand === "effingham")
     return (
       <Image
         src="/effingham-logo.png"
@@ -15,7 +32,7 @@ export default function Logo({ className = "h-7 w-auto" }: { className?: string 
         priority
       />
     );
-  if (workspace.id !== "decatur") return <span className={`inline-flex items-center font-bold text-green-800 ${className}`}>{workspace.name}</span>;
+  if (brand !== "decatur") return <span className={`inline-flex items-center font-bold text-green-800 ${className}`}>{workspace.name}</span>;
   return (
     <Image
       src="/the-gist-logo.png"
