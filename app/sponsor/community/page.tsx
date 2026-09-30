@@ -4,13 +4,15 @@ import { useState, useRef, Suspense } from "react";
 import Link from "@/components/workspace/WorkspaceLink";
 import Logo from "@/components/Logo";
 import { WorkspaceAnchor } from "@/components/workspace/WorkspaceLink";
+import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
 import { workspaceFetch } from "@/lib/workspace-client";
 import { normalizeUrl } from "@/lib/url";
 
 const MAX_DESC = 140;
 
 function CommunityContent() {
-  const [form, setForm] = useState({ businessName: "", contactName: "", email: "", website: "", description: "" });
+  const { workspace } = useWorkspace();
+  const [form, setForm] = useState({ businessName: "", contactName: "", email: "", website: "", description: "", subscribeNewsletter: false });
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -18,7 +20,7 @@ function CommunityContent() {
   const [portalUrl, setPortalUrl] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
 
-  function update(key: keyof typeof form, val: string) {
+  function update(key: keyof typeof form, val: string | boolean) {
     setForm((f) => ({ ...f, [key]: val }));
   }
 
@@ -169,6 +171,16 @@ function CommunityContent() {
           </div>
 
           {error && <p className="text-sm text-red-600">{error}</p>}
+
+          <label className="flex items-start gap-2.5 rounded-xl p-1 cursor-pointer">
+            <input type="checkbox" checked={form.subscribeNewsletter} onChange={(e) => update("subscribeNewsletter", e.target.checked)}
+              className="mt-0.5 h-4 w-4 accent-green-700" />
+            <span className="text-sm text-gray-700">
+              <span className="font-semibold">Send me {workspace.name} free every morning</span>
+              <br />
+              <span className="text-xs text-gray-500">Optional. One short email every morning, unsubscribe anytime.</span>
+            </span>
+          </label>
 
           <button type="submit" disabled={submitting}
             className="w-full bg-green-700 hover:bg-green-800 disabled:opacity-50 text-white font-semibold py-3 rounded-xl text-sm transition-colors">

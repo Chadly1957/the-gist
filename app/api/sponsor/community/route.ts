@@ -4,12 +4,13 @@ import { prisma } from "@/lib/db";
 import { workspaceUnique } from "@/lib/workspace";
 import { normalizeUrl } from "@/lib/url";
 import { sendCommunityBoardConfirmation } from "@/lib/sponsor-week-email";
+import { optInSponsorToNewsletter } from "@/lib/sponsor-newsletter-optin";
 
 export const dynamic = "force-dynamic";
 
 // Free Community Board signup: instant acceptance, immediately in rotation.
 export async function POST(req: NextRequest) {
-  const { businessName, contactName, email, website, description } = await req.json();
+  const { businessName, contactName, email, website, description, subscribeNewsletter } = await req.json();
 
   const trimmedBusiness = businessName?.trim();
   const trimmedContact = contactName?.trim();
@@ -60,6 +61,17 @@ export async function POST(req: NextRequest) {
 
   const appUrl = await getWorkspaceUrl();
   const portalUrl = `${appUrl}/sponsor/portal?token=${profile.magicToken}`;
+
+  // Newsletter opt-in is explicit consent from the checkbox. It must never
+  // fail the signup.
+  if (subscribeNewsletter === true) {
+    try {
+      await optInSponsorToNewsletter(normalizedEmail, trimmedContact);
+    } catch (err) {
+      console.error("sponsor newsletter opt-in error:", err);
+    }
+  }
+
   await sendCommunityBoardConfirmation({
     to: normalizedEmail,
     contactName: profile.contactName,

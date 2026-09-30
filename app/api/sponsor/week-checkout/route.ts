@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { basePrisma } from "@/lib/db-base";
 import Stripe from "stripe";
 import { normalizeUrl } from "@/lib/url";
+import { optInSponsorToNewsletter } from "@/lib/sponsor-newsletter-optin";
 import {
   WEEK_TIERS,
   countTaken,
@@ -27,6 +28,7 @@ export async function POST(req: NextRequest) {
     logoUrl,
     aboutText,
     chadWritesCopy,
+    subscribeNewsletter,
     portalToken,
     returnTo,
   } = await req.json();
@@ -182,6 +184,16 @@ export async function POST(req: NextRequest) {
       ? "That slot just sold. Please pick another week."
       : "Could not reserve your slot. Please try again.";
     return NextResponse.json({ error: msg }, { status: err instanceof Error && err.message === "That slot just sold." ? 409 : 500 });
+  }
+
+  // Newsletter opt-in is explicit consent from the checkbox, independent of
+  // whether the Stripe payment completes. It must never fail the checkout.
+  if (subscribeNewsletter === true) {
+    try {
+      await optInSponsorToNewsletter(normalizedEmail, trimmedContact);
+    } catch (err) {
+      console.error("sponsor newsletter opt-in error:", err);
+    }
   }
 
   return NextResponse.json({ url: session.url });

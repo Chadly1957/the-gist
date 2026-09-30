@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import Link from "@/components/workspace/WorkspaceLink";
 import Logo from "@/components/Logo";
+import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
 import { workspaceFetch } from "@/lib/workspace-client";
 import { normalizeUrl } from "@/lib/url";
 
@@ -93,7 +94,9 @@ export default function WeekBookingFlow({
     logoUrl: "",
     aboutText: "",
     chadWritesCopy: false,
+    subscribeNewsletter: false,
   });
+  const { workspace } = useWorkspace();
   const [uploading, setUploading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState("");
@@ -278,6 +281,7 @@ export default function WeekBookingFlow({
         logoUrl: form.logoUrl,
         aboutText: form.aboutText,
         chadWritesCopy: form.chadWritesCopy,
+        subscribeNewsletter: form.subscribeNewsletter,
       };
       if (portalToken) {
         body.portalToken = portalToken;
@@ -463,6 +467,17 @@ export default function WeekBookingFlow({
                   <span className="text-xs text-gray-500">Optional. Leave this unchecked and you&apos;ll write your own headline and body text.</span>
                 </span>
               </label>
+              {!portalToken && (
+                <label className="flex items-start gap-2.5 rounded-xl p-1 cursor-pointer">
+                  <input type="checkbox" checked={form.subscribeNewsletter} onChange={(e) => update("subscribeNewsletter", e.target.checked)}
+                    className="mt-0.5 h-4 w-4 accent-green-700" />
+                  <span className="text-sm text-gray-700">
+                    <span className="font-semibold">Send me {workspace.name} free every morning</span>
+                    <br />
+                    <span className="text-xs text-gray-500">Optional. One short email every morning, unsubscribe anytime.</span>
+                  </span>
+                </label>
+              )}
 
               {formError && <p className="text-sm text-red-600">{formError}</p>}
 
