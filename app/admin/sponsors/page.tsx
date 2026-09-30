@@ -526,28 +526,40 @@ function AdminSponsorsContent() {
     setPlaceForm((f) => ({ ...f, [k]: v }));
   }
 
-  // Which previous ad the place-ad form was auto-filled from (booking date), if any.
-  const [autofillSource, setAutofillSource] = useState<string | null>(null);
+  // What the place-ad form was auto-filled from, if anything.
+  const [autofillNote, setAutofillNote] = useState<string | null>(null);
 
   // Auto-fill the ad creative when a business is picked: reuse that sponsor's
-  // most recent previous ad (matched by email, unique per workspace). Falls
-  // back to the profile's website for the link URL when there's no prior ad.
+  // most recent previous ad (matched by email, unique per workspace), falling
+  // back to their Community Board spotlight listing, then to the profile's
+  // website for the link URL.
   function autofillPlaceForm(profileId: string) {
     const profile = profiles.find((p) => p.id === profileId);
-    const prev = profile
+    const prevAd = profile
       ? bookings
           .filter((b) => b.sponsor.email === profile.email && (b.headline || b.body))
           .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))[0]
       : undefined;
-    setAutofillSource(prev ? prev.date : null);
+    const spotlight = profile
+      ? spotlights
+          .filter((s) => s.sponsor.email === profile.email && s.status !== "expired")
+          .sort((a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0))[0]
+      : undefined;
+    setAutofillNote(
+      prevAd
+        ? `Filled from their ${new Date(prevAd.date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })} ad — edit freely.`
+        : spotlight
+          ? "Filled from their Community Board listing — edit freely."
+          : null
+    );
     setPlaceForm((f) => ({
       ...f,
       profileId,
-      headline: prev?.headline ?? "",
-      body: prev?.body ?? "",
-      ctaUrl: prev?.ctaUrl ?? profile?.website ?? "",
-      ctaLabel: prev?.ctaLabel ?? "",
-      imageUrl: prev?.imageUrl ?? "",
+      headline: prevAd?.headline ?? spotlight?.businessName ?? "",
+      body: prevAd?.body ?? spotlight?.description ?? "",
+      ctaUrl: prevAd?.ctaUrl ?? spotlight?.ctaUrl ?? profile?.website ?? "",
+      ctaLabel: prevAd?.ctaLabel ?? spotlight?.ctaLabel ?? "",
+      imageUrl: prevAd?.imageUrl ?? spotlight?.logoUrl ?? "",
     }));
   }
 
@@ -842,10 +854,8 @@ function AdminSponsorsContent() {
                         <option key={p.id} value={p.id}>{p.businessName}</option>
                       ))}
                     </select>
-                    {autofillSource && (
-                      <span className="block mt-1 text-gray-400">
-                        Filled from their {new Date(autofillSource + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })} ad — edit freely.
-                      </span>
+                    {autofillNote && (
+                      <span className="block mt-1 text-gray-400">{autofillNote}</span>
                     )}
                   </label>
                   <label className="text-xs text-gray-600">Tier
