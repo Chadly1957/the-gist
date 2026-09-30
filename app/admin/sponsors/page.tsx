@@ -526,6 +526,43 @@ function AdminSponsorsContent() {
     setPlaceForm((f) => ({ ...f, [k]: v }));
   }
 
+  // What the place-ad form was auto-filled from, if anything.
+  const [autofillNote, setAutofillNote] = useState<string | null>(null);
+
+  // Auto-fill the ad creative when a business is picked: reuse that sponsor's
+  // most recent previous ad (matched by email, unique per workspace), falling
+  // back to their Community Board spotlight listing, then to the profile's
+  // website for the link URL.
+  function autofillPlaceForm(profileId: string) {
+    const profile = profiles.find((p) => p.id === profileId);
+    const prevAd = profile
+      ? bookings
+          .filter((b) => b.sponsor.email === profile.email && (b.headline || b.body))
+          .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))[0]
+      : undefined;
+    const spotlight = profile
+      ? spotlights
+          .filter((s) => s.sponsor.email === profile.email && s.status !== "expired")
+          .sort((a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0))[0]
+      : undefined;
+    setAutofillNote(
+      prevAd
+        ? `Filled from their ${new Date(prevAd.date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })} ad — edit freely.`
+        : spotlight
+          ? "Filled from their Community Board listing — edit freely."
+          : null
+    );
+    setPlaceForm((f) => ({
+      ...f,
+      profileId,
+      headline: prevAd?.headline ?? spotlight?.businessName ?? "",
+      body: prevAd?.body ?? spotlight?.description ?? "",
+      ctaUrl: prevAd?.ctaUrl ?? spotlight?.ctaUrl ?? profile?.website ?? "",
+      ctaLabel: prevAd?.ctaLabel ?? spotlight?.ctaLabel ?? "",
+      imageUrl: prevAd?.imageUrl ?? spotlight?.logoUrl ?? "",
+    }));
+  }
+
   async function submitPlaceAd() {
     setPlaceError(null);
     setPlaceOk(null);
@@ -810,13 +847,16 @@ function AdminSponsorsContent() {
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                   <label className="text-xs text-gray-600">Business
-                    <select value={placeForm.profileId} onChange={(e) => setPlace("profileId", e.target.value)}
+                    <select value={placeForm.profileId} onChange={(e) => autofillPlaceForm(e.target.value)}
                       className="mt-1 w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm">
                       <option value="">Select...</option>
                       {profiles.filter((p) => p.active).map((p) => (
                         <option key={p.id} value={p.id}>{p.businessName}</option>
                       ))}
                     </select>
+                    {autofillNote && (
+                      <span className="block mt-1 text-gray-400">{autofillNote}</span>
+                    )}
                   </label>
                   <label className="text-xs text-gray-600">Tier
                     <select value={placeForm.tier} onChange={(e) => setPlace("tier", e.target.value)}
