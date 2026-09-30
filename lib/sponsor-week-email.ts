@@ -314,7 +314,7 @@ export async function sendCommunityBoardConfirmation(args: {
       <p style="color: #4b5563; font-size: 14px; line-height: 1.5;">
         Hi ${escapeHtml(args.contactName)}, ${escapeHtml(args.businessName)} is now live on the
         ${escapeHtml(workspace.name)} Community Board. Your listing will rotate at the bottom of the newsletter,
-        in front of local readers every weekday morning.
+        in front of local readers every morning.
       </p>
       <p style="color: #4b5563; font-size: 14px; line-height: 1.5;">
         Use your sponsor portal any time to update your listing.
