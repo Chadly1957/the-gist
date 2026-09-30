@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
 
   const [rawSpotlights, dateBookings] = await Promise.all([
     prisma.spotlightListing.findMany({
-      where: { status: "approved" },
+      where: { status: { in: ["approved", "active"] } },
       orderBy: [{ lastShownAt: { sort: "asc", nulls: "first" } }, { shownCount: "asc" }],
       take: spotlightCount,
     }),

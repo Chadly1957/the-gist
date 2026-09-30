@@ -5,7 +5,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   const spotlights = await prisma.spotlightListing.findMany({
-    where: { status: "approved" },
+    where: { status: { in: ["approved", "active"] } },
     select: {
       id: true,
       businessName: true,
