@@ -41,3 +41,48 @@ export async function sendSponsorPortalEmail(
     console.error("Failed to send sponsor portal email:", err);
   }
 }
+
+// One email can own several businesses: send every portal link in one email.
+export async function sendSponsorPortalLinksEmail(
+  to: string,
+  contactName: string,
+  links: { businessName: string; portalUrl: string }[]
+): Promise<void> {
+  try {
+    const workspace = await getWorkspace();
+    const rows = await prisma.setting.findMany();
+    const settings = Object.fromEntries(rows.map((r) => [r.key, r.value]));
+    const client = await getEmailClient(settings);
+    if (!client) return;
+
+    const plural = links.length > 1;
+    const buttons = links
+      .map(
+        (l) => `
+      <p style="margin: 0 0 6px; color: #111827; font-size: 14px; font-weight: 700;">${escapeHtml(l.businessName)}</p>
+      <p style="margin: 0 0 20px;">
+        <a href="${l.portalUrl}" style="background: #24726f; color: #ffffff; padding: 12px 22px; border-radius: 10px; text-decoration: none; font-weight: 600; font-size: 14px; display: inline-block;">
+          Go to My Sponsor Portal
+        </a>
+      </p>`
+      )
+      .join("");
+
+    await client.sendEmail({
+      to,
+      subject: `Your Sponsor Portal Link${plural ? "s" : ""}: ${workspace.name}`,
+      htmlBody: `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 480px; margin: 0 auto; padding: 32px 24px;">
+      <h2 style="color: #111827; margin: 0 0 12px;">Your Sponsor Portal${plural ? "s" : ""}</h2>
+      <p style="color: #4b5563; font-size: 14px; line-height: 1.5;">
+        Hi ${contactName}, here ${plural ? "are your personal links" : "is your personal link"} to ${escapeHtml(workspace.name)} sponsor portal${plural ? "s" : ""}. Use ${plural ? "them" : "it"} to submit listings, book ad dates, and check your status.
+      </p>
+      <div style="margin: 24px 0;">${buttons}</div>
+      <p style="color: #9ca3af; font-size: 12px;">Each link is unique to that business — keep them private. If you didn't request this email, you can ignore it.</p>
+    </div>
+  `,
+    });
+  } catch (err) {
+    console.error("Failed to send sponsor portal email:", err);
+  }
+}

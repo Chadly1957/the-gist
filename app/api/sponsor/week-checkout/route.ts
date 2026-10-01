@@ -137,8 +137,14 @@ export async function POST(req: NextRequest) {
 
       let profile = portalProfile
         ? { id: portalProfile.id }
-        : await tx.sponsorProfile.findUnique({
-            where: { workspaceId_email: { workspaceId, email: normalizedEmail } },
+        : await tx.sponsorProfile.findFirst({
+            // One email can own several businesses: match the exact business.
+            where: {
+              workspaceId,
+              email: normalizedEmail,
+              businessName: { equals: trimmedBusiness, mode: "insensitive" },
+            },
+            orderBy: { createdAt: "asc" },
           });
       if (!profile) {
         profile = await tx.sponsorProfile.create({

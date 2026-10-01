@@ -1,8 +1,7 @@
 import { getWorkspaceUrl } from "@/lib/workspace";
-import { workspaceUnique } from "@/lib/workspace";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { sendSponsorPortalEmail } from "@/lib/sponsor-email";
+import { sendSponsorPortalLinksEmail } from "@/lib/sponsor-email";
 
 export const dynamic = "force-dynamic";
 
@@ -14,12 +13,22 @@ export async function POST(req: NextRequest) {
   }
 
   const normalized = email.trim().toLowerCase();
-  const profile = await prisma.sponsorProfile.findUnique({ where: await workspaceUnique("email", normalized) });
+  // One email can own several businesses: send every portal link.
+  const profiles = await prisma.sponsorProfile.findMany({
+    where: { email: normalized },
+    orderBy: { createdAt: "asc" },
+  });
 
-  if (profile) {
+  if (profiles.length > 0) {
     const appUrl = await getWorkspaceUrl();
-    const portalUrl = `${appUrl}/sponsor/portal?token=${profile.magicToken}`;
-    await sendSponsorPortalEmail(normalized, profile.contactName, portalUrl);
+    await sendSponsorPortalLinksEmail(
+      normalized,
+      profiles[0].contactName,
+      profiles.map((p) => ({
+        businessName: p.businessName,
+        portalUrl: `${appUrl}/sponsor/portal?token=${p.magicToken}`,
+      }))
+    );
   }
 
   return NextResponse.json({
