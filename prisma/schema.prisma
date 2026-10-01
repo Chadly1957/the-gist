@@ -50,6 +50,9 @@ model Workspace {
   pollOptionRows              PollOption[]
   pollVoteRows                PollVote[]
   tipRows                     Tip[]
+  couponBookPurchaseRows      CouponBookPurchase[]
+  couponRows                  Coupon[]
+  couponRedemptionRows        CouponRedemption[]
 }
 
 model AdminUser {
@@ -598,5 +601,61 @@ model Tip {
   @@unique([id, workspaceId])
   @@index([stripeSessionId])
   @@index([status])
+  @@index([workspaceId])
+}
+
+model CouponBookPurchase {
+  workspaceId     String             @default("decatur")
+  workspace       Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  id              String             @id @default(cuid())
+  email           String
+  stripeSessionId String?            @unique
+  // Unguessable token encoded in the buyer's QR code; the cashier page needs
+  // no login, so this token is the only credential. Keep it private.
+  buyerToken      String             @unique @default(cuid())
+  // Emailed magic link for the reader dashboard (no passwords).
+  magicToken      String             @unique @default(cuid())
+  active          Boolean            @default(true)
+  createdAt       DateTime           @default(now())
+  redemptions     CouponRedemption[]
+
+  @@unique([id, workspaceId])
+  @@index([workspaceId, email])
+  @@index([workspaceId])
+}
+
+model Coupon {
+  workspaceId    String             @default("decatur")
+  workspace      Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  id             String             @id @default(cuid())
+  businessName   String
+  title          String
+  description    String             @default("")
+  terms          String             @default("")
+  // 1 = one-time use, null = unlimited recurring. Enforced server-side.
+  maxRedemptions Int?
+  active         Boolean            @default(true)
+  sortOrder      Int                @default(0)
+  contactEmail   String?
+  createdAt      DateTime           @default(now())
+  redemptions    CouponRedemption[]
+
+  @@unique([id, workspaceId])
+  @@index([workspaceId])
+}
+
+model CouponRedemption {
+  workspaceId String             @default("decatur")
+  workspace   Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  id          String             @id @default(cuid())
+  couponId    String
+  coupon      Coupon             @relation(fields: [couponId], references: [id], onDelete: Cascade)
+  purchaseId  String
+  purchase    CouponBookPurchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  redeemedAt  DateTime           @default(now())
+
+  @@unique([id, workspaceId])
+  @@index([couponId])
+  @@index([purchaseId])
   @@index([workspaceId])
 }

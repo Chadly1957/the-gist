@@ -46,6 +46,23 @@ async function fulfillWeekBooking(workspaceId: string, session: Stripe.Checkout.
   await fulfillPaidWeekBooking(workspaceId, booking);
 }
 
+async function fulfillCouponBookPurchase(workspaceId: string, session: Stripe.Checkout.Session) {
+  const email = (session.customer_details?.email || session.metadata?.email || "").trim().toLowerCase();
+  if (!email || !email.includes("@")) {
+    // Money is captured but we have no address to deliver the book to.
+    console.error(`Coupon book payment captured but no email for session ${session.id}`);
+    return;
+  }
+  // Idempotent: the same session completing twice reuses the purchase row.
+  const purchase = await basePrisma.couponBookPurchase.upsert({
+    where: { stripeSessionId: session.id },
+    update: { active: true, email },
+    create: { workspaceId, email, stripeSessionId: session.id, active: true },
+  });
+  const { sendCouponBookMagicLinkEmail } = await import("@/lib/coupon-book-email");
+  await sendCouponBookMagicLinkEmail({ workspaceId, to: email, magicToken: purchase.magicToken });
+}
+
 export async function POST(req: NextRequest) {
   if (!process.env.STRIPE_SECRET_KEY || !process.env.STRIPE_WEBHOOK_SECRET) {
     return NextResponse.json({ error: "Stripe not configured." }, { status: 503 });
@@ -70,6 +87,8 @@ export async function POST(req: NextRequest) {
     const approvedAt = new Date();
     if (session.metadata?.kind === "sponsor_week") {
       await fulfillWeekBooking(workspaceId, session);
+    } else if (session.metadata?.kind === "coupon_book") {
+      await fulfillCouponBookPurchase(workspaceId, session);
     } else {
       await basePrisma.adBooking.updateMany({
         where: { workspaceId, stripeSessionId: sessionId, status: "pending_payment" },
