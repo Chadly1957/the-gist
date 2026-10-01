@@ -1,5 +1,4 @@
 import { getWorkspaceUrl } from "@/lib/workspace";
-import { workspaceUnique } from "@/lib/workspace";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { normalizeUrl } from "@/lib/url";
@@ -16,7 +15,14 @@ export async function POST(req: NextRequest) {
 
   const normalized = email.trim().toLowerCase();
 
-  const existing = await prisma.sponsorProfile.findUnique({ where: await workspaceUnique("email", normalized) });
+  // One email can own several businesses: match the exact business.
+  const existing = await prisma.sponsorProfile.findFirst({
+    where: {
+      email: normalized,
+      businessName: { equals: businessName.trim(), mode: "insensitive" },
+    },
+    orderBy: { createdAt: "asc" },
+  });
   if (existing) {
     const appUrl = await getWorkspaceUrl();
     const portalUrl = `${appUrl}/sponsor/portal?token=${existing.magicToken}`;

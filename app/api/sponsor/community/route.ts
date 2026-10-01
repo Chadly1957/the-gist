@@ -1,7 +1,6 @@
 import { getWorkspace, getWorkspaceUrl } from "@/lib/workspace";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { workspaceUnique } from "@/lib/workspace";
 import { normalizeUrl } from "@/lib/url";
 import { sendCommunityBoardConfirmation } from "@/lib/sponsor-week-email";
 import { optInSponsorToNewsletter } from "@/lib/sponsor-newsletter-optin";
@@ -35,7 +34,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Keep your description to 140 characters or less." }, { status: 400 });
   }
 
-  let profile = await prisma.sponsorProfile.findUnique({ where: await workspaceUnique("email", normalizedEmail) });
+  // One email can own several businesses: match the exact business so each
+  // business keeps its own profile (and portal). Same business reusing the
+  // same email reuses its profile.
+  let profile = await prisma.sponsorProfile.findFirst({
+    where: {
+      email: normalizedEmail,
+      businessName: { equals: trimmedBusiness, mode: "insensitive" },
+    },
+    orderBy: { createdAt: "asc" },
+  });
   if (!profile) {
     profile = await prisma.sponsorProfile.create({
       data: {

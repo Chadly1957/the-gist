@@ -11,6 +11,7 @@ import MultiDateCalendar from "@/components/MultiDateCalendar";
 
 interface Spotlight {
   id: string;
+  sponsorId: string;
   businessName: string;
   logoUrl: string | null;
   description: string;
@@ -25,6 +26,7 @@ interface Spotlight {
 
 interface Booking {
   id: string;
+  sponsorId: string;
   type: string;
   date: string;
   status: string;
@@ -533,16 +535,18 @@ function AdminSponsorsContent() {
   // most recent previous ad (matched by email, unique per workspace), falling
   // back to their Community Board spotlight listing, then to the profile's
   // website for the link URL.
+  // Match by profile id: one email can own several businesses, so matching by
+  // email would mix their creatives together.
   function autofillPlaceForm(profileId: string) {
     const profile = profiles.find((p) => p.id === profileId);
     const prevAd = profile
       ? bookings
-          .filter((b) => b.sponsor.email === profile.email && (b.headline || b.body))
+          .filter((b) => b.sponsorId === profileId && (b.headline || b.body))
           .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))[0]
       : undefined;
     const spotlight = profile
       ? spotlights
-          .filter((s) => s.sponsor.email === profile.email && s.status !== "expired")
+          .filter((s) => s.sponsorId === profileId && s.status !== "expired")
           .sort((a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0))[0]
       : undefined;
     setAutofillNote(
@@ -1206,7 +1210,7 @@ function AdminSponsorsContent() {
                       {editingBookingId === b.id ? (
                         <div className="space-y-3">
                           {(() => {
-                            const listing = spotlights.find(s => s.sponsor.email === b.sponsor.email && s.status === "approved");
+                            const listing = spotlights.find((s) => s.sponsorId === b.sponsorId && s.status === "approved");
                             if (!listing) return null;
                             return (
                               <div className="flex items-center justify-between bg-green-50 border border-green-100 rounded-lg px-3 py-2">
@@ -1464,7 +1468,7 @@ function AdminSponsorsContent() {
                   if (!newBookingForm.profileId) return null;
                   const profile = profiles.find((p) => p.id === newBookingForm.profileId);
                   if (!profile) return null;
-                  const listing = spotlights.find((s) => s.sponsor.email === profile.email && s.status === "approved");
+                  const listing = spotlights.find((s) => s.sponsorId === profile.id && s.status === "approved");
                   if (!listing) return null;
                   return (
                     <div className="flex items-center justify-between bg-green-50 border border-green-100 rounded-lg px-3 py-2">
