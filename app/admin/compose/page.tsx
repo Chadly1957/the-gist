@@ -64,6 +64,9 @@ export default function ComposePage() {
   } | null>(null);
   const [clearingPool, setClearingPool] = useState(false);
   const [mobileTab, setMobileTab] = useState<"articles" | "compose">("articles");
+  const [linkInput, setLinkInput] = useState("");
+  const [addingLink, setAddingLink] = useState(false);
+  const [linkError, setLinkError] = useState("");
 
   // Restore draft from localStorage on mount (runs before fetch effects)
   useEffect(() => {
@@ -227,6 +230,37 @@ export default function ComposePage() {
     setArticles((prev) =>
       prev.map((a) => (a.id === id ? { ...a, selected: !a.selected } : a))
     );
+  }
+
+  async function handleAddLink() {
+    const url = linkInput.trim();
+    if (!url) return;
+    setAddingLink(true);
+    setLinkError("");
+    try {
+      const res = await workspaceFetch("/api/admin/articles", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setLinkError(data.error || "Couldn't add that link.");
+        return;
+      }
+      const added = data.article as Article;
+      setArticles((prev) => {
+        const withSelected = { ...added, selected: true };
+        return prev.some((a) => a.id === added.id)
+          ? prev.map((a) => (a.id === added.id ? withSelected : a))
+          : [withSelected, ...prev];
+      });
+      setLinkInput("");
+    } catch {
+      setLinkError("Network error — try again.");
+    } finally {
+      setAddingLink(false);
+    }
   }
 
   const sortedArticles = localFirst
@@ -456,6 +490,33 @@ export default function ComposePage() {
               </button>
             </div>
           )}
+        </div>
+
+        {/* Add from link */}
+        <div className="px-5 py-3 border-b border-gray-100">
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleAddLink();
+            }}
+            className="flex items-center gap-2"
+          >
+            <input
+              type="text"
+              value={linkInput}
+              onChange={(e) => setLinkInput(e.target.value)}
+              placeholder="Paste an article link to add it to the pool…"
+              className="flex-1 min-w-0 px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-green-500"
+            />
+            <button
+              type="submit"
+              disabled={addingLink || !linkInput.trim()}
+              className="text-xs font-semibold text-green-700 hover:text-green-800 disabled:text-gray-300 shrink-0 px-1"
+            >
+              {addingLink ? "Adding…" : "Add"}
+            </button>
+          </form>
+          {linkError && <p className="text-xs text-red-500 mt-1.5">{linkError}</p>}
         </div>
 
         {/* Per-source scrape progress */}
