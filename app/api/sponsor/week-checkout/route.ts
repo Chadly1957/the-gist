@@ -10,7 +10,7 @@ import {
   formatWeekRange,
   isValidTier,
   mondayOf,
-  upcomingSponsorWeeks,
+  bookableSponsorWeeks,
   withWeekLock,
   type WeekTier,
 } from "@/lib/sponsor-weeks";
@@ -81,7 +81,7 @@ export async function POST(req: NextRequest) {
     where: { workspaceId, holdToken, expiresAt: { gt: new Date() } },
     include: { week: { select: { id: true, weekStart: true } } },
   });
-  if (!hold || !isValidTier(hold.tier) || mondayOf(hold.week.weekStart) !== hold.week.weekStart || !upcomingSponsorWeeks().includes(hold.week.weekStart)) {
+  if (!hold || !isValidTier(hold.tier) || mondayOf(hold.week.weekStart) !== hold.week.weekStart || !(await bookableSponsorWeeks(workspaceId)).includes(hold.week.weekStart)) {
     return NextResponse.json({ error: "Your reservation expired. Please pick a week again." }, { status: 400 });
   }
   const tier = hold.tier as WeekTier;

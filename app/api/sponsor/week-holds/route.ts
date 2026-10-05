@@ -4,10 +4,10 @@ import { basePrisma } from "@/lib/db-base";
 import {
   HOLD_MINUTES,
   WEEK_TIERS,
+  bookableSponsorWeeks,
   countTaken,
   isValidTier,
   mondayOf,
-  upcomingSponsorWeeks,
   withWeekLock,
   type WeekTier,
 } from "@/lib/sponsor-weeks";
@@ -21,12 +21,15 @@ export async function POST(req: NextRequest) {
   if (!isValidTier(tier)) {
     return NextResponse.json({ error: "Pick a valid package." }, { status: 400 });
   }
-  if (typeof weekStart !== "string" || mondayOf(weekStart) !== weekStart || !upcomingSponsorWeeks().includes(weekStart)) {
-    return NextResponse.json({ error: "Pick a valid week." }, { status: 400 });
-  }
 
   const workspace = await getWorkspace();
   const workspaceId = workspace.id;
+
+  // The current week is bookable while it is still a full week (no issue
+  // sent yet); otherwise booking starts next Monday.
+  if (typeof weekStart !== "string" || mondayOf(weekStart) !== weekStart || !(await bookableSponsorWeeks(workspaceId)).includes(weekStart)) {
+    return NextResponse.json({ error: "Pick a valid week." }, { status: 400 });
+  }
 
   try {
     const hold = await withWeekLock(workspaceId, weekStart, async (tx) => {
