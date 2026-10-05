@@ -635,14 +635,28 @@ export default function ComposePage() {
                     <p className="text-xs text-gray-500 leading-relaxed line-clamp-2">
                       {article.description}
                     </p>
-                    <p className="text-xs text-gray-300 mt-1.5">
-                      {new Date(article.publishedAt).toLocaleDateString("en-US", {
-                        month: "short",
-                        day: "numeric",
-                        hour: "numeric",
-                        minute: "2-digit",
-                      })}
-                    </p>
+                    <div className="flex items-center justify-between mt-1.5">
+                      <p className="text-xs text-gray-300">
+                        {new Date(article.publishedAt).toLocaleDateString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                          hour: "numeric",
+                          minute: "2-digit",
+                        })}
+                      </p>
+                      <a
+                        href={article.articleUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="inline-flex items-center gap-1 text-xs font-semibold text-green-700 border border-green-200 rounded-md px-2 py-0.5 hover:bg-green-50 transition-colors shrink-0"
+                      >
+                        Read
+                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                        </svg>
+                      </a>
+                    </div>
                   </div>
                 </label>
               ))}
