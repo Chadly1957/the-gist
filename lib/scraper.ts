@@ -133,6 +133,69 @@ async function scrapeArticleMeta(
   }
 }
 
+// Scrape a single user-pasted URL for the Compose tab's "add from link".
+// Lenient on purpose: falls back to the <title>/first paragraph and "now"
+// for the date, since a pasted link may lack article meta tags. Returns
+// null only when no usable title could be found.
+export async function scrapePastedUrl(rawUrl: string): Promise<ScrapedArticle | null> {
+  let url = rawUrl.trim();
+  if (!/^https?:\/\//i.test(url)) url = `https://${url}`;
+  try {
+    const { finalUrl, html } = await fetchFollowingRedirects(url);
+    if (!html) return null;
+    const $ = cheerio.load(html);
+
+    const title =
+      $('meta[property="og:title"]').attr("content") ||
+      $('meta[name="twitter:title"]').attr("content") ||
+      $("h1").first().text() ||
+      $("title").text() ||
+      "";
+    if (!title.trim()) return null;
+
+    const description =
+      $('meta[property="og:description"]').attr("content") ||
+      $('meta[name="description"]').attr("content") ||
+      $('meta[name="twitter:description"]').attr("content") ||
+      $("article p").first().text() ||
+      $("p").first().text() ||
+      "";
+
+    const imageUrl =
+      $('meta[property="og:image"]').attr("content") ||
+      $('meta[name="twitter:image"]').attr("content") ||
+      $('meta[property="og:image:url"]').attr("content") ||
+      null;
+
+    const dateStr =
+      $('meta[property="article:published_time"]').attr("content") ||
+      $('meta[name="date"]').attr("content") ||
+      $("time[datetime]").first().attr("datetime") ||
+      "";
+    const parsed = dateStr ? new Date(dateStr) : null;
+    const publishedAt = parsed && !isNaN(parsed.getTime()) ? parsed : new Date();
+
+    let sourceName = "Web";
+    try {
+      sourceName = new URL(finalUrl).hostname.replace(/^www\./, "");
+    } catch {
+      // keep default
+    }
+
+    return {
+      title: title.trim(),
+      description: truncate(description),
+      imageUrl: imageUrl ? resolveUrl(imageUrl, finalUrl) : null,
+      articleUrl: finalUrl,
+      sourceName,
+      publishedAt,
+      tags: [],
+    };
+  } catch {
+    return null;
+  }
+}
+
 // Check if a source URL is a Google News search feed
 function isGoogleNewsFeed(url: string): boolean {
   try {
