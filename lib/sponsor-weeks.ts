@@ -46,6 +46,37 @@ export function upcomingSponsorWeeks(count = 8): string[] {
   return weeks;
 }
 
+/**
+ * Weeks a buyer may book right now, for the admin and public flows. The
+ * current week is included only on Monday before the newsletter goes out:
+ * once Monday's issue is sent the week is partial and booking starts with
+ * next Monday. Server dates are UTC (Vercel), which matches the existing
+ * week math; the newsletter sends on weekday mornings, so the boundary
+ * cases (e.g. Sunday night UTC = the coming week, fully unsent) behave
+ * correctly.
+ */
+export async function bookableSponsorWeeks(workspaceId: string, count = 8): Promise<string[]> {
+  const today = toISODate(new Date());
+  const thisMonday = mondayOf(today);
+  // 1 = Monday. Only Monday can still be a full, unsent week.
+  let includeCurrent = parseISODate(today).getDay() === 1;
+  if (includeCurrent) {
+    const sent = await basePrisma.newsletterSend.findFirst({
+      where: {
+        workspaceId,
+        status: "sent",
+        sentAt: { gte: new Date(`${thisMonday}T00:00:00Z`) },
+      },
+      select: { id: true },
+    });
+    includeCurrent = !sent;
+  }
+  const start = includeCurrent ? 0 : 1;
+  const weeks: string[] = [];
+  for (let i = start; i < start + count; i++) weeks.push(addDaysISO(thisMonday, i * 7));
+  return weeks;
+}
+
 export function isValidTier(tier: string): tier is WeekTier {
   return tier === "presenting" || tier === "standard";
 }
@@ -119,7 +150,7 @@ export async function countTaken(
 
 export async function getWeeksAvailability(workspaceId: string): Promise<WeekAvailability[]> {
   const now = new Date();
-  const weeks = upcomingSponsorWeeks();
+  const weeks = await bookableSponsorWeeks(workspaceId);
   // All Mon-Fri issue dates across the upcoming weeks.
   const issueDates = weeks.flatMap((w) => [0, 1, 2, 3, 4].map((o) => addDaysISO(w, o)));
   const [holds, bookings, dayRows] = await Promise.all([
