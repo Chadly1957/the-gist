@@ -1,0 +1,173 @@
+"use client";
+
+import { Suspense, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { couponBookIsFounding, COUPON_BOOK_FOUNDING_CENTS, COUPON_BOOK_REGULAR_CENTS } from "@/lib/coupon-book";
+
+interface BookCoupon {
+  id: string;
+  businessName: string;
+  title: string;
+  description: string;
+  terms: string;
+  maxRedemptions: number | null;
+  redemptionsByMe: number;
+  usedUp: boolean;
+}
+
+interface BookData {
+  email: string;
+  qrDataUrl: string;
+  coupons: BookCoupon[];
+}
+
+function cents(n: number) {
+  return `$${(n / 100).toFixed(2).replace(/\.00$/, "")}`;
+}
+
+function CouponsPageInner() {
+  const searchParams = useSearchParams();
+  const token = searchParams.get("token");
+  const [book, setBook] = useState<BookData | null>(null);
+  const [bookError, setBookError] = useState<string | null>(null);
+  const [email, setEmail] = useState("");
+  const [buying, setBuying] = useState(false);
+  const [linkSent, setLinkSent] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
+
+  const founding = couponBookIsFounding();
+  const priceCents = founding ? COUPON_BOOK_FOUNDING_CENTS : COUPON_BOOK_REGULAR_CENTS;
+
+  useEffect(() => {
+    if (!token) return;
+    fetch(`/api/coupons/book?token=${encodeURIComponent(token)}`)
+      .then(async (r) => {
+        const data = await r.json();
+        if (!r.ok) throw new Error(data.error || "Could not open your book.");
+        setBook(data);
+      })
+      .catch((e) => setBookError(e instanceof Error ? e.message : "Could not open your book."));
+  }, [token]);
+
+  async function buy() {
+    setBuying(true);
+    setFormError(null);
+    try {
+      const res = await fetch("/api/coupons/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Checkout failed.");
+      window.location.href = data.url;
+    } catch (e) {
+      setFormError(e instanceof Error ? e.message : "Checkout failed.");
+      setBuying(false);
+    }
+  }
+
+  async function resendLink() {
+    setFormError(null);
+    setLinkSent(null);
+    try {
+      const res = await fetch("/api/coupons/magic-link", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Something went wrong.");
+      setLinkSent(data.message);
+    } catch (e) {
+      setFormError(e instanceof Error ? e.message : "Something went wrong.");
+    }
+  }
+
+  // Logged-in book view.
+  if (token) {
+    if (bookError) {
+      return (
+        <div className="min-h-screen flex items-center justify-center p-6">
+          <div className="max-w-sm text-center">
+            <h1 className="text-xl font-bold mb-2">Link not valid</h1>
+            <p className="text-gray-600 text-sm">{bookError}</p>
+          </div>
+        </div>
+      );
+    }
+    if (!book) return <div className="min-h-screen flex items-center justify-center"><p className="text-gray-500">Opening your book…</p></div>;
+    return (
+      <div className="min-h-screen bg-gray-50 p-4">
+        <div className="max-w-md mx-auto">
+          <h1 className="text-2xl font-bold text-center mt-4">My Coupon Book</h1>
+          <p className="text-center text-gray-500 text-sm mb-4">{book.email}</p>
+          <div className="bg-white rounded-2xl shadow p-6 text-center mb-6">
+            <p className="text-sm text-gray-600 mb-3">Show this code at any participating business. They scan it to apply your discount.</p>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={book.qrDataUrl} alt="Your coupon book QR code" className="mx-auto w-56 h-56" />
+          </div>
+          <div className="space-y-3">
+            {book.coupons.map((c) => (
+              <div key={c.id} className={`bg-white rounded-xl shadow p-4 ${c.usedUp ? "opacity-50" : ""}`}>
+                <p className="text-xs text-gray-500 uppercase tracking-wide">{c.businessName}</p>
+                <p className="font-bold text-lg">{c.title}</p>
+                {c.description && <p className="text-gray-600 text-sm mt-1">{c.description}</p>}
+                {c.terms && <p className="text-gray-400 text-xs mt-1">{c.terms}</p>}
+                <p className={`text-xs mt-2 font-semibold ${c.usedUp ? "text-red-600" : "text-gray-400"}`}>
+                  {c.usedUp ? "Used up" : c.maxRedemptions === 1 ? "One-time use" : "Reusable"}
+                </p>
+              </div>
+            ))}
+          </div>
+          {book.coupons.length === 0 && (
+            <p className="text-center text-gray-500 mt-8">Coupons are on the way. Check back soon!</p>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // Landing / buy view.
+  return (
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
+      <div className="max-w-md w-full bg-white rounded-2xl shadow p-8">
+        <h1 className="text-2xl font-bold mb-2">The Gist Coupon Book</h1>
+        <p className="text-gray-600 text-sm mb-6">
+          Real discounts from local businesses, right on your phone. Show your personal QR code at the
+          register and the cashier scans it to apply your discount. No apps, no printing, no hassle.
+        </p>
+        {formError && <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg p-3 mb-4 text-sm">{formError}</div>}
+        {linkSent && <div className="bg-green-50 border border-green-200 text-green-700 rounded-lg p-3 mb-4 text-sm">{linkSent}</div>}
+        <label className="block text-sm font-semibold mb-1" htmlFor="coupon-email">Email</label>
+        <input
+          id="coupon-email"
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="you@example.com"
+          className="w-full border rounded-lg px-3 py-2 mb-4"
+        />
+        <button
+          onClick={buy}
+          disabled={buying || !email.includes("@")}
+          className="w-full py-3 rounded-xl bg-green-700 text-white font-bold disabled:opacity-50 mb-3"
+        >
+          {buying ? "Starting checkout…" : `Get the Book — ${cents(priceCents)}${founding ? " (founding price)" : ""}`}
+        </button>
+        <button onClick={resendLink} className="w-full py-2 text-sm text-gray-600 underline">
+          Already bought one? Email me my link
+        </button>
+        {!founding && <p className="text-center text-gray-400 text-xs mt-4">Founding pricing has ended. Regular price {cents(priceCents)}.</p>}
+      </div>
+    </div>
+  );
+}
+
+export default function CouponsPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><p className="text-gray-500">Loading…</p></div>}>
+      <CouponsPageInner />
+    </Suspense>
+  );
+}
