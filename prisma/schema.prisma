@@ -53,6 +53,10 @@ model Workspace {
   couponBookPurchaseRows      CouponBookPurchase[]
   couponRows                  Coupon[]
   couponRedemptionRows        CouponRedemption[]
+  retailerRows                Retailer[]
+  dealWeekRows                DealWeek[]
+  dealRows                    Deal[]
+  dealDigestSendRows          DealDigestSend[]
 }
 
 model AdminUser {
@@ -620,6 +624,9 @@ model CouponBookPurchase {
   // Lifetime access: one-time $15 buyers are grandfathered in free if the book
   // ever moves to a subscription. All one-time purchases get this.
   isLifetime      Boolean            @default(true)
+  // Weekly deals digest: buyers get the fresh book in their inbox every week
+  // unless they opt out (footer link in each digest).
+  digestOptOut    Boolean            @default(false)
   createdAt       DateTime           @default(now())
   redemptions     CouponRedemption[]
 
@@ -664,5 +671,89 @@ model CouponRedemption {
   @@unique([id, workspaceId])
   @@index([couponId])
   @@index([purchaseId])
+  @@index([workspaceId])
+}
+
+// Coupon book content engine: weekly retailer deals (Phase 1).
+// Retailers are configured per workspace; national content (Hobby Lobby) is
+// seeded per workspace too so the unique constraints stay uniform.
+model Retailer {
+  workspaceId          String     @default("decatur")
+  workspace            Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  id                   String     @id @default(cuid())
+  slug                 String
+  displayName          String
+  // hobby-lobby | target | aldi | dollar-general | kroger | manual
+  pipeline             String
+  // JSON: { zip, storeId, locationId } — whatever the pipeline needs.
+  storeConfig          String     @default("{}")
+  affiliateUrlTemplate String?
+  active               Boolean    @default(true)
+  createdAt            DateTime   @default(now())
+  dealWeeks            DealWeek[]
+
+  @@unique([workspaceId, slug])
+  @@unique([id, workspaceId])
+  @@index([workspaceId])
+}
+
+model DealWeek {
+  workspaceId String    @default("decatur")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  id          String    @id @default(cuid())
+  retailerId  String
+  retailer    Retailer  @relation(fields: [retailerId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
+  weekStart   String // YYYY-MM-DD (Monday)
+  weekEnd     String
+  sourceUrl   String?
+  // draft | published
+  status      String    @default("draft")
+  fetchedAt   DateTime  @default(now())
+  publishedAt DateTime?
+  deals       Deal[]
+
+  @@unique([workspaceId, retailerId, weekStart])
+  @@unique([id, workspaceId])
+  @@index([workspaceId, status])
+}
+
+model Deal {
+  workspaceId  String    @default("decatur")
+  workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  id           String    @id @default(cuid())
+  dealWeekId   String
+  dealWeek     DealWeek  @relation(fields: [dealWeekId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
+  // Our own wording — prices/facts aren't copyrightable, but we paraphrase
+  // retailer headlines rather than copying ad copy verbatim.
+  title        String
+  price        String?
+  regPrice     String?
+  category     String?
+  summary      String    @default("")
+  // Deep link to the retailer's own ad page for this deal/week.
+  dealUrl      String?
+  // Manual/evergreen deals: any business Chad finds (no per-retailer obligation).
+  businessName String?
+  validFrom    String?
+  validTo      String?
+  isTopPick    Boolean   @default(false)
+  sortOrder    Int       @default(0)
+
+  @@unique([id, workspaceId])
+  @@index([workspaceId, dealWeekId])
+}
+
+// Log of weekly buyer-digest sends (one row per send per workspace).
+model DealDigestSend {
+  workspaceId    String    @default("decatur")
+  workspace      Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  id             String    @id @default(cuid())
+  sentAt         DateTime  @default(now())
+  subject        String
+  recipientCount Int       @default(0)
+  // JSON array of DealWeek ids included in this send.
+  dealWeekIds    String    @default("[]")
+
+  @@unique([id, workspaceId])
   @@index([workspaceId])
 }
