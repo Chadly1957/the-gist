@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { couponBookIsFounding, COUPON_BOOK_FOUNDING_CENTS, COUPON_BOOK_REGULAR_CENTS } from "@/lib/coupon-book";
+import { COUPON_BOOK_PRICE_CENTS } from "@/lib/coupon-book";
 
 interface BookCoupon {
   id: string;
@@ -35,8 +35,7 @@ function CouponsPageInner() {
   const [linkSent, setLinkSent] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
 
-  const founding = couponBookIsFounding();
-  const priceCents = founding ? COUPON_BOOK_FOUNDING_CENTS : COUPON_BOOK_REGULAR_CENTS;
+  const priceCents = COUPON_BOOK_PRICE_CENTS;
 
   useEffect(() => {
     if (!token) return;
@@ -153,12 +152,11 @@ function CouponsPageInner() {
           disabled={buying || !email.includes("@")}
           className="w-full py-3 rounded-xl bg-green-700 text-white font-bold disabled:opacity-50 mb-3"
         >
-          {buying ? "Starting checkout…" : `Get the Book — ${cents(priceCents)}${founding ? " (founding price)" : ""}`}
+          {buying ? "Starting checkout…" : `Get the Book — ${cents(priceCents)}, yours for life`}
         </button>
         <button onClick={resendLink} className="w-full py-2 text-sm text-gray-600 underline">
           Already bought one? Email me my link
         </button>
-        {!founding && <p className="text-center text-gray-400 text-xs mt-4">Founding pricing has ended. Regular price {cents(priceCents)}.</p>}
       </div>
     </div>
   );
