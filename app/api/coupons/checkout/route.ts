@@ -3,7 +3,6 @@ import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import {
   COUPON_BOOK_STRIPE_KIND,
-  couponBookIsFounding,
   couponBookPriceCents,
 } from "@/lib/coupon-book";
 
@@ -22,9 +21,7 @@ export async function POST(req: NextRequest) {
   }
 
   const workspace = await getWorkspace();
-  const founding = couponBookIsFounding();
   const amountCents = couponBookPriceCents();
-  const priceLabel = founding ? "Founding price" : "Regular price";
 
   const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
   const appUrl = await getWorkspaceUrl();
@@ -42,7 +39,7 @@ export async function POST(req: NextRequest) {
             unit_amount: amountCents,
             product_data: {
               name: `${workspace.name} Coupon Book`,
-              description: `${priceLabel} — one-time purchase`,
+              description: `One-time purchase — yours for life`,
             },
           },
           quantity: 1,

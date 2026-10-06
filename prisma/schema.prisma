@@ -617,6 +617,9 @@ model CouponBookPurchase {
   // Emailed magic link for the reader dashboard (no passwords).
   magicToken      String             @unique @default(cuid())
   active          Boolean            @default(true)
+  // Lifetime access: one-time $15 buyers are grandfathered in free if the book
+  // ever moves to a subscription. All one-time purchases get this.
+  isLifetime      Boolean            @default(true)
   createdAt       DateTime           @default(now())
   redemptions     CouponRedemption[]
 
