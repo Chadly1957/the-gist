@@ -15,10 +15,33 @@ interface BookCoupon {
   usedUp: boolean;
 }
 
+interface BookDeal {
+  title: string;
+  price?: string | null;
+  businessName?: string | null;
+  dealUrl?: string | null;
+  isTopPick: boolean;
+}
+
+interface BookRetailerDeals {
+  displayName: string;
+  deals: BookDeal[];
+}
+
 interface BookData {
   email: string;
   qrDataUrl: string;
   coupons: BookCoupon[];
+  deals?: {
+    topPicks: BookDeal[];
+    retailers: BookRetailerDeals[];
+    weekLabel: string;
+  };
+  referrals?: {
+    rakuten: string;
+    ibotta: string;
+    note: string;
+  };
 }
 
 function cents(n: number) {
@@ -106,6 +129,77 @@ function CouponsPageInner() {
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={book.qrDataUrl} alt="Your coupon book QR code" className="mx-auto w-56 h-56" />
           </div>
+          {book.deals && (book.deals.topPicks.length > 0 || book.deals.retailers.length > 0) && (
+            <div className="mb-6">
+              <h2 className="text-xl font-bold mb-1">This Week&apos;s Deals</h2>
+              {book.deals.weekLabel && (
+                <p className="text-gray-500 text-xs mb-3">{book.deals.weekLabel}</p>
+              )}
+              {book.deals.topPicks.length > 0 && (
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-3">
+                  <p className="font-bold text-sm mb-2">⭐ Top picks</p>
+                  <ul className="space-y-1.5">
+                    {book.deals.topPicks.map((d, i) => (
+                      <li key={i} className="text-sm">
+                        {d.businessName && <span className="text-gray-500">{d.businessName}: </span>}
+                        <span className="font-medium">{d.title}</span>
+                        {d.price && <span className="font-bold"> {d.price}</span>}
+                        {d.dealUrl && (
+                          <a href={d.dealUrl} target="_blank" rel="noreferrer" className="text-teal-700 underline ml-1">
+                            view →
+                          </a>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {book.deals.retailers.map((r) => (
+                <div key={r.displayName} className="bg-white rounded-xl shadow p-4 mb-3">
+                  <p className="font-bold text-sm mb-2">{r.displayName}</p>
+                  <ul className="space-y-1.5">
+                    {r.deals
+                      .filter((d) => !d.isTopPick)
+                      .slice(0, 12)
+                      .map((d, i) => (
+                        <li key={i} className="text-sm text-gray-700">
+                          {d.businessName && <span className="text-gray-500">{d.businessName}: </span>}
+                          {d.title}
+                          {d.price && <span className="font-bold"> {d.price}</span>}
+                          {d.dealUrl && (
+                            <a href={d.dealUrl} target="_blank" rel="noreferrer" className="text-teal-700 underline ml-1">
+                              view →
+                            </a>
+                          )}
+                        </li>
+                      ))}
+                  </ul>
+                </div>
+              ))}
+              {(book.referrals?.rakuten || book.referrals?.ibotta) && (
+                <div className="bg-green-50 border border-green-200 rounded-xl p-4 mb-3">
+                  <p className="font-bold text-sm mb-1">💰 Stack your savings</p>
+                  {book.referrals.note && <p className="text-xs text-gray-600 mb-2">{book.referrals.note}</p>}
+                  <p className="text-xs">
+                    {book.referrals.rakuten && (
+                      <a href={book.referrals.rakuten} target="_blank" rel="noreferrer" className="text-teal-700 underline">
+                        Get cash back with Rakuten
+                      </a>
+                    )}
+                    {book.referrals.rakuten && book.referrals.ibotta && " · "}
+                    {book.referrals.ibotta && (
+                      <a href={book.referrals.ibotta} target="_blank" rel="noreferrer" className="text-teal-700 underline">
+                        Get the Ibotta app
+                      </a>
+                    )}
+                  </p>
+                </div>
+              )}
+              <p className="text-gray-400 text-[11px] mt-2">
+                As an Amazon Associate and affiliate partner we may earn from qualifying purchases.
+              </p>
+            </div>
+          )}
           <div className="space-y-3">
             {book.coupons.map((c) => (
               <div key={c.id} className={`bg-white rounded-xl shadow p-4 ${c.usedUp ? "opacity-50" : ""}`}>

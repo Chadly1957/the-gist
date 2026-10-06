@@ -2,6 +2,7 @@ import { getWorkspace, getWorkspaceUrl } from "@/lib/workspace";
 import { NextRequest, NextResponse } from "next/server";
 import { basePrisma } from "@/lib/db-base";
 import QRCode from "qrcode";
+import { getPublishedDigestData } from "@/lib/deals/digest";
 
 export const dynamic = "force-dynamic";
 
@@ -42,6 +43,11 @@ export async function GET(req: NextRequest) {
   });
   const usedCounts = Object.fromEntries(redemptionCounts.map((r) => [r.couponId, r._count.couponId]));
 
+  // This Week's Deals: latest published deal weeks + referral wallet links.
+  const digestData = await getPublishedDigestData(workspace.id);
+  const settingRows = await basePrisma.setting.findMany({ where: { workspaceId: workspace.id } });
+  const settings = Object.fromEntries(settingRows.map((r) => [r.key, r.value]));
+
   return NextResponse.json({
     email: purchase.email,
     cashierUrl,
@@ -51,5 +57,15 @@ export async function GET(req: NextRequest) {
       redemptionsByMe: usedCounts[c.id] ?? 0,
       usedUp: c.maxRedemptions != null && (usedCounts[c.id] ?? 0) >= c.maxRedemptions,
     })),
+    deals: {
+      topPicks: digestData.topPicks,
+      retailers: digestData.retailers,
+      weekLabel: digestData.weekLabel,
+    },
+    referrals: {
+      rakuten: settings["deals_referral_rakuten"] || "",
+      ibotta: settings["deals_referral_ibotta"] || "",
+      note: settings["deals_referral_note"] || "",
+    },
   });
 }
