@@ -138,18 +138,18 @@ model Setting {
 }
 
 model NewsletterSend {
-  workspaceId          String                    @default("decatur")
-  workspace            Workspace                 @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
-  id                   String                    @id @default(cuid())
-  subject              String
-  htmlBody             String
-  htmlSnapshot         String?
-  sentAt               DateTime                  @default(now())
-  recipientCount       Int                       @default(0)
-  status               String                    @default("sent")
+  workspaceId            String                    @default("decatur")
+  workspace              Workspace                 @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  id                     String                    @id @default(cuid())
+  subject                String
+  htmlBody               String
+  htmlSnapshot           String?
+  sentAt                 DateTime                  @default(now())
+  recipientCount         Int                       @default(0)
+  status                 String                    @default("sent")
   sponsorAnalyticsSentAt DateTime?
-  recipients           NewsletterRecipient[]
-  spotlightAppearances NewsletterSendSpotlight[]
+  recipients             NewsletterRecipient[]
+  spotlightAppearances   NewsletterSendSpotlight[]
 
   @@unique([id, workspaceId])
   @@index([workspaceId])
@@ -209,82 +209,83 @@ model LinkClick {
 }
 
 model SponsorProfile {
-  workspaceId   String             @default("decatur")
-  workspace     Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
-  id            String             @id @default(cuid())
+  workspaceId   String               @default("decatur")
+  workspace     Workspace            @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  id            String               @id @default(cuid())
   businessName  String
   contactName   String
   email         String
   phone         String?
   website       String?
-  magicToken    String             @unique @default(cuid())
-  active        Boolean            @default(true)
+  magicToken    String               @unique @default(cuid())
+  active        Boolean              @default(true)
   notes         String?
-  createdAt     DateTime           @default(now())
+  createdAt     DateTime             @default(now())
   spotlights    SpotlightListing[]
   bookings      AdBooking[]
   weekBookings  SponsorWeekBooking[]
   events        Event[]
   wordyBookings WordyBooking[]
+  coupons       Coupon[]
 
+  @@unique([id, workspaceId])
   // One person can own several businesses: email alone is not unique.
   // Find-or-create flows match on email + business name.
   @@index([workspaceId, email])
-  @@unique([id, workspaceId])
   @@index([workspaceId])
 }
 
 model SpotlightListing {
-  workspaceId     String                    @default("decatur")
-  workspace       Workspace                 @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
-  id              String                    @id @default(cuid())
-  sponsorId       String
-  sponsor         SponsorProfile            @relation(fields: [sponsorId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
-  businessName    String
-  logoUrl         String?
-  description     String
-  ctaLabel        String                    @default("Visit Website")
-  ctaUrl          String
-  status          String                    @default("pending")
-  lastShownAt     DateTime?
-  shownCount      Int                       @default(0)
+  workspaceId        String                    @default("decatur")
+  workspace          Workspace                 @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  id                 String                    @id @default(cuid())
+  sponsorId          String
+  sponsor            SponsorProfile            @relation(fields: [sponsorId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
+  businessName       String
+  logoUrl            String?
+  description        String
+  ctaLabel           String                    @default("Visit Website")
+  ctaUrl             String
+  status             String                    @default("pending")
+  lastShownAt        DateTime?
+  shownCount         Int                       @default(0)
   upgradeNudgeSentAt DateTime?
-  createdAt       DateTime                  @default(now())
-  approvedAt      DateTime?
-  sendAppearances NewsletterSendSpotlight[]
+  createdAt          DateTime                  @default(now())
+  approvedAt         DateTime?
+  sendAppearances    NewsletterSendSpotlight[]
 
   @@unique([id, workspaceId])
   @@index([workspaceId])
 }
 
 model AdBooking {
-  workspaceId       String             @default("decatur")
-  workspace         Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
-  id                String             @id @default(cuid())
-  sponsorId         String
-  sponsor           SponsorProfile     @relation(fields: [sponsorId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
-  type              String
-  date              String
-  status            String             @default("pending_review")
-  isPaid            Boolean            @default(false)
+  workspaceId          String              @default("decatur")
+  workspace            Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  id                   String              @id @default(cuid())
+  sponsorId            String
+  sponsor              SponsorProfile      @relation(fields: [sponsorId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
+  type                 String
+  date                 String
+  status               String              @default("pending_review")
+  isPaid               Boolean             @default(false)
   // $0 comp/house placement (spec section 12). Marked in admin only; the
   // newsletter renders it like any other ad.
-  isComp            Boolean            @default(false)
-  discountPct       Int                @default(0)
-  stripeSessionId   String?
-  imageUrl          String?
-  headline          String
-  body              String
-  ctaUrl            String
-  ctaLabel          String             @default("Learn More")
-  presentingBlurb   String?
-  adminNotes        String?
+  isComp               Boolean             @default(false)
+  discountPct          Int                 @default(0)
+  stripeSessionId      String?
+  imageUrl             String?
+  headline             String
+  body                 String
+  ctaUrl               String
+  ctaLabel             String              @default("Learn More")
+  presentingBlurb      String?
+  adminNotes           String?
   // Set when this row was projected from a week-based SponsorWeekBooking.
   sponsorWeekBookingId String?
   sponsorWeekBooking   SponsorWeekBooking? @relation(fields: [sponsorWeekBookingId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
-  createdAt         DateTime           @default(now())
-  approvedAt        DateTime?
-  gameSponsorEvents GameSponsorEvent[]
+  createdAt            DateTime            @default(now())
+  approvedAt           DateTime?
+  gameSponsorEvents    GameSponsorEvent[]
 
   @@unique([id, workspaceId])
   @@index([stripeSessionId])
@@ -295,7 +296,7 @@ model AdBooking {
 model SponsorDayConfig {
   workspaceId  String    @default("decatur")
   workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
-  date         String    // YYYY-MM-DD of the newsletter issue
+  date         String // YYYY-MM-DD of the newsletter issue
   maxInArticle Int       @default(2) // per-issue standard-slot override (soft cap)
   createdAt    DateTime  @default(now())
 
@@ -310,7 +311,7 @@ model SponsorWeek {
   workspaceId String               @default("decatur")
   workspace   Workspace            @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
   id          String               @id @default(cuid())
-  weekStart   String               // Monday, YYYY-MM-DD
+  weekStart   String // Monday, YYYY-MM-DD
   createdAt   DateTime             @default(now())
   holds       SponsorHold[]
   bookings    SponsorWeekBooking[]
@@ -327,7 +328,7 @@ model SponsorHold {
   id          String      @id @default(cuid())
   weekId      String
   week        SponsorWeek @relation(fields: [weekId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
-  tier        String      // "presenting" | "standard"
+  tier        String // "presenting" | "standard"
   holdToken   String      @unique @default(cuid())
   expiresAt   DateTime
   createdAt   DateTime    @default(now())
@@ -338,35 +339,35 @@ model SponsorHold {
 }
 
 model SponsorWeekBooking {
-  workspaceId     String         @default("decatur")
-  workspace       Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
-  id              String         @id @default(cuid())
-  weekId          String
-  week            SponsorWeek    @relation(fields: [weekId, workspaceId], references: [id, workspaceId], onDelete: Restrict)
-  sponsorId       String
-  sponsor         SponsorProfile @relation(fields: [sponsorId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
-  tier            String         // "presenting" | "standard"
-  status          String         @default("pending_payment") // pending_payment -> paid -> completed | cancelled
-  amountCents     Int
-  stripeSessionId String?
-  businessName    String
-  contactName     String
-  email           String
-  website         String?
-  logoUrl         String
-  aboutText       String
-  chadWritesCopy  Boolean        @default(true)
-  finalAdCopy     String?
-  copyFinalizedAt DateTime?
-  rebookToken     String         @unique @default(cuid())
-  resultsSentAt   DateTime?
-  renewalSentAt   DateTime?
-  paidAt          DateTime?
-  ownerNotifiedAt   DateTime?
-  buyerNotifiedAt   DateTime?
+  workspaceId            String         @default("decatur")
+  workspace              Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  id                     String         @id @default(cuid())
+  weekId                 String
+  week                   SponsorWeek    @relation(fields: [weekId, workspaceId], references: [id, workspaceId], onDelete: Restrict)
+  sponsorId              String
+  sponsor                SponsorProfile @relation(fields: [sponsorId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
+  tier                   String // "presenting" | "standard"
+  status                 String         @default("pending_payment") // pending_payment -> paid -> completed | cancelled
+  amountCents            Int
+  stripeSessionId        String?
+  businessName           String
+  contactName            String
+  email                  String
+  website                String?
+  logoUrl                String
+  aboutText              String
+  chadWritesCopy         Boolean        @default(true)
+  finalAdCopy            String?
+  copyFinalizedAt        DateTime?
+  rebookToken            String         @unique @default(cuid())
+  resultsSentAt          DateTime?
+  renewalSentAt          DateTime?
+  paidAt                 DateTime?
+  ownerNotifiedAt        DateTime?
+  buyerNotifiedAt        DateTime?
   fulfillmentAlertSentAt DateTime?
-  createdAt       DateTime       @default(now())
-  adBookingRows   AdBooking[]
+  createdAt              DateTime       @default(now())
+  adBookingRows          AdBooking[]
 
   @@unique([id, workspaceId])
   @@index([workspaceId])
@@ -639,6 +640,9 @@ model Coupon {
   contactEmail   String?
   createdAt      DateTime           @default(now())
   redemptions    CouponRedemption[]
+  // Self-serve portal submission: null = created by admin in the coupon book flow.
+  sponsorId      String?
+  sponsor        SponsorProfile?    @relation(fields: [sponsorId], references: [id], onDelete: SetNull)
 
   @@unique([id, workspaceId])
   @@index([workspaceId])
