@@ -67,6 +67,17 @@ interface Payment {
   receiptUrl: string | null;
 }
 
+interface PortalCoupon {
+  id: string;
+  businessName: string;
+  title: string;
+  description: string;
+  terms: string;
+  maxRedemptions: number | null;
+  active: boolean;
+  createdAt: string;
+}
+
 interface Profile {
   id: string;
   businessName: string;
@@ -87,7 +98,7 @@ interface Analytics {
   bookingGameStats: Record<string, { wordyImpressions: number; wordyClicks: number; matchImpressions: number; matchClicks: number }>;
 }
 
-type View = "overview" | "spotlight" | "booking" | "profile" | "event" | "billing" | "editWeek";
+type View = "overview" | "spotlight" | "booking" | "profile" | "event" | "billing" | "editWeek" | "coupons";
 
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
   pending: { label: "Pending Review", color: "bg-yellow-50 text-yellow-700" },
@@ -201,6 +212,22 @@ function PortalContent() {
   const [eSubmitting, setESubmitting] = useState(false);
   const [eError, setEError] = useState("");
   const [eSuccess, setESuccess] = useState(false);
+
+  // Coupons (self-serve, live immediately)
+  const [coupons, setCoupons] = useState<PortalCoupon[] | null>(null);
+  const [cForm, setCForm] = useState({ title: "", description: "", terms: "", kind: "recurring" as "recurring" | "one-time", maxRedemptions: "" });
+  const [cSubmitting, setCSubmitting] = useState(false);
+  const [cError, setCError] = useState("");
+  const [cSuccess, setCSuccess] = useState(false);
+  const [cToggling, setCToggling] = useState<string | null>(null);
+
+  function loadCoupons() {
+    if (!token) return;
+    workspaceFetch(`/api/sponsor/coupons?token=${encodeURIComponent(token)}`)
+      .then((r) => r.json())
+      .then((data) => { if (!data.error) setCoupons(data.coupons); })
+      .catch(() => {});
+  }
 
   function refreshPortalData() {
     if (!token) return;
@@ -378,6 +405,62 @@ function PortalContent() {
     setESubmitting(false);
   }
 
+  async function submitCoupon(e: React.FormEvent) {
+    e.preventDefault();
+    setCSubmitting(true); setCError("");
+    try {
+      const res = await workspaceFetch("/api/sponsor/coupons", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          token,
+          title: cForm.title,
+          description: cForm.description,
+          terms: cForm.terms,
+          maxRedemptions: cForm.kind === "one-time" ? cForm.maxRedemptions : null,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setCSuccess(true);
+        setCForm({ title: "", description: "", terms: "", kind: "recurring", maxRedemptions: "" });
+        loadCoupons();
+      } else setCError(data.error || "Submission failed.");
+    } catch (_e) { setCError("Connection error."); }
+    setCSubmitting(false);
+  }
+
+  async function toggleCouponActive(c: PortalCoupon) {
+    setCToggling(c.id);
+    try {
+      const res = await workspaceFetch(`/api/sponsor/coupons/${c.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token, active: !c.active }),
+      });
+      const data = await res.json();
+      if (res.ok) setCoupons((list) => list ? list.map((x) => x.id === c.id ? data.coupon : x) : list);
+      else setCError(data.error || "Update failed.");
+    } catch (_e) { setCError("Connection error."); }
+    setCToggling(null);
+  }
+
+  async function deleteCoupon(c: PortalCoupon) {
+    if (!confirm(`Delete the coupon "${c.title}"? This cannot be undone.`)) return;
+    try {
+      const res = await workspaceFetch(`/api/sponsor/coupons/${c.id}?token=${encodeURIComponent(token)}`, { method: "DELETE" });
+      const data = await res.json();
+      if (res.ok) setCoupons((list) => list ? list.filter((x) => x.id !== c.id) : list);
+      else setCError(data.error || "Delete failed.");
+    } catch (_e) { setCError("Connection error."); }
+  }
+
+  function openCoupons() {
+    setCSuccess(false); setCError("");
+    loadCoupons();
+    setView("coupons");
+  }
+
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center">
       <div className="w-6 h-6 border-2 border-green-600 border-t-transparent rounded-full animate-spin" />
@@ -553,6 +636,20 @@ function PortalContent() {
                 <div>
                   <p className="text-sm font-semibold text-gray-800">Submit an Event</p>
                   <p className="text-xs text-gray-400">Free — appears in the newsletter calendar</p>
+                </div>
+              </button>
+              <button
+                onClick={openCoupons}
+                className="flex items-center gap-3 p-4 bg-white rounded-xl border border-gray-200 hover:border-green-400 hover:shadow-sm transition-all text-left"
+              >
+                <div className="w-9 h-9 rounded-lg bg-amber-50 flex items-center justify-center shrink-0">
+                  <svg className="w-5 h-5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" />
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-gray-800">Coupons</p>
+                  <p className="text-xs text-gray-400">Free — goes live in the coupon book instantly</p>
                 </div>
               </button>
               <button
@@ -1011,6 +1108,105 @@ function PortalContent() {
         )}
 
         {/* EVENT SUBMISSION FORM */}
+        {view === "coupons" && (
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900 mb-1">Coupons</h1>
+            <p className="text-sm text-gray-500 mb-6">Free for Community Partners. Your coupon goes live in the coupon book immediately — no review, no waiting.</p>
+
+            {cSuccess ? (
+              <div className="bg-green-50 border border-green-100 rounded-xl p-6 text-center mb-6">
+                <p className="text-green-800 font-semibold mb-1">Coupon is live!</p>
+                <p className="text-sm text-green-600">Book holders can redeem it right now.</p>
+                <div className="flex gap-3 justify-center mt-4">
+                  <button onClick={() => setCSuccess(false)} className="text-sm text-green-700 underline">Add another coupon</button>
+                  <button onClick={() => { setCSuccess(false); setView("overview"); }} className="text-sm text-gray-500 underline">Back to portal</button>
+                </div>
+              </div>
+            ) : (
+              <form onSubmit={submitCoupon} className="space-y-4 bg-white rounded-xl border border-gray-200 p-6 mb-6">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Coupon Title * <span className="font-normal text-gray-400">(80 characters max)</span></label>
+                  <input type="text" required maxLength={80} value={cForm.title} onChange={(e) => setCForm((f) => ({ ...f, title: e.target.value }))}
+                    placeholder="e.g. 10% off any sandwich"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Description <span className="font-normal text-gray-400">(optional)</span></label>
+                  <textarea value={cForm.description} onChange={(e) => setCForm((f) => ({ ...f, description: e.target.value }))} rows={2}
+                    placeholder="What does the customer get?"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Terms <span className="font-normal text-gray-400">(optional — exclusions, expiry, fine print)</span></label>
+                  <textarea value={cForm.terms} onChange={(e) => setCForm((f) => ({ ...f, terms: e.target.value }))} rows={2}
+                    placeholder="e.g. One per visit. Expires 12/31/2026. Not valid with other offers."
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-2">How many times can it be used?</label>
+                  <div className="flex flex-col gap-2">
+                    <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                      <input type="radio" name="coupon-kind" checked={cForm.kind === "recurring"} onChange={() => setCForm((f) => ({ ...f, kind: "recurring" }))}
+                        className="accent-green-700" />
+                      Unlimited <span className="text-gray-400">(recurring — every visit)</span>
+                    </label>
+                    <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                      <input type="radio" name="coupon-kind" checked={cForm.kind === "one-time"} onChange={() => setCForm((f) => ({ ...f, kind: "one-time" }))}
+                        className="accent-green-700" />
+                      One-time, limited redemptions
+                    </label>
+                    {cForm.kind === "one-time" && (
+                      <input type="number" min={1} step={1} value={cForm.maxRedemptions}
+                        onChange={(e) => setCForm((f) => ({ ...f, maxRedemptions: e.target.value }))}
+                        placeholder="e.g. 50"
+                        className="w-40 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+                    )}
+                  </div>
+                </div>
+                {cError && <p className="text-sm text-red-600">{cError}</p>}
+                <button type="submit" disabled={cSubmitting}
+                  className="w-full bg-green-700 hover:bg-green-800 disabled:opacity-50 text-white font-semibold py-2.5 rounded-xl text-sm transition-colors">
+                  {cSubmitting ? "Publishing…" : "Publish Coupon"}
+                </button>
+              </form>
+            )}
+
+            <h2 className="text-lg font-bold text-gray-900 mb-3">Your coupons</h2>
+            {coupons === null ? (
+              <p className="text-sm text-gray-400">Loading…</p>
+            ) : coupons.length === 0 ? (
+              <p className="text-sm text-gray-400">No coupons yet. Publish your first one above.</p>
+            ) : (
+              <div className="space-y-3">
+                {coupons.map((c) => (
+                  <div key={c.id} className={`bg-white rounded-xl border p-4 flex items-start justify-between gap-4 ${c.active ? "border-gray-200" : "border-gray-200 opacity-60"}`}>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="text-sm font-semibold text-gray-800">{c.title}</p>
+                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${c.active ? "bg-green-50 text-green-700" : "bg-gray-100 text-gray-500"}`}>
+                          {c.active ? "Live" : "Paused"}
+                        </span>
+                        <span className="text-xs text-gray-400">{c.maxRedemptions ? `${c.maxRedemptions} redemptions` : "Unlimited"}</span>
+                      </div>
+                      {c.description && <p className="text-sm text-gray-500 mt-1">{truncateWords(c.description, 140)}</p>}
+                    </div>
+                    <div className="flex gap-2 shrink-0">
+                      <button onClick={() => toggleCouponActive(c)} disabled={cToggling === c.id}
+                        className="text-sm px-3 py-1 border rounded-lg disabled:opacity-50">
+                        {cToggling === c.id ? "…" : c.active ? "Pause" : "Activate"}
+                      </button>
+                      <button onClick={() => deleteCoupon(c)} className="text-sm px-3 py-1 border border-red-200 text-red-600 rounded-lg">
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            <button onClick={() => { setCSuccess(false); setView("overview"); }} className="mt-6 text-sm text-gray-500 underline">Back to portal</button>
+          </div>
+        )}
+
         {view === "event" && (
           <div>
             <h1 className="text-2xl font-bold text-gray-900 mb-1">Submit an Event</h1>
