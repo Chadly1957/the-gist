@@ -738,6 +738,8 @@ model Deal {
   summary      String    @default("")
   // Deep link to the retailer's own ad page for this deal/week.
   dealUrl      String?
+  // True when dealUrl points at the specific item (not just the weekly ad).
+  isItemUrl    Boolean  @default(false)
   // Manual/evergreen deals: any business Chad finds (no per-retailer obligation).
   businessName String?
   validFrom    String?

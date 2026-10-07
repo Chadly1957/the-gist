@@ -22,6 +22,7 @@ interface BookDeal {
   price?: string | null;
   businessName?: string | null;
   dealUrl?: string | null;
+  isItemUrl?: boolean;
   isTopPick: boolean;
 }
 
@@ -40,6 +41,7 @@ interface GasData {
 interface BookData {
   email: string;
   dealsLogoUrl?: string | null;
+  dealsEmailHeaderUrl?: string | null;
   coupons: BookCoupon[];
   gas?: GasData;
   deals?: {
@@ -61,13 +63,26 @@ function cents(n: number) {
 // Sleek scrolling ticker for top picks. One marquee, used sparingly.
 function TopPicksMarquee({ picks }: { picks: BookDeal[] }) {
   if (!picks.length) return null;
-  const items = picks.map((d, i) => (
-    <span key={i} className="mx-6 inline-flex items-center gap-2 whitespace-nowrap text-sm">
-      <span>⭐</span>
-      <span className="font-medium">{d.title}</span>
-      {d.price && <span className="font-bold text-amber-300">{d.price}</span>}
-    </span>
-  ));
+  const items = picks.map((d, i) => {
+    const inner = (
+      <>
+        <span>⭐</span>
+        {d.businessName && <span className="text-stone-400">{d.businessName}:</span>}
+        <span className="font-medium">{d.title}</span>
+        {d.price && <span className="font-bold text-amber-300">{d.price}</span>}
+      </>
+    );
+    return d.dealUrl ? (
+      <a key={i} href={d.dealUrl} target="_blank" rel="noreferrer"
+         className="mx-6 inline-flex items-center gap-2 whitespace-nowrap text-sm hover:underline">
+        {inner}
+      </a>
+    ) : (
+      <span key={i} className="mx-6 inline-flex items-center gap-2 whitespace-nowrap text-sm">
+        {inner}
+      </span>
+    );
+  });
   return (
     <div className="overflow-hidden bg-stone-900 text-white rounded-2xl py-2.5 mb-4">
       <style>{`@keyframes gist-marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }`}</style>
@@ -180,13 +195,16 @@ function DealsPageInner() {
       <div className="min-h-screen bg-gradient-to-b from-stone-100 to-gray-200 p-4 pb-10">
         <div className="max-w-2xl mx-auto">
           {/* Header */}
-          <div className="bg-stone-900 text-white rounded-3xl p-6 mb-4 text-center shadow-sm">
-            {book.dealsLogoUrl && (
+          <div className="bg-stone-200 rounded-3xl p-6 mb-4 text-center shadow-sm">
+            {book.dealsEmailHeaderUrl ? (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img src={book.dealsEmailHeaderUrl} alt="The Gist Deals" className="mx-auto max-h-24 w-auto mb-3 rounded-xl" />
+            ) : book.dealsLogoUrl ? (
               /* eslint-disable-next-line @next/next/no-img-element */
               <img src={book.dealsLogoUrl} alt="The Gist Deals" className="mx-auto h-16 w-auto mb-3" />
-            )}
-            <h1 className="text-2xl font-bold">My Gist Deals Book</h1>
-            <p className="text-stone-400 text-sm mt-1">{book.email}</p>
+            ) : null}
+            <h1 className="text-2xl font-bold text-stone-900">My Gist Deals Book</h1>
+            <p className="text-stone-500 text-sm mt-1">{book.email}</p>
           </div>
 
           {book.deals && <TopPicksMarquee picks={book.deals.topPicks} />}
@@ -222,7 +240,7 @@ function DealsPageInner() {
                               {d.price && <span className="font-bold"> {d.price}</span>}
                               {d.dealUrl && (
                                 <a href={d.dealUrl} target="_blank" rel="noreferrer" className="text-teal-700 underline ml-1">
-                                  view →
+                                  {d.isItemUrl ? "view item →" : "weekly ad →"}
                                 </a>
                               )}
                             </li>

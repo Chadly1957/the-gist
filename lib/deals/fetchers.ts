@@ -72,6 +72,7 @@ export async function fetchHobbyLobby(): Promise<FetchResult> {
       category: "Crafts & Home",
       summary: details || undefined,
       dealUrl,
+      isItemUrl: !!href,
     });
   });
 
@@ -166,6 +167,7 @@ export async function fetchTarget(config: StoreConfig): Promise<FetchResult> {
         category,
         summary: summaryParts.join(" ") || undefined,
         dealUrl: h.tcin ? `https://www.target.com/p/-/A-${h.tcin}` : sourceUrl,
+        isItemUrl: !!h.tcin,
       });
     }
   }
@@ -410,12 +412,14 @@ export async function fetchKroger(config: StoreConfig): Promise<FetchResult> {
     const price = first?.items?.[0]?.price;
     const amount = price?.promo ?? price?.regular;
     if (!first?.description || amount == null) continue;
+    const itemQuery = cleanTitle(first.description || staple);
     deals.push({
-      title: `Kroger price check: ${cleanTitle(first.description)}`,
+      title: `Kroger price check: ${itemQuery}`,
       price: `$${amount.toFixed(2)}`,
       category: "Price check",
       summary: price?.promo != null ? "Sale price this week." : "Regular shelf price.",
-      dealUrl: sourceUrl,
+      dealUrl: `https://www.kroger.com/search?query=${encodeURIComponent(itemQuery)}`,
+      isItemUrl: false,
     });
     // Be gentle: the free tier allows 10k product calls/day; we use ~12/week.
     await new Promise((r) => setTimeout(r, 250));
