@@ -14,7 +14,10 @@ export async function GET() {
   const session = await getAdminSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const rows = await prisma.setting.findMany({ where: { key: { in: [...KEYS] } } });
+  const workspace = await getWorkspace();
+  const rows = await prisma.setting.findMany({
+    where: { workspaceId: workspace.id, key: { in: [...KEYS] } },
+  });
   const out: Record<string, string> = {};
   for (const k of KEYS) out[k] = rows.find((r) => r.key === k)?.value || "";
   return NextResponse.json({ referrals: out });

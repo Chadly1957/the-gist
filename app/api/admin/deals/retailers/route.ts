@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getAdminSession } from "@/lib/auth";
+import { getWorkspace } from "@/lib/workspace";
 
 export const dynamic = "force-dynamic";
 
@@ -9,10 +10,13 @@ export async function GET() {
   const session = await getAdminSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+  const workspace = await getWorkspace();
   const retailers = await prisma.retailer.findMany({
+    where: { workspaceId: workspace.id },
     orderBy: { displayName: "asc" },
     include: {
       dealWeeks: {
+        where: { workspaceId: workspace.id },
         orderBy: { weekStart: "desc" },
         take: 1,
         select: { id: true, weekStart: true, status: true, _count: { select: { deals: true } } },
@@ -27,8 +31,12 @@ export async function PUT(req: Request) {
   const session = await getAdminSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+  const workspace = await getWorkspace();
   const { id, storeConfig, affiliateUrlTemplate, active, displayName } = await req.json();
   if (!id) return NextResponse.json({ error: "Retailer id required." }, { status: 400 });
+
+  const existing = await prisma.retailer.findFirst({ where: { id, workspaceId: workspace.id } });
+  if (!existing) return NextResponse.json({ error: "Retailer not found." }, { status: 404 });
 
   let parsedConfig: string | undefined;
   if (storeConfig !== undefined) {
