@@ -10,6 +10,7 @@ interface Coupon {
   description: string;
   terms: string;
   maxRedemptions: number | null;
+  refreshInterval: string | null;
   active: boolean;
   sortOrder: number;
   contactEmail: string | null;
@@ -29,7 +30,7 @@ const emptyForm = {
   title: "",
   description: "",
   terms: "",
-  oneTime: true,
+  refreshInterval: "weekly" as "daily" | "weekly" | "monthly",
   contactEmail: "",
   sortOrder: "0",
 };
@@ -100,7 +101,7 @@ export default function AdminCouponsPage() {
       title: form.title,
       description: form.description,
       terms: form.terms,
-      maxRedemptions: form.oneTime ? 1 : null,
+      refreshInterval: form.refreshInterval,
       contactEmail: form.contactEmail,
       sortOrder: Number(form.sortOrder) || 0,
     };
@@ -126,7 +127,7 @@ export default function AdminCouponsPage() {
       title: c.title,
       description: c.description,
       terms: c.terms,
-      oneTime: c.maxRedemptions === 1,
+      refreshInterval: (c.refreshInterval === "daily" || c.refreshInterval === "monthly" ? c.refreshInterval : "weekly") as "daily" | "weekly" | "monthly",
       contactEmail: c.contactEmail || "",
       sortOrder: String(c.sortOrder),
     });
@@ -194,11 +195,22 @@ export default function AdminCouponsPage() {
             <label className="block text-sm font-semibold mb-1">Sort order</label>
             <input type="number" value={form.sortOrder} onChange={(e) => set("sortOrder", e.target.value)} className="w-full border rounded-lg px-3 py-2" />
           </div>
-          <div className="md:col-span-2 flex items-center gap-6">
-            <label className="flex items-center gap-2 text-sm">
-              <input type="checkbox" checked={form.oneTime} onChange={(e) => set("oneTime", e.target.checked)} />
-              One-time use (unchecked = reusable)
-            </label>
+          <div className="md:col-span-2 flex items-center gap-6 flex-wrap">
+            <div className="flex items-center gap-2 text-sm">
+              <span className="font-semibold">Refreshes:</span>
+              <div className="inline-flex rounded-lg border overflow-hidden">
+                {(["daily", "weekly", "monthly"] as const).map((opt) => (
+                  <button
+                    key={opt}
+                    type="button"
+                    onClick={() => set("refreshInterval", opt)}
+                    className={`px-3 py-1.5 text-sm capitalize ${form.refreshInterval === opt ? "bg-green-700 text-white font-semibold" : "bg-white text-gray-600"}`}
+                  >
+                    {opt}
+                  </button>
+                ))}
+              </div>
+            </div>
             <button type="submit" className="px-5 py-2 rounded-lg bg-green-700 text-white font-bold">
               {editingId ? "Save changes" : "Add coupon"}
             </button>
@@ -218,7 +230,7 @@ export default function AdminCouponsPage() {
             <div key={c.id} className={`border rounded-lg p-4 flex items-start justify-between gap-4 ${c.active ? "" : "opacity-50"}`}>
               <div>
                 <p className="text-xs text-gray-500 uppercase">{c.businessName}</p>
-                <p className="font-bold">{c.title} <span className="font-normal text-gray-500 text-sm">({c.maxRedemptions === 1 ? "one-time" : "reusable"})</span></p>
+                <p className="font-bold">{c.title} <span className="font-normal text-gray-500 text-sm">({c.refreshInterval ? `refreshes ${c.refreshInterval}` : c.maxRedemptions === 1 ? "one-time" : "reusable"})</span></p>
                 <p className="text-xs text-gray-500 mt-1">{c._count.redemptions} redemptions</p>
               </div>
               <div className="flex gap-2 shrink-0">

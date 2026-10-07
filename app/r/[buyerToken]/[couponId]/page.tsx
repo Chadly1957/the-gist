@@ -1,4 +1,5 @@
 import { basePrisma } from "@/lib/db-base";
+import { intervalStart, isRefreshInterval } from "@/lib/coupons/intervals";
 import { notFound } from "next/navigation";
 import RedeemClient from "./RedeemClient";
 
@@ -18,6 +19,12 @@ export default async function RedeemPage({
   });
   if (!purchase || !purchase.active) notFound();
 
+  const ws = await basePrisma.workspace.findUnique({
+    where: { id: purchase.workspaceId },
+    select: { timezone: true },
+  });
+  const timeZone = ws?.timezone || "America/Chicago";
+
   const coupon = await basePrisma.coupon.findFirst({
     where: { id: params.couponId, workspaceId: purchase.workspaceId, active: true },
     select: {
@@ -27,17 +34,29 @@ export default async function RedeemPage({
       description: true,
       terms: true,
       maxRedemptions: true,
+      refreshInterval: true,
     },
   });
   if (!coupon) notFound();
 
-  let usedCount = 0;
-  if (coupon.maxRedemptions != null) {
-    usedCount = await basePrisma.couponRedemption.count({
+  let usedUp = false;
+  if (isRefreshInterval(coupon.refreshInterval)) {
+    const start = intervalStart(coupon.refreshInterval, timeZone);
+    const used = await basePrisma.couponRedemption.count({
+      where: {
+        workspaceId: purchase.workspaceId,
+        couponId: coupon.id,
+        purchaseId: purchase.id,
+        redeemedAt: { gte: start },
+      },
+    });
+    usedUp = used >= 1;
+  } else if (coupon.maxRedemptions != null) {
+    const used = await basePrisma.couponRedemption.count({
       where: { workspaceId: purchase.workspaceId, couponId: coupon.id, purchaseId: purchase.id },
     });
+    usedUp = used >= coupon.maxRedemptions;
   }
-  const usedUp = coupon.maxRedemptions != null && usedCount >= coupon.maxRedemptions;
 
   return (
     <RedeemClient

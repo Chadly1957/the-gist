@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { isRefreshInterval } from "@/lib/coupons/intervals";
 import { prisma } from "@/lib/db";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -26,7 +27,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const { token, title, description, terms, maxRedemptions } = await req.json();
+  const { token, title, description, terms, refreshInterval } = await req.json();
 
   const profile = await profileFromToken(token);
   if (!profile) return NextResponse.json({ error: "Invalid token." }, { status: 401 });
@@ -40,13 +41,9 @@ export async function POST(req: NextRequest) {
   if (cleanDescription.length > 2000) return NextResponse.json({ error: "Description must be 2000 characters or less." }, { status: 400 });
   if (cleanTerms.length > 2000) return NextResponse.json({ error: "Terms must be 2000 characters or less." }, { status: 400 });
 
-  // null/empty = unlimited recurring; otherwise a positive integer = one-time count.
-  let uses: number | null = null;
-  if (maxRedemptions !== undefined && maxRedemptions !== null && maxRedemptions !== "") {
-    uses = Number(maxRedemptions);
-    if (!Number.isInteger(uses) || uses < 1) {
-      return NextResponse.json({ error: "Redemption count must be a whole number of 1 or more, or left blank for unlimited." }, { status: 400 });
-    }
+  // Renewing coupon: one use per customer per interval, auto-refreshes.
+  if (!isRefreshInterval(refreshInterval)) {
+    return NextResponse.json({ error: "Pick how often it refreshes: daily, weekly, or monthly." }, { status: 400 });
   }
 
   const activeCount = await db.coupon.count({
@@ -66,7 +63,8 @@ export async function POST(req: NextRequest) {
       title: cleanTitle,
       description: cleanDescription,
       terms: cleanTerms,
-      maxRedemptions: uses,
+      maxRedemptions: null,
+      refreshInterval,
       active: true,
       contactEmail: profile.email,
       sponsorId: profile.id,

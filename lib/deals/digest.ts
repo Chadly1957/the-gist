@@ -40,6 +40,7 @@ export async function getPublishedDigestData(workspaceId: string): Promise<Diges
   const retailers = await basePrisma.retailer.findMany({
     where: { workspaceId, active: true },
     orderBy: { displayName: "asc" },
+    // sponsorId needed to merge in unexpired sponsor deals below
     include: {
       dealWeeks: {
         where: { workspaceId, status: "published" },
@@ -50,21 +51,49 @@ export async function getPublishedDigestData(workspaceId: string): Promise<Diges
     },
   });
 
+  const now = new Date();
+  const live = (d: { expiresAt: Date | null }) => !d.expiresAt || d.expiresAt > now;
+  const toDigest = (d: { title: string; price: string | null; businessName: string | null; dealUrl: string | null; isItemUrl: boolean; isTopPick: boolean }): DigestDeal => ({
+    title: d.title,
+    price: d.price,
+    businessName: d.businessName,
+    dealUrl: d.dealUrl,
+    isItemUrl: d.isItemUrl,
+    isTopPick: d.isTopPick,
+  });
+
   const topPicks: DigestDeal[] = [];
   const out: DigestRetailer[] = [];
   let weekLabel = "";
   for (const r of retailers) {
     const week = r.dealWeeks[0];
-    if (!week || !week.deals.length) continue;
-    if (!weekLabel) weekLabel = `Week of ${week.weekStart}`;
-    const deals: DigestDeal[] = week.deals.map((d) => ({
-      title: d.title,
-      price: d.price,
-      businessName: d.businessName,
-      dealUrl: d.dealUrl,
-      isItemUrl: d.isItemUrl,
-      isTopPick: d.isTopPick,
-    }));
+    let deals: DigestDeal[] = [];
+    if (week) {
+      if (!weekLabel) weekLabel = `Week of ${week.weekStart}`;
+      deals = week.deals.filter(live).map(toDigest);
+    }
+    // Sponsor sections: also pull unexpired deals from older published weeks
+    // (weekly/monthly cadence outlives the week they were posted in).
+    if (r.sponsorId) {
+      const older = await basePrisma.deal.findMany({
+        where: {
+          workspaceId,
+          dealWeek: { retailerId: r.id, status: "published" },
+          OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+          ...(week ? { NOT: { dealWeekId: week.id } } : {}),
+        },
+        orderBy: [{ sortOrder: "asc" }],
+      });
+      const seen = new Set(deals.map((d) => d.title + "|" + (d.price || "")));
+      for (const d of older) {
+        const key = d.title + "|" + (d.price || "");
+        if (!seen.has(key)) {
+          seen.add(key);
+          deals.push(toDigest(d));
+        }
+      }
+    }
+    if (!deals.length) continue;
     out.push({ displayName: r.displayName, logoUrl: r.logoUrl, deals });
     for (const d of deals) if (d.isTopPick) topPicks.push(d);
   }

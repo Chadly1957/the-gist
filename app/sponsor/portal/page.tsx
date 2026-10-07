@@ -74,6 +74,7 @@ interface PortalCoupon {
   description: string;
   terms: string;
   maxRedemptions: number | null;
+  refreshInterval: string | null;
   active: boolean;
   createdAt: string;
 }
@@ -98,7 +99,7 @@ interface Analytics {
   bookingGameStats: Record<string, { wordyImpressions: number; wordyClicks: number; matchImpressions: number; matchClicks: number }>;
 }
 
-type View = "overview" | "spotlight" | "booking" | "profile" | "event" | "billing" | "editWeek" | "coupons";
+type View = "overview" | "spotlight" | "booking" | "profile" | "event" | "billing" | "editWeek" | "coupons" | "deals";
 
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
   pending: { label: "Pending Review", color: "bg-yellow-50 text-yellow-700" },
@@ -216,11 +217,19 @@ function PortalContent() {
   // Coupons (self-serve, live immediately)
   const [coupons, setCoupons] = useState<PortalCoupon[] | null>(null);
   const [couponRedemptions, setCouponRedemptions] = useState<Array<{ id: string; couponTitle: string; buyerEmail: string; redeemedAt: string; notes: string }> | null>(null);
-  const [cForm, setCForm] = useState({ title: "", description: "", terms: "", kind: "recurring" as "recurring" | "one-time", maxRedemptions: "" });
+  const [cForm, setCForm] = useState({ title: "", description: "", terms: "", refreshInterval: "weekly" as "daily" | "weekly" | "monthly" });
   const [cSubmitting, setCSubmitting] = useState(false);
   const [cError, setCError] = useState("");
   const [cSuccess, setCSuccess] = useState(false);
   const [cToggling, setCToggling] = useState<string | null>(null);
+  const [sDeals, setSDeals] = useState<Array<{ id: string; title: string; price: string | null; summary: string; expiresAt: string | null }> | null>(null);
+  const [sDealsRetailer, setSDealsRetailer] = useState<{ displayName: string; logoUrl: string | null } | null>(null);
+  const [dForm, setDForm] = useState({ title: "", price: "", description: "", cadence: "weekly" as "weekly" | "monthly" });
+  const [dSubmitting, setDSubmitting] = useState(false);
+  const [dError, setDError] = useState("");
+  const [dSuccess, setDSuccess] = useState(false);
+  const [dLogo, setDLogo] = useState("");
+  const [dLogoSaved, setDLogoSaved] = useState(false);
 
   function loadCoupons() {
     if (!token) return;
@@ -232,6 +241,69 @@ function PortalContent() {
       .then((r) => r.json())
       .then((data) => { if (!data.error) setCouponRedemptions(data.redemptions); })
       .catch(() => {});
+  }
+
+  function loadSDeals() {
+    if (!token) return;
+    workspaceFetch(`/api/sponsor/deals?token=${encodeURIComponent(token)}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (!data.error) {
+          setSDeals(data.deals);
+          setSDealsRetailer(data.retailer);
+          setDLogo(data.retailer?.logoUrl || "");
+        }
+      })
+      .catch(() => {});
+  }
+
+  function openSDeals() {
+    setDSuccess(false); setDError("");
+    loadSDeals();
+    setView("deals");
+  }
+
+  async function submitSDeal(e: React.FormEvent) {
+    e.preventDefault();
+    setDSubmitting(true); setDError("");
+    try {
+      const res = await workspaceFetch("/api/sponsor/deals", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token, title: dForm.title, price: dForm.price, description: dForm.description, cadence: dForm.cadence }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setDSuccess(true);
+        setDForm({ title: "", price: "", description: "", cadence: "weekly" });
+        loadSDeals();
+      } else setDError(data.error || "Submission failed.");
+    } catch (_e) { setDError("Connection error."); }
+    setDSubmitting(false);
+  }
+
+  async function deleteSDeal(id: string) {
+    if (!confirm("Remove this deal from the Deals Book?")) return;
+    try {
+      const res = await workspaceFetch(`/api/sponsor/deals/${id}?token=${encodeURIComponent(token)}`, { method: "DELETE" });
+      const data = await res.json();
+      if (res.ok) loadSDeals();
+      else setDError(data.error || "Delete failed.");
+    } catch (_e) { setDError("Connection error."); }
+  }
+
+  async function saveDLogo() {
+    setDLogoSaved(false); setDError("");
+    try {
+      const res = await workspaceFetch("/api/sponsor/deals", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token, logoUrl: dLogo }),
+      });
+      const data = await res.json();
+      if (res.ok) setDLogoSaved(true);
+      else setDError(data.error || "Could not save the logo.");
+    } catch (_e) { setDError("Connection error."); }
   }
 
   function refreshPortalData() {
@@ -422,13 +494,13 @@ function PortalContent() {
           title: cForm.title,
           description: cForm.description,
           terms: cForm.terms,
-          maxRedemptions: cForm.kind === "one-time" ? cForm.maxRedemptions : null,
+          refreshInterval: cForm.refreshInterval,
         }),
       });
       const data = await res.json();
       if (res.ok) {
         setCSuccess(true);
-        setCForm({ title: "", description: "", terms: "", kind: "recurring", maxRedemptions: "" });
+        setCForm({ title: "", description: "", terms: "", refreshInterval: "weekly" });
         loadCoupons();
       } else setCError(data.error || "Submission failed.");
     } catch (_e) { setCError("Connection error."); }
@@ -655,6 +727,20 @@ function PortalContent() {
                 <div>
                   <p className="text-sm font-semibold text-gray-800">Coupons</p>
                   <p className="text-xs text-gray-400">Free — goes live in The Gist Deals instantly</p>
+                </div>
+              </button>
+              <button
+                onClick={openSDeals}
+                className="flex items-center gap-3 p-4 bg-white rounded-xl border border-gray-200 hover:border-green-400 hover:shadow-sm transition-all text-left"
+              >
+                <div className="w-9 h-9 rounded-lg bg-teal-50 flex items-center justify-center shrink-0">
+                  <svg className="w-5 h-5 text-teal-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-gray-800">Your Deals</p>
+                  <p className="text-xs text-gray-400">Post weekly deals in the Deals Book</p>
                 </div>
               </button>
               <button
@@ -1148,25 +1234,20 @@ function PortalContent() {
                     className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none" />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-2">How many times can it be used?</label>
-                  <div className="flex flex-col gap-2">
-                    <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-                      <input type="radio" name="coupon-kind" checked={cForm.kind === "recurring"} onChange={() => setCForm((f) => ({ ...f, kind: "recurring" }))}
-                        className="accent-green-700" />
-                      Unlimited <span className="text-gray-400">(recurring — every visit)</span>
-                    </label>
-                    <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-                      <input type="radio" name="coupon-kind" checked={cForm.kind === "one-time"} onChange={() => setCForm((f) => ({ ...f, kind: "one-time" }))}
-                        className="accent-green-700" />
-                      One-time, limited redemptions
-                    </label>
-                    {cForm.kind === "one-time" && (
-                      <input type="number" min={1} step={1} value={cForm.maxRedemptions}
-                        onChange={(e) => setCForm((f) => ({ ...f, maxRedemptions: e.target.value }))}
-                        placeholder="e.g. 50"
-                        className="w-40 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
-                    )}
+                  <label className="block text-xs font-semibold text-gray-600 mb-2">How often can each customer use it?</label>
+                  <div className="inline-flex rounded-lg border border-gray-200 overflow-hidden">
+                    {(["daily", "weekly", "monthly"] as const).map((opt) => (
+                      <button
+                        key={opt}
+                        type="button"
+                        onClick={() => setCForm((f) => ({ ...f, refreshInterval: opt }))}
+                        className={`px-4 py-2 text-sm capitalize ${cForm.refreshInterval === opt ? "bg-green-700 text-white font-semibold" : "bg-white text-gray-600"}`}
+                      >
+                        {opt}
+                      </button>
+                    ))}
                   </div>
+                  <p className="text-xs text-gray-400 mt-1">Refreshes automatically — one use per customer per {cForm.refreshInterval === "daily" ? "day" : cForm.refreshInterval === "weekly" ? "week" : "month"}.</p>
                 </div>
                 {cError && <p className="text-sm text-red-600">{cError}</p>}
                 <button type="submit" disabled={cSubmitting}
@@ -1191,7 +1272,7 @@ function PortalContent() {
                         <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${c.active ? "bg-green-50 text-green-700" : "bg-gray-100 text-gray-500"}`}>
                           {c.active ? "Live" : "Paused"}
                         </span>
-                        <span className="text-xs text-gray-400">{c.maxRedemptions ? `${c.maxRedemptions} redemptions` : "Unlimited"}</span>
+                        <span className="text-xs text-gray-400">{c.refreshInterval ? `Refreshes ${c.refreshInterval}` : c.maxRedemptions ? `${c.maxRedemptions} redemptions` : "Unlimited"}</span>
                       </div>
                       {c.description && <p className="text-sm text-gray-500 mt-1">{truncateWords(c.description, 140)}</p>}
                     </div>
@@ -1228,6 +1309,105 @@ function PortalContent() {
               </div>
             )}
             <button onClick={() => { setCSuccess(false); setView("overview"); }} className="mt-6 text-sm text-gray-500 underline">Back to portal</button>
+          </div>
+        )}
+
+        {view === "deals" && (
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900 mb-1">Your Deals</h1>
+            <p className="text-sm text-gray-500 mb-6">Post weekly or monthly deals — they show up in the Deals Book under your own business section, just like Target or Aldi. Goes live immediately.</p>
+
+            {dSuccess ? (
+              <div className="bg-green-50 border border-green-100 rounded-xl p-6 text-center mb-6">
+                <p className="text-green-800 font-semibold mb-1">Deal is live!</p>
+                <p className="text-sm text-green-600">Book holders can see it right now.</p>
+                <div className="flex gap-3 justify-center mt-4">
+                  <button onClick={() => setDSuccess(false)} className="text-sm text-green-700 underline">Post another deal</button>
+                  <button onClick={() => { setDSuccess(false); setView("overview"); }} className="text-sm text-gray-500 underline">Back to portal</button>
+                </div>
+              </div>
+            ) : (
+              <form onSubmit={submitSDeal} className="space-y-4 bg-white rounded-xl border border-gray-200 p-6 mb-6">
+                {dError && <p className="text-sm text-red-600">{dError}</p>}
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Deal title * <span className="font-normal text-gray-400">(120 characters max)</span></label>
+                  <input type="text" required maxLength={120} value={dForm.title} onChange={(e) => setDForm((f) => ({ ...f, title: e.target.value }))}
+                    placeholder="e.g. 20% off all pizzas this week"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Price <span className="font-normal text-gray-400">(optional)</span></label>
+                  <input type="text" maxLength={40} value={dForm.price} onChange={(e) => setDForm((f) => ({ ...f, price: e.target.value }))}
+                    placeholder="e.g. $9.99"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Details <span className="font-normal text-gray-400">(optional)</span></label>
+                  <textarea value={dForm.description} onChange={(e) => setDForm((f) => ({ ...f, description: e.target.value }))} rows={2}
+                    placeholder="Anything shoppers should know — exclusions, fine print…"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-2">How long should it run?</label>
+                  <div className="inline-flex rounded-lg border border-gray-200 overflow-hidden">
+                    {(["weekly", "monthly"] as const).map((opt) => (
+                      <button
+                        key={opt}
+                        type="button"
+                        onClick={() => setDForm((f) => ({ ...f, cadence: opt }))}
+                        className={`px-4 py-2 text-sm capitalize ${dForm.cadence === opt ? "bg-green-700 text-white font-semibold" : "bg-white text-gray-600"}`}
+                      >
+                        {opt}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1">
+                    {dForm.cadence === "weekly" ? "Stays live for 7 days." : "Stays live for 30 days."} You can remove it anytime.
+                  </p>
+                </div>
+                <button type="submit" disabled={dSubmitting} className="px-5 py-2 rounded-lg bg-green-700 text-white font-bold text-sm disabled:opacity-50">
+                  {dSubmitting ? "Posting…" : "Post deal"}
+                </button>
+              </form>
+            )}
+
+            <h2 className="text-lg font-bold text-gray-900 mb-3">Your live deals</h2>
+            {sDeals === null ? (
+              <p className="text-sm text-gray-400">Loading…</p>
+            ) : sDeals.length === 0 ? (
+              <p className="text-sm text-gray-400">No live deals yet. Post your first one above.</p>
+            ) : (
+              <div className="space-y-2 mb-6">
+                {sDeals.map((d) => (
+                  <div key={d.id} className="bg-white rounded-xl border border-gray-200 p-4 flex items-start justify-between gap-4">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-gray-800">{d.title}
+                        {d.price && <span className="font-bold"> · {d.price}</span>}
+                      </p>
+                      {d.summary && <p className="text-sm text-gray-500 mt-0.5">{d.summary}</p>}
+                      {d.expiresAt && <p className="text-xs text-gray-400 mt-1">Runs until {new Date(d.expiresAt).toLocaleDateString()}</p>}
+                    </div>
+                    <button onClick={() => deleteSDeal(d.id)} className="text-sm px-3 py-1 border border-red-200 text-red-600 rounded-lg shrink-0">
+                      Remove
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <h2 className="text-lg font-bold text-gray-900 mb-3">Business logo</h2>
+            <div className="bg-white rounded-xl border border-gray-200 p-4 mb-6">
+              <p className="text-xs text-gray-500 mb-2">Shown next to your deals section in the Deals Book. Paste an image URL, or leave blank.</p>
+              <div className="flex gap-2">
+                <input type="url" value={dLogo} onChange={(e) => { setDLogo(e.target.value); setDLogoSaved(false); }}
+                  placeholder="https://…"
+                  className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+                <button onClick={saveDLogo} className="px-4 py-2 text-sm bg-green-700 text-white rounded-lg font-semibold">Save</button>
+              </div>
+              {dLogoSaved && <p className="text-xs text-green-600 mt-1">Logo saved.</p>}
+            </div>
+
+            <button onClick={() => { setDSuccess(false); setView("overview"); }} className="mt-2 text-sm text-gray-500 underline">Back to portal</button>
           </div>
         )}
 

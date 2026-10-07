@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { basePrisma } from "@/lib/db-base";
 import { sendCouponRedemptionEmail } from "@/lib/coupon-book-email";
+import { intervalStart, isRefreshInterval, refreshesLabel } from "@/lib/coupons/intervals";
 
 export const dynamic = "force-dynamic";
 
@@ -22,13 +23,37 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "This Gist Deals Book isn't valid." }, { status: 404 });
   }
 
+  const ws = await basePrisma.workspace.findUnique({
+    where: { id: purchase.workspaceId },
+    select: { timezone: true },
+  });
+  const timeZone = ws?.timezone || "America/Chicago";
+
   const result = await basePrisma.$transaction(async (tx) => {
     const coupon = await tx.coupon.findFirst({
       where: { id: couponId, workspaceId: purchase.workspaceId, active: true },
     });
     if (!coupon) return { ok: false as const, error: "Coupon not found or no longer active.", status: 404 };
 
-    if (coupon.maxRedemptions != null) {
+    if (isRefreshInterval(coupon.refreshInterval)) {
+      // Renewing coupon: one redemption per interval.
+      const start = intervalStart(coupon.refreshInterval, timeZone);
+      const used = await tx.couponRedemption.count({
+        where: {
+          workspaceId: purchase.workspaceId,
+          couponId: coupon.id,
+          purchaseId: purchase.id,
+          redeemedAt: { gte: start },
+        },
+      });
+      if (used >= 1) {
+        return {
+          ok: false as const,
+          error: `Already used — this coupon refreshes ${refreshesLabel(coupon.refreshInterval)}.`,
+          status: 409,
+        };
+      }
+    } else if (coupon.maxRedemptions != null) {
       const used = await tx.couponRedemption.count({
         where: { workspaceId: purchase.workspaceId, couponId: coupon.id, purchaseId: purchase.id },
       });

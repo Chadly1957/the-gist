@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { isRefreshInterval } from "@/lib/coupons/intervals";
 import { prisma } from "@/lib/db";
 import { getAdminSession } from "@/lib/auth";
 import { getWorkspace } from "@/lib/workspace";
@@ -15,7 +16,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   });
   if (!existing) return NextResponse.json({ error: "Coupon not found." }, { status: 404 });
 
-  const { businessName, title, description, terms, maxRedemptions, contactEmail, sortOrder, active } =
+  const { businessName, title, description, terms, maxRedemptions, refreshInterval, contactEmail, sortOrder, active } =
     await req.json();
 
   const data: Record<string, unknown> = {};
@@ -23,7 +24,10 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (title !== undefined) data.title = title.trim();
   if (description !== undefined) data.description = (description || "").trim();
   if (terms !== undefined) data.terms = (terms || "").trim();
-  if (maxRedemptions !== undefined) data.maxRedemptions = maxRedemptions === 1 ? 1 : null;
+  if (refreshInterval !== undefined) {
+    data.refreshInterval = isRefreshInterval(refreshInterval) ? refreshInterval : null;
+    if (isRefreshInterval(refreshInterval)) data.maxRedemptions = null;
+  } else if (maxRedemptions !== undefined) data.maxRedemptions = maxRedemptions === 1 ? 1 : null;
   if (contactEmail !== undefined) data.contactEmail = contactEmail?.trim().toLowerCase() || null;
   if (sortOrder !== undefined && Number.isFinite(Number(sortOrder))) data.sortOrder = Number(sortOrder);
   if (active !== undefined) data.active = !!active;

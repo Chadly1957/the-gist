@@ -12,9 +12,22 @@ interface BookCoupon {
   description: string;
   terms: string;
   maxRedemptions: number | null;
+  refreshInterval: string | null;
   redemptionsByMe: number;
   usedUp: boolean;
   qrDataUrl: string;
+}
+
+function couponCadenceLabel(c: BookCoupon): { text: string; used: boolean } {
+  if (c.refreshInterval === "daily" || c.refreshInterval === "weekly" || c.refreshInterval === "monthly") {
+    const period = c.refreshInterval === "daily" ? "daily" : c.refreshInterval === "weekly" ? "weekly" : "monthly";
+    const back = c.refreshInterval === "daily" ? "tomorrow" : c.refreshInterval === "weekly" ? "next week" : "next month";
+    return c.usedUp ? { text: `Used up — refreshes ${back}`, used: true } : { text: `Refreshes ${period}`, used: false };
+  }
+  if (c.maxRedemptions != null) {
+    return c.usedUp ? { text: "Used up", used: true } : { text: c.maxRedemptions === 1 ? "One-time use" : "Reusable", used: false };
+  }
+  return { text: "Reusable", used: false };
 }
 
 interface BookDeal {
@@ -279,9 +292,14 @@ function DealsPageInner() {
                           <p className="text-xs text-gray-500">Show at {c.businessName} to redeem</p>
                         </div>
                       )}
-                      <p className={`text-xs mt-2 font-semibold ${c.usedUp ? "text-red-600" : "text-gray-400"}`}>
-                        {c.usedUp ? "Used up" : c.maxRedemptions === 1 ? "One-time use" : "Reusable"}
-                      </p>
+                      {(() => {
+                        const label = couponCadenceLabel(c);
+                        return (
+                          <p className={`text-xs mt-2 font-semibold ${label.used ? "text-red-600" : "text-gray-400"}`}>
+                            {label.text}
+                          </p>
+                        );
+                      })()}
                     </div>
                   ))}
                 </div>
