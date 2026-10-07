@@ -87,24 +87,40 @@ function WorkspaceEditor({
   const [heroFile, setHeroFile] = useState<File | null>(null);
   const [heroPreview, setHeroPreview] = useState<string | null>(null);
   const [heroRemoved, setHeroRemoved] = useState(false);
+  const [dealsLogoFile, setDealsLogoFile] = useState<File | null>(null);
+  const [dealsLogoPreview, setDealsLogoPreview] = useState<string | null>(null);
+  const [dealsLogoRemoved, setDealsLogoRemoved] = useState(false);
+  const [dealsHeaderFile, setDealsHeaderFile] = useState<File | null>(null);
+  const [dealsHeaderPreview, setDealsHeaderPreview] = useState<string | null>(null);
+  const [dealsHeaderRemoved, setDealsHeaderRemoved] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
-  function pickFile(kind: "logo" | "hero", file: File | null) {
+  function pickFile(kind: "logo" | "hero" | "deals-logo" | "deals-header", file: File | null) {
     if (kind === "logo") {
       if (logoPreview) URL.revokeObjectURL(logoPreview);
       setLogoFile(file);
       setLogoPreview(file ? URL.createObjectURL(file) : null);
       if (file) setLogoRemoved(false);
-    } else {
+    } else if (kind === "hero") {
       if (heroPreview) URL.revokeObjectURL(heroPreview);
       setHeroFile(file);
       setHeroPreview(file ? URL.createObjectURL(file) : null);
       if (file) setHeroRemoved(false);
+    } else if (kind === "deals-logo") {
+      if (dealsLogoPreview) URL.revokeObjectURL(dealsLogoPreview);
+      setDealsLogoFile(file);
+      setDealsLogoPreview(file ? URL.createObjectURL(file) : null);
+      if (file) setDealsLogoRemoved(false);
+    } else {
+      if (dealsHeaderPreview) URL.revokeObjectURL(dealsHeaderPreview);
+      setDealsHeaderFile(file);
+      setDealsHeaderPreview(file ? URL.createObjectURL(file) : null);
+      if (file) setDealsHeaderRemoved(false);
     }
   }
 
-  async function uploadBranding(kind: "logo" | "hero", file: File): Promise<string> {
+  async function uploadBranding(kind: "logo" | "hero" | "deals-logo" | "deals-header", file: File): Promise<string> {
     const form = new FormData();
     form.append("workspaceId", workspace.id);
     form.append("kind", kind);
@@ -125,6 +141,10 @@ function WorkspaceEditor({
       else if (logoRemoved) body.logoUrl = "";
       if (heroFile) body.heroImageUrl = await uploadBranding("hero", heroFile);
       else if (heroRemoved) body.heroImageUrl = "";
+      if (dealsLogoFile) body.dealsLogoUrl = await uploadBranding("deals-logo", dealsLogoFile);
+      else if (dealsLogoRemoved) body.dealsLogoUrl = "";
+      if (dealsHeaderFile) body.dealsEmailHeaderUrl = await uploadBranding("deals-header", dealsHeaderFile);
+      else if (dealsHeaderRemoved) body.dealsEmailHeaderUrl = "";
       const res = await workspaceFetch("/api/admin/workspaces", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -132,7 +152,7 @@ function WorkspaceEditor({
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Could not save workspace.");
-      onSaved({ ...workspace, name: data.workspace.name, area: data.workspace.area, latitude: data.workspace.latitude, longitude: data.workspace.longitude, timezone: data.workspace.timezone, primaryColor: data.workspace.primaryColor, secondaryColor: data.workspace.secondaryColor, logoUrl: data.workspace.logoUrl, heroImageUrl: data.workspace.heroImageUrl });
+      onSaved({ ...workspace, name: data.workspace.name, area: data.workspace.area, latitude: data.workspace.latitude, longitude: data.workspace.longitude, timezone: data.workspace.timezone, primaryColor: data.workspace.primaryColor, secondaryColor: data.workspace.secondaryColor, logoUrl: data.workspace.logoUrl, heroImageUrl: data.workspace.heroImageUrl, dealsLogoUrl: data.workspace.dealsLogoUrl, dealsEmailHeaderUrl: data.workspace.dealsEmailHeaderUrl });
       setOpen(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not save workspace.");
@@ -208,6 +228,29 @@ function WorkspaceEditor({
           onPick={(f) => pickFile("hero", f)}
           onRemove={() => { pickFile("hero", null); setHeroRemoved(true); }}
           onUndo={() => setHeroRemoved(false)}
+        />
+      </div>
+      <p className="text-xs font-semibold text-gray-700 pt-1">The Gist Deals branding</p>
+      <div className="grid grid-cols-2 gap-3">
+        <BrandingPicker
+          label="Deals logo"
+          hint="Coupon book portal header. PNG/JPG/WebP, under 5MB."
+          currentUrl={workspace.dealsLogoUrl}
+          preview={dealsLogoPreview}
+          removed={dealsLogoRemoved}
+          onPick={(f) => pickFile("deals-logo", f)}
+          onRemove={() => { pickFile("deals-logo", null); setDealsLogoRemoved(true); }}
+          onUndo={() => setDealsLogoRemoved(false)}
+        />
+        <BrandingPicker
+          label="Deals email header"
+          hint="Wide banner at the top of the weekly deals email. PNG/JPG/WebP, under 5MB."
+          currentUrl={workspace.dealsEmailHeaderUrl}
+          preview={dealsHeaderPreview}
+          removed={dealsHeaderRemoved}
+          onPick={(f) => pickFile("deals-header", f)}
+          onRemove={() => { pickFile("deals-header", null); setDealsHeaderRemoved(true); }}
+          onUndo={() => setDealsHeaderRemoved(false)}
         />
       </div>
       {error && <p className="text-xs text-red-600">{error}</p>}

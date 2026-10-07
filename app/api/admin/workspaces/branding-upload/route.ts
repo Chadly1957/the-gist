@@ -30,8 +30,8 @@ export async function POST(req: NextRequest) {
   if (typeof workspaceId !== "string" || !workspaceId) {
     return NextResponse.json({ error: "Workspace is required." }, { status: 400 });
   }
-  if (kind !== "logo" && kind !== "hero") {
-    return NextResponse.json({ error: "Kind must be logo or hero." }, { status: 400 });
+  if (kind !== "logo" && kind !== "hero" && kind !== "deals-logo" && kind !== "deals-header") {
+    return NextResponse.json({ error: "Kind must be logo, hero, deals-logo, or deals-header." }, { status: 400 });
   }
   const workspace = await basePrisma.workspace.findUnique({ where: { id: workspaceId }, select: { id: true } });
   if (!workspace) return NextResponse.json({ error: "Workspace not found." }, { status: 404 });

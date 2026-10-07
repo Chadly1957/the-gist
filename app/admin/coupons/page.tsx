@@ -42,6 +42,9 @@ export default function AdminCouponsPage() {
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [compEmail, setCompEmail] = useState("");
+  const [comping, setComping] = useState(false);
+  const [compMsg, setCompMsg] = useState<string | null>(null);
 
   async function load() {
     setLoading(true);
@@ -59,6 +62,31 @@ export default function AdminCouponsPage() {
   useEffect(() => {
     load();
   }, []);
+
+  async function compBook(e: React.FormEvent) {
+    e.preventDefault();
+    if (!compEmail.includes("@")) { setCompMsg("Enter a valid email address."); return; }
+    setComping(true);
+    setCompMsg(null);
+    try {
+      const res = await workspaceFetch("/api/admin/coupons/comped", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: compEmail.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Could not comp the book.");
+      setCompMsg(data.created
+        ? `Book comped for ${data.email}. Magic link emailed.`
+        : `${data.email} already had a book — magic link re-sent.`);
+      setCompEmail("");
+      load();
+    } catch (err) {
+      setCompMsg(err instanceof Error ? err.message : "Could not comp the book.");
+    } finally {
+      setComping(false);
+    }
+  }
 
   function set<K extends keyof typeof emptyForm>(key: K, value: (typeof emptyForm)[K]) {
     setForm((f) => ({ ...f, [key]: value }));
@@ -128,6 +156,16 @@ export default function AdminCouponsPage() {
       <p className="text-gray-500 text-sm mb-6">{purchaseCount} book{purchaseCount === 1 ? "" : "s"} sold · {coupons.filter((c) => c.active).length} active coupons</p>
 
       {error && <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg p-3 mb-4 text-sm">{error}</div>}
+
+      <div className="bg-white rounded-xl shadow p-6 mb-8">
+        <h2 className="font-bold mb-1">Comp a book</h2>
+        <p className="text-xs text-gray-500 mb-3">Add someone free of charge — no Stripe. They get full lifetime access and their magic link by email.</p>
+        <form onSubmit={compBook} className="flex gap-2">
+          <input type="email" value={compEmail} onChange={(e) => setCompEmail(e.target.value)} placeholder="you@example.com" className="flex-1 border rounded-lg px-3 py-2" />
+          <button disabled={comping} className="px-4 py-2 bg-gray-700 text-white rounded-lg text-sm whitespace-nowrap disabled:opacity-50">{comping ? "Adding…" : "Comp book"}</button>
+        </form>
+        {compMsg && <p className="text-xs text-gray-600 mt-2">{compMsg}</p>}
+      </div>
 
       <div className="bg-white rounded-xl shadow p-6 mb-8">
         <h2 className="font-bold mb-4">{editingId ? "Edit coupon" : "Add a coupon"}</h2>

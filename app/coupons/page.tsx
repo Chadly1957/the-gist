@@ -31,6 +31,7 @@ interface BookRetailerDeals {
 
 interface BookData {
   email: string;
+  dealsLogoUrl?: string | null;
   qrDataUrl: string;
   coupons: BookCoupon[];
   deals?: {
@@ -123,6 +124,10 @@ function CouponsPageInner() {
     return (
       <div className="min-h-screen bg-gray-50 p-4">
         <div className="max-w-md mx-auto">
+          {book.dealsLogoUrl && (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img src={book.dealsLogoUrl} alt="The Gist Deals" className="mx-auto h-14 w-auto mt-4" />
+          )}
           <h1 className="text-2xl font-bold text-center mt-4">My Coupon Book</h1>
           <p className="text-center text-gray-500 text-sm mb-4">{book.email}</p>
           <div className="bg-white rounded-2xl shadow p-6 text-center mb-6">

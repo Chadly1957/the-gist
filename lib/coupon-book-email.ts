@@ -1,4 +1,4 @@
-import { getWorkspaceUrl, withWorkspace } from "@/lib/workspace";
+import { getWorkspace, getWorkspaceUrl, withWorkspace } from "@/lib/workspace";
 import { escapeHtml } from "@/lib/html";
 import { prisma } from "@/lib/db";
 import { basePrisma } from "@/lib/db-base";
@@ -24,11 +24,16 @@ export async function sendCouponBookMagicLinkEmail(opts: {
       const settings = Object.fromEntries(rows.map((r) => [r.key, r.value]));
       const client = await getEmailClient(settings);
       if (!client) return;
+      const ws = await getWorkspace();
+      const logoHtml = ws.dealsLogoUrl
+        ? `<img src="${escapeHtml(ws.dealsLogoUrl)}" alt="The Gist Deals" style="height: 48px; width: auto; display: block; margin: 0 0 16px;" />`
+        : "";
       await client.sendEmail({
         to: opts.to,
         subject: `Your Gist Coupon Book is ready`,
         htmlBody: `
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 480px; margin: 0 auto; padding: 32px 24px;">
+      ${logoHtml}
       <h2 style="color: #111827; margin: 0 0 12px;">Your Coupon Book</h2>
       <p style="color: #4b5563; font-size: 14px; line-height: 1.5;">
         Thanks for grabbing the Gist Coupon Book! Tap below to open your book and see your personal QR code. Show the QR code at any participating business and they'll scan it to apply your discount.
