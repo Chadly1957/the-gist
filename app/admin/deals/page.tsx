@@ -70,6 +70,8 @@ export default function AdminDealsPage() {
   const [outcomes, setOutcomes] = useState<Array<{ displayName: string; ok: boolean; dealCount?: number; error?: string }>>([]);
   const [manual, setManual] = useState(emptyManual);
   const [manualMsg, setManualMsg] = useState("");
+  const [businesses, setBusinesses] = useState<Array<{ name: string; hasPortal: boolean }>>([]);
+  const [bizOpen, setBizOpen] = useState(false);
   const [referrals, setReferrals] = useState({ deals_referral_rakuten: "", deals_referral_ibotta: "", deals_referral_note: "" });
   const [digest, setDigest] = useState<any>(null);
   const [editingRetailer, setEditingRetailer] = useState<Retailer | null>(null);
@@ -77,13 +79,15 @@ export default function AdminDealsPage() {
 
   async function load() {
     setLoading(true);
-    const [rRes, wRes, refRes, dRes] = await Promise.all([
+    const [rRes, wRes, refRes, dRes, bRes] = await Promise.all([
       workspaceFetch("/api/admin/deals/retailers"),
       workspaceFetch("/api/admin/deals/weeks"),
       workspaceFetch("/api/admin/deals/referrals"),
       workspaceFetch("/api/admin/deals/send-digest"),
+      workspaceFetch("/api/admin/deals/businesses"),
     ]);
     if (rRes.ok) setRetailers((await rRes.json()).retailers);
+    if (bRes.ok) setBusinesses((await bRes.json()).businesses);
     if (wRes.ok) setWeeks((await wRes.json()).weeks);
     if (refRes.ok) setReferrals((await refRes.json()).referrals);
     if (dRes.ok) setDigest(await dRes.json());
@@ -398,8 +402,44 @@ export default function AdminDealsPage() {
               {manualRetailers.map((r) => <option key={r.slug} value={r.slug}>{r.displayName}</option>)}
             </select>
           </label>
-          <label className="text-sm">Business name
-            <input value={manual.businessName} onChange={(e) => setManual({ ...manual, businessName: e.target.value })} className="mt-1 w-full border rounded-lg px-2 py-1.5 text-sm" placeholder="Joe's Pizza" />
+          <label className="text-sm relative">Business name
+            <input
+              value={manual.businessName}
+              onChange={(e) => { setManual({ ...manual, businessName: e.target.value }); setBizOpen(true); }}
+              onFocus={() => setBizOpen(true)}
+              onBlur={() => setTimeout(() => setBizOpen(false), 150)}
+              className="mt-1 w-full border rounded-lg px-2 py-1.5 text-sm"
+              placeholder="Joe's Pizza"
+              autoComplete="off"
+            />
+            {bizOpen && manual.businessName.trim().length > 0 && (() => {
+              const q = manual.businessName.trim().toLowerCase();
+              const matches = businesses.filter((b) => b.name.toLowerCase().includes(q) && b.name.toLowerCase() !== q).slice(0, 8);
+              if (!matches.length) return null;
+              return (
+                <div className="absolute z-10 left-0 right-0 top-full mt-1 bg-white border rounded-lg shadow-lg max-h-56 overflow-y-auto">
+                  {matches.map((b) => (
+                    <button
+                      key={b.name}
+                      type="button"
+                      onMouseDown={(e) => { e.preventDefault(); setManual({ ...manual, businessName: b.name }); setBizOpen(false); }}
+                      className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center justify-between gap-2"
+                    >
+                      <span>{b.name}</span>
+                      {b.hasPortal && <span className="text-[10px] font-bold text-green-700 bg-green-50 px-1.5 py-0.5 rounded">PORTAL</span>}
+                    </button>
+                  ))}
+                </div>
+              );
+            })()}
+            {(() => {
+              const q = manual.businessName.trim().toLowerCase();
+              const exact = businesses.find((b) => b.name.toLowerCase() === q);
+              if (exact?.hasPortal) {
+                return <p className="text-[11px] text-green-700 mt-1">This business has a sponsor portal.</p>;
+              }
+              return null;
+            })()}
           </label>
           <label className="text-sm col-span-2">Deal title *
             <input required value={manual.title} onChange={(e) => setManual({ ...manual, title: e.target.value })} className="mt-1 w-full border rounded-lg px-2 py-1.5 text-sm" placeholder="2-for-1 large pizzas" />
