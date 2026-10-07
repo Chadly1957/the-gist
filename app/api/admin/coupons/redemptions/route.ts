@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getAdminSession } from "@/lib/auth";
+import { getWorkspace } from "@/lib/workspace";
 
 export const dynamic = "force-dynamic";
 
@@ -9,7 +10,9 @@ export async function GET() {
   const session = await getAdminSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+  const workspace = await getWorkspace();
   const redemptions = await prisma.couponRedemption.findMany({
+    where: { workspaceId: workspace.id },
     orderBy: { redeemedAt: "desc" },
     take: 200,
     include: {

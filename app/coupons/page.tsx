@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useState } from "react";
+import { workspaceFetch } from "@/lib/workspace-client";
 import { useSearchParams } from "next/navigation";
 import { COUPON_BOOK_PRICE_CENTS } from "@/lib/coupon-book";
 
@@ -62,7 +63,7 @@ function CouponsPageInner() {
 
   useEffect(() => {
     if (!token) return;
-    fetch(`/api/coupons/book?token=${encodeURIComponent(token)}`)
+    workspaceFetch(`/api/coupons/book?token=${encodeURIComponent(token)}`)
       .then(async (r) => {
         const data = await r.json();
         if (!r.ok) throw new Error(data.error || "Could not open your book.");
@@ -75,7 +76,7 @@ function CouponsPageInner() {
     setBuying(true);
     setFormError(null);
     try {
-      const res = await fetch("/api/coupons/checkout", {
+      const res = await workspaceFetch("/api/coupons/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),
@@ -93,7 +94,7 @@ function CouponsPageInner() {
     setFormError(null);
     setLinkSent(null);
     try {
-      const res = await fetch("/api/coupons/magic-link", {
+      const res = await workspaceFetch("/api/coupons/magic-link", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),

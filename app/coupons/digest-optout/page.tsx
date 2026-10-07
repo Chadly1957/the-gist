@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useState } from "react";
+import { workspaceFetch } from "@/lib/workspace-client";
 import { useSearchParams } from "next/navigation";
 
 function OptOutInner() {
@@ -13,7 +14,7 @@ function OptOutInner() {
       setStatus("error");
       return;
     }
-    fetch("/api/coupons/digest-optout", {
+    workspaceFetch("/api/coupons/digest-optout", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ token }),
