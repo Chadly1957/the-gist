@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { workspaceFetch } from "@/lib/workspace-client";
 
 interface Retailer {
   id: string;
@@ -76,10 +77,10 @@ export default function AdminDealsPage() {
   async function load() {
     setLoading(true);
     const [rRes, wRes, refRes, dRes] = await Promise.all([
-      fetch("/api/admin/deals/retailers"),
-      fetch("/api/admin/deals/weeks"),
-      fetch("/api/admin/deals/referrals"),
-      fetch("/api/admin/deals/send-digest"),
+      workspaceFetch("/api/admin/deals/retailers"),
+      workspaceFetch("/api/admin/deals/weeks"),
+      workspaceFetch("/api/admin/deals/referrals"),
+      workspaceFetch("/api/admin/deals/send-digest"),
     ]);
     if (rRes.ok) setRetailers((await rRes.json()).retailers);
     if (wRes.ok) setWeeks((await wRes.json()).weeks);
@@ -91,7 +92,7 @@ export default function AdminDealsPage() {
   useEffect(() => { load(); }, []);
 
   async function seed() {
-    const res = await fetch("/api/admin/deals/seed", { method: "POST" });
+    const res = await workspaceFetch("/api/admin/deals/seed", { method: "POST" });
     const data = await res.json();
     alert(res.ok ? `Seeded: ${data.created} created, ${data.kept} already there.` : data.error);
     load();
@@ -101,7 +102,7 @@ export default function AdminDealsPage() {
     setRefreshing(retailerId || "all");
     setOutcomes([]);
     try {
-      const res = await fetch("/api/admin/deals/refresh", {
+      const res = await workspaceFetch("/api/admin/deals/refresh", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(retailerId ? { retailerId } : {}),
@@ -147,7 +148,7 @@ export default function AdminDealsPage() {
   async function submitManual(e: React.FormEvent) {
     e.preventDefault();
     setManualMsg("");
-    const res = await fetch("/api/admin/deals/manual", {
+    const res = await workspaceFetch("/api/admin/deals/manual", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(manual),
@@ -163,7 +164,7 @@ export default function AdminDealsPage() {
   }
 
   async function saveReferrals() {
-    const res = await fetch("/api/admin/deals/referrals", {
+    const res = await workspaceFetch("/api/admin/deals/referrals", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(referrals),
@@ -173,7 +174,7 @@ export default function AdminDealsPage() {
 
   async function sendDigest() {
     if (!confirm(`Send the weekly digest to ${digest?.buyerCount || 0} buyers?`)) return;
-    const res = await fetch("/api/admin/deals/send-digest", { method: "POST" });
+    const res = await workspaceFetch("/api/admin/deals/send-digest", { method: "POST" });
     const data = await res.json();
     alert(res.ok ? `Sent to ${data.sent} buyers (${data.failed} failed).` : `Error: ${data.error || data.skipped}`);
     load();
@@ -182,7 +183,7 @@ export default function AdminDealsPage() {
   const [testEmail, setTestEmail] = useState("");
   async function sendTestDigest() {
     if (!testEmail.includes("@")) { alert("Enter a valid email address."); return; }
-    const res = await fetch("/api/admin/deals/send-digest", {
+    const res = await workspaceFetch("/api/admin/deals/send-digest", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ testEmail: testEmail.trim() }),
@@ -198,7 +199,7 @@ export default function AdminDealsPage() {
 
   async function saveCfg() {
     if (!editingRetailer) return;
-    const res = await fetch("/api/admin/deals/retailers", {
+    const res = await workspaceFetch("/api/admin/deals/retailers", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id: editingRetailer.id, storeConfig: cfgText }),
