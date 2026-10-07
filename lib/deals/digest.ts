@@ -12,6 +12,7 @@ export interface DigestDeal {
   price?: string | null;
   businessName?: string | null;
   dealUrl?: string | null;
+  isItemUrl: boolean;
   isTopPick: boolean;
 }
 
@@ -61,6 +62,7 @@ export async function getPublishedDigestData(workspaceId: string): Promise<Diges
       price: d.price,
       businessName: d.businessName,
       dealUrl: d.dealUrl,
+      isItemUrl: d.isItemUrl,
       isTopPick: d.isTopPick,
     }));
     out.push({ displayName: r.displayName, logoUrl: r.logoUrl, deals });
@@ -78,7 +80,7 @@ function dealRow(d: DigestDeal): string {
   const label = d.businessName ? `${escapeHtml(d.businessName)}: ${escapeHtml(d.title)}` : escapeHtml(d.title);
   const price = d.price ? ` <strong>${escapeHtml(d.price)}</strong>` : "";
   const link = d.dealUrl
-    ? ` <a href="${escapeHtml(d.dealUrl)}" style="color: #24726f;">view&nbsp;→</a>`
+    ? ` <a href="${escapeHtml(d.dealUrl)}" style="color: #24726f;">${d.isItemUrl ? "view&nbsp;item&nbsp;→" : "weekly&nbsp;ad&nbsp;→"}</a>`
     : "";
   return `<li style="margin: 0 0 8px; font-size: 14px; line-height: 1.45; color: #1f2937;">${label}${price}${link}</li>`;
 }

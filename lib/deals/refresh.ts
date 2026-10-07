@@ -78,6 +78,7 @@ export async function refreshRetailer(
           category: d.category,
           summary: d.summary || "",
           dealUrl: d.dealUrl,
+          isItemUrl: d.isItemUrl ?? false,
           validFrom: d.validFrom,
           validTo: d.validTo,
           sortOrder: order++,

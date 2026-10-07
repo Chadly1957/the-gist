@@ -13,6 +13,8 @@ export interface NormalizedDeal {
   summary?: string;
   /** Deep link to the retailer's own ad/offer page. */
   dealUrl?: string;
+  /** True when dealUrl lands on the specific item rather than the weekly ad. */
+  isItemUrl?: boolean;
   /** Manual/evergreen deals only. */
   businessName?: string;
   validFrom?: string;

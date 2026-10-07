@@ -65,6 +65,7 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     email: purchase.email,
     dealsLogoUrl: workspace.dealsLogoUrl,
+    dealsEmailHeaderUrl: workspace.dealsEmailHeaderUrl,
     gas,
     coupons: couponsWithQr,
     deals: {
