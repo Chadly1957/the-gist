@@ -6,7 +6,7 @@ import { sendCouponBookMagicLinkEmail } from "@/lib/coupon-book-email";
 
 export const dynamic = "force-dynamic";
 
-// Comp a coupon book: add a buyer free of charge (no Stripe). Creates an active
+// Comp a Gist Deals Book: add a buyer free of charge (no Stripe). Creates an active
 // lifetime purchase and emails them their magic link. Idempotent per email:
 // if they already have an active book, we just resend the link.
 export async function POST(req: NextRequest) {

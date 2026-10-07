@@ -5,7 +5,7 @@ import { getWorkspace } from "@/lib/workspace";
 export const dynamic = "force-dynamic";
 
 // One-click opt-out from the weekly buyer digest (footer link in each digest).
-// The buyer keeps their coupon book — this only stops the weekly email.
+// The buyer keeps their Gist Deals Book — this only stops the weekly email.
 export async function POST(req: NextRequest) {
   const workspace = await getWorkspace();
   const { token } = await req.json().catch(() => ({} as { token?: string }));

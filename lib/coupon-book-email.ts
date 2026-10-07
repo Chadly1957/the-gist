@@ -19,32 +19,32 @@ export async function sendCouponBookMagicLinkEmail(opts: {
   try {
     await withWorkspaceById(opts.workspaceId, async () => {
       const workspaceUrl = await getWorkspaceUrl();
-      const bookUrl = `${workspaceUrl}/coupons?token=${opts.magicToken}`;
+      const bookUrl = `${workspaceUrl}/deals?token=${opts.magicToken}`;
       const rows = await prisma.setting.findMany();
       const settings = Object.fromEntries(rows.map((r) => [r.key, r.value]));
       const client = await getEmailClient(settings);
       if (!client) return;
       const ws = await getWorkspace();
       const logoHtml = ws.dealsLogoUrl
-        ? `<img src="${escapeHtml(ws.dealsLogoUrl)}" alt="The Gist Deals" style="height: 48px; width: auto; display: block; margin: 0 0 16px;" />`
+        ? `<img src="${escapeHtml(ws.dealsLogoUrl)}" alt="The Gist Deals" style="height: 96px; width: auto; display: block; margin: 0 0 16px;" />`
         : "";
       await client.sendEmail({
         to: opts.to,
-        subject: `Your Gist Coupon Book is ready`,
+        subject: `Your Gist Deals Book is ready`,
         htmlBody: `
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 480px; margin: 0 auto; padding: 32px 24px;">
       ${logoHtml}
-      <h2 style="color: #111827; margin: 0 0 12px;">Your Coupon Book</h2>
+      <h2 style="color: #111827; margin: 0 0 12px;">Your Gist Deals Book</h2>
       <p style="color: #4b5563; font-size: 14px; line-height: 1.5;">
-        Thanks for grabbing the Gist Coupon Book! Tap below to open your book and see your personal QR code. Show the QR code at any participating business and they'll scan it to apply your discount.
+        Thanks for grabbing the Gist Deals Book! Tap below to open your book and see your deals and local coupons. Refreshed every week.
       </p>
       <p style="margin: 24px 0;">
         <a href="${bookUrl}" style="background: #24726f; color: #ffffff; padding: 12px 22px; border-radius: 10px; text-decoration: none; font-weight: 600; font-size: 14px; display: inline-block;">
-          Open My Coupon Book
+          Open My Gist Deals Book
         </a>
       </p>
       <p style="color: #9ca3af; font-size: 12px; word-break: break-all;">Or copy this link: ${bookUrl}</p>
-      <p style="color: #9ca3af; font-size: 12px;">This link is unique to you. If you didn't buy a coupon book, you can ignore this email.</p>
+      <p style="color: #9ca3af; font-size: 12px;">This link is unique to you. If you didn't get a Gist Deals Book, you can ignore this email.</p>
     </div>
   `,
       });

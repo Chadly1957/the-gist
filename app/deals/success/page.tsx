@@ -7,7 +7,7 @@ export default function CouponSuccessPage() {
         <div className="text-5xl mb-4">🎉</div>
         <h1 className="text-2xl font-bold mb-2">You're in!</h1>
         <p className="text-gray-600 text-sm">
-          Your coupon book purchase went through. We've emailed you a personal link to open your book
+          Your Gist Deals Book purchase went through. We've emailed you a personal link to open your book
           and see your QR code. (Check spam if you don't see it in a minute or two.)
         </p>
       </div>

@@ -22,6 +22,12 @@ const nextConfig = {
         destination: "https://thegistdecatur.com/:path*",
         permanent: true,
       },
+      // /coupons was renamed to /deals — keep old links (magic links, QR fallbacks) working
+      {
+        source: "/coupons/:path*",
+        destination: "/deals/:path*",
+        permanent: true,
+      },
     ];
   },
 };

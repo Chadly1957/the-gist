@@ -1,4 +1,4 @@
-// Weekly buyer digest: the fresh coupon book in buyers' inboxes every week.
+// Weekly buyer digest: the fresh Gist Deals Book in buyers' inboxes every week.
 // Audience = active CouponBookPurchase rows that haven't opted out.
 // Triggered from the admin deals page ("Send weekly digest") after publishing.
 
@@ -145,21 +145,21 @@ export async function renderDigestHtml(
                  `<li style="margin: 0 0 8px; font-size: 14px; line-height: 1.45; color: #1f2937;"><strong>${escapeHtml(c.businessName)}</strong>: ${escapeHtml(c.title)}${c.terms ? ` <span style="color: #6b7280; font-size: 12px;">(${escapeHtml(c.terms)})</span>` : ""}</li>`
              )
              .join("")}</ul>
-           <p style="color: #6b7280; font-size: 12px; margin: 8px 0 0;">Show your book's QR code at these businesses to redeem. <a href="${escapeHtml(bookUrl)}" style="color: #24726f;">Open My Coupon Book</a></p>`
+           <p style="color: #6b7280; font-size: 12px; margin: 8px 0 0;">Show your book's QR code at these businesses to redeem. <a href="${escapeHtml(bookUrl)}" style="color: #24726f;">Open My Gist Deals Book</a></p>`
         : "";
 
       return `
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 560px; margin: 0 auto; padding: 32px 24px;">
       ${headerHtml}
-      <h2 style="color: #111827; margin: 0 0 4px;">Your Coupon Book — fresh deals</h2>
+      <h2 style="color: #111827; margin: 0 0 4px;">Your Gist Deals Book — fresh deals</h2>
       <p style="color: #6b7280; font-size: 13px; margin: 0 0 16px;">${escapeHtml(data.weekLabel)} · As an Amazon Associate and affiliate partner we may earn from qualifying purchases.</p>
-      <p style="margin: 0 0 16px;"><a href="${escapeHtml(bookUrl)}" style="background: #24726f; color: #ffffff; padding: 12px 22px; border-radius: 10px; text-decoration: none; font-weight: 600; font-size: 14px; display: inline-block;">Open My Coupon Book</a></p>
+      <p style="margin: 0 0 16px;"><a href="${escapeHtml(bookUrl)}" style="background: #24726f; color: #ffffff; padding: 12px 22px; border-radius: 10px; text-decoration: none; font-weight: 600; font-size: 14px; display: inline-block;">Open My Gist Deals Book</a></p>
       ${topPickHtml}
       ${retailerHtml}
       ${couponsHtml}
       ${referralHtml}
       <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 28px 0 12px;" />
-      <p style="color: #9ca3af; font-size: 11px; margin: 0;">You're getting this because you bought the Gist Coupon Book. <a href="${escapeHtml(optOutUrl)}" style="color: #9ca3af;">Stop the weekly deals email</a> (you'll keep your book).</p>
+      <p style="color: #9ca3af; font-size: 11px; margin: 0;">You're getting this because you bought the Gist Deals Book. <a href="${escapeHtml(optOutUrl)}" style="color: #9ca3af;">Stop the weekly deals email</a> (you'll keep your book).</p>
     </div>`;
     }
   );
@@ -191,7 +191,7 @@ export async function sendWeeklyDigest(
       );
       const client = await getEmailClient(settings);
       if (!client) throw new Error("Email is not configured for this workspace.");
-      const subject = `[TEST] Your Coupon Book: fresh deals for ${data.weekLabel.replace("Week of ", "")}`;
+      const subject = `[TEST] Your Gist Deals Book: fresh deals for ${data.weekLabel.replace("Week of ", "")}`;
       const bookUrl = `${workspaceUrl}/coupons`;
       const html = await renderDigestHtml(workspaceId, data, bookUrl, bookUrl);
       const batch = await client.sendBatch([
@@ -220,11 +220,11 @@ export async function sendWeeklyDigest(
       const client = await getEmailClient(settings);
       if (!client) throw new Error("Email is not configured for this workspace.");
 
-      const subject = `Your Coupon Book: fresh deals for ${data.weekLabel.replace("Week of ", "")}`;
+      const subject = `Your Gist Deals Book: fresh deals for ${data.weekLabel.replace("Week of ", "")}`;
       const emails = await Promise.all(
         buyers.map(async (b) => {
-          const bookUrl = `${workspaceUrl}/coupons?token=${b.magicToken}`;
-          const optOutUrl = `${workspaceUrl}/coupons/digest-optout?token=${b.magicToken}`;
+          const bookUrl = `${workspaceUrl}/deals?token=${b.magicToken}`;
+          const optOutUrl = `${workspaceUrl}/deals/digest-optout?token=${b.magicToken}`;
           const html = await renderDigestHtml(workspaceId, data, bookUrl, optOutUrl);
           return {
             to: b.email,

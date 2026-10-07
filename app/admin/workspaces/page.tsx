@@ -234,7 +234,7 @@ function WorkspaceEditor({
       <div className="grid grid-cols-2 gap-3">
         <BrandingPicker
           label="Deals logo"
-          hint="Coupon book portal header. PNG/JPG/WebP, under 5MB."
+          hint="The Gist Deals portal header. PNG/JPG/WebP, under 5MB."
           currentUrl={workspace.dealsLogoUrl}
           preview={dealsLogoPreview}
           removed={dealsLogoRemoved}
