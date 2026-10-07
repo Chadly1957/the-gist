@@ -52,6 +52,7 @@ export async function GET(req: NextRequest) {
     email: purchase.email,
     cashierUrl,
     qrDataUrl,
+    dealsLogoUrl: workspace.dealsLogoUrl,
     coupons: coupons.map((c) => ({
       ...c,
       redemptionsByMe: usedCounts[c.id] ?? 0,

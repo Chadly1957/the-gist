@@ -3,7 +3,7 @@
 // Triggered from the admin deals page ("Send weekly digest") after publishing.
 
 import { basePrisma } from "@/lib/db-base";
-import { withWorkspace, getWorkspaceUrl } from "@/lib/workspace";
+import { withWorkspace, getWorkspace, getWorkspaceUrl } from "@/lib/workspace";
 import { getEmailClient, htmlToText } from "@/lib/email";
 import { escapeHtml } from "@/lib/html";
 
@@ -20,9 +20,17 @@ export interface DigestRetailer {
   deals: DigestDeal[];
 }
 
+export interface DigestCoupon {
+  businessName: string;
+  title: string;
+  description: string;
+  terms: string;
+}
+
 export interface DigestData {
   topPicks: DigestDeal[];
   retailers: DigestRetailer[];
+  coupons: DigestCoupon[];
   weekLabel: string;
 }
 
@@ -57,7 +65,12 @@ export async function getPublishedDigestData(workspaceId: string): Promise<Diges
     out.push({ displayName: r.displayName, deals });
     for (const d of deals) if (d.isTopPick) topPicks.push(d);
   }
-  return { topPicks: topPicks.slice(0, 10), retailers: out, weekLabel };
+  const coupons = await basePrisma.coupon.findMany({
+    where: { workspaceId, active: true },
+    orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+    select: { businessName: true, title: true, description: true, terms: true },
+  });
+  return { topPicks: topPicks.slice(0, 10), retailers: out, coupons, weekLabel };
 }
 
 function dealRow(d: DigestDeal): string {
@@ -84,6 +97,13 @@ export async function renderDigestHtml(
       const rakuten = settings["deals_referral_rakuten"]?.trim();
       const ibotta = settings["deals_referral_ibotta"]?.trim();
       const referralNote = settings["deals_referral_note"]?.trim();
+      const ws = await getWorkspace();
+      const headerImg = ws.dealsEmailHeaderUrl || ws.dealsLogoUrl;
+      const headerHtml = ws.dealsEmailHeaderUrl
+        ? `<img src="${escapeHtml(ws.dealsEmailHeaderUrl)}" alt="The Gist Deals" style="width: 100%; max-width: 560px; height: auto; display: block; border-radius: 12px; margin: 0 0 16px;" />`
+        : ws.dealsLogoUrl
+          ? `<img src="${escapeHtml(ws.dealsLogoUrl)}" alt="The Gist Deals" style="height: 56px; width: auto; display: block; margin: 0 0 16px;" />`
+          : "";
 
       const topPickHtml = data.topPicks.length
         ? `<h3 style="color: #111827; margin: 20px 0 8px; font-size: 16px;">⭐ This week's Top 10</h3>
@@ -117,13 +137,26 @@ export async function renderDigestHtml(
         </div>`
           : "";
 
+      const couponsHtml = data.coupons.length
+        ? `<h3 style="color: #111827; margin: 20px 0 8px; font-size: 16px;">🎟️ Local coupons</h3>
+           <ul style="padding-left: 20px; margin: 0;">${data.coupons
+             .map(
+               (c) =>
+                 `<li style="margin: 0 0 8px; font-size: 14px; line-height: 1.45; color: #1f2937;"><strong>${escapeHtml(c.businessName)}</strong>: ${escapeHtml(c.title)}${c.terms ? ` <span style="color: #6b7280; font-size: 12px;">(${escapeHtml(c.terms)})</span>` : ""}</li>`
+             )
+             .join("")}</ul>
+           <p style="color: #6b7280; font-size: 12px; margin: 8px 0 0;">Show your book's QR code at these businesses to redeem. <a href="${escapeHtml(bookUrl)}" style="color: #24726f;">Open My Coupon Book</a></p>`
+        : "";
+
       return `
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 560px; margin: 0 auto; padding: 32px 24px;">
+      ${headerHtml}
       <h2 style="color: #111827; margin: 0 0 4px;">Your Coupon Book — fresh deals</h2>
       <p style="color: #6b7280; font-size: 13px; margin: 0 0 16px;">${escapeHtml(data.weekLabel)} · As an Amazon Associate and affiliate partner we may earn from qualifying purchases.</p>
       <p style="margin: 0 0 16px;"><a href="${escapeHtml(bookUrl)}" style="background: #24726f; color: #ffffff; padding: 12px 22px; border-radius: 10px; text-decoration: none; font-weight: 600; font-size: 14px; display: inline-block;">Open My Coupon Book</a></p>
       ${topPickHtml}
       ${retailerHtml}
+      ${couponsHtml}
       ${referralHtml}
       <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 28px 0 12px;" />
       <p style="color: #9ca3af; font-size: 11px; margin: 0;">You're getting this because you bought the Gist Coupon Book. <a href="${escapeHtml(optOutUrl)}" style="color: #9ca3af;">Stop the weekly deals email</a> (you'll keep your book).</p>

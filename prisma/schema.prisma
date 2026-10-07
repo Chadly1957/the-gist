@@ -20,6 +20,8 @@ model Workspace {
   secondaryColor              String                    @default("#166534")
   logoUrl                     String?
   heroImageUrl                String?
+  dealsLogoUrl                String?
+  dealsEmailHeaderUrl         String?
   createdAt                   DateTime                  @default(now())
   sourceRows                  Source[]
   articleRows                 Article[]

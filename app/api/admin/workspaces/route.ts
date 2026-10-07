@@ -8,7 +8,7 @@ export async function GET() {
   if (!await getAdminSession()) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const workspaces = await basePrisma.workspace.findMany({
     orderBy: { createdAt: "asc" },
-    select: { id: true, name: true, slug: true, area: true, domain: true, latitude: true, longitude: true, timezone: true, primaryColor: true, secondaryColor: true, logoUrl: true, heroImageUrl: true, _count: { select: { subscriberRows: true, sourceRows: true, newsletterSendRows: true } } },
+    select: { id: true, name: true, slug: true, area: true, domain: true, latitude: true, longitude: true, timezone: true, primaryColor: true, secondaryColor: true, logoUrl: true, heroImageUrl: true, dealsLogoUrl: true, dealsEmailHeaderUrl: true, _count: { select: { subscriberRows: true, sourceRows: true, newsletterSendRows: true } } },
   });
   return NextResponse.json({ workspaces, currentId: (await getWorkspace()).id });
 }
@@ -100,7 +100,7 @@ export async function PATCH(req: NextRequest) {
   const existing = await basePrisma.workspace.findUnique({ where: { id }, select: { id: true } });
   if (!existing) return NextResponse.json({ error: "Workspace not found." }, { status: 404 });
 
-  const data: { name?: string; area?: string; domain?: string | null; latitude?: number; longitude?: number; timezone?: string; primaryColor?: string; secondaryColor?: string; logoUrl?: string | null; heroImageUrl?: string | null } = {};
+  const data: { name?: string; area?: string; domain?: string | null; latitude?: number; longitude?: number; timezone?: string; primaryColor?: string; secondaryColor?: string; logoUrl?: string | null; heroImageUrl?: string | null; dealsLogoUrl?: string | null; dealsEmailHeaderUrl?: string | null } = {};
   const name = typeof body?.name === "string" ? body.name.trim() : undefined;
   const area = typeof body?.area === "string" ? body.area.trim() : undefined;
   if (name !== undefined) {
@@ -172,6 +172,20 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: "Hero image must be a valid image URL, or blank to clear it." }, { status: 400 });
     }
     data.heroImageUrl = heroImageUrl === "" ? null : heroImageUrl;
+  }
+  const dealsLogoUrl = parseBrandingUrl(body?.dealsLogoUrl);
+  if (dealsLogoUrl !== undefined) {
+    if (dealsLogoUrl !== "" && !isBrandingUrl(dealsLogoUrl)) {
+      return NextResponse.json({ error: "Deals logo must be a valid image URL, or blank to clear it." }, { status: 400 });
+    }
+    data.dealsLogoUrl = dealsLogoUrl === "" ? null : dealsLogoUrl;
+  }
+  const dealsEmailHeaderUrl = parseBrandingUrl(body?.dealsEmailHeaderUrl);
+  if (dealsEmailHeaderUrl !== undefined) {
+    if (dealsEmailHeaderUrl !== "" && !isBrandingUrl(dealsEmailHeaderUrl)) {
+      return NextResponse.json({ error: "Deals email header must be a valid image URL, or blank to clear it." }, { status: 400 });
+    }
+    data.dealsEmailHeaderUrl = dealsEmailHeaderUrl === "" ? null : dealsEmailHeaderUrl;
   }
   if (Object.keys(data).length === 0) {
     return NextResponse.json({ error: "Nothing to update." }, { status: 400 });
