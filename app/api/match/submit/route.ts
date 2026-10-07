@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
+import { ensureMatchScoreTable } from "@/lib/matchScores";
 import { getDeviceId, MATCH_MAX_SCORE, setDeviceCookie, todayDateKey } from "@/lib/matchGame";
 
 export const dynamic = "force-dynamic";
@@ -19,6 +20,7 @@ export async function POST(req: NextRequest) {
   const { deviceId, isNew } = getDeviceId(req);
 
   try {
+    await ensureMatchScoreTable();
     await prisma.matchScore.create({
       data: { date, deviceId, name, score },
     });
