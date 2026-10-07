@@ -1,12 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getAdminSession } from "@/lib/auth";
+import { getWorkspace } from "@/lib/workspace";
 
 export const dynamic = "force-dynamic";
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getAdminSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const workspace = await getWorkspace();
+  const existing = await prisma.coupon.findFirst({
+    where: { id: params.id, workspaceId: workspace.id },
+  });
+  if (!existing) return NextResponse.json({ error: "Coupon not found." }, { status: 404 });
 
   const { businessName, title, description, terms, maxRedemptions, contactEmail, sortOrder, active } =
     await req.json();
@@ -32,6 +39,12 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getAdminSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const workspace = await getWorkspace();
+  const existing = await prisma.coupon.findFirst({
+    where: { id: params.id, workspaceId: workspace.id },
+  });
+  if (!existing) return NextResponse.json({ error: "Coupon not found." }, { status: 404 });
 
   // Never hard-delete a coupon that has redemptions; deactivate it instead.
   const redemptionCount = await prisma.couponRedemption.count({ where: { couponId: params.id } });

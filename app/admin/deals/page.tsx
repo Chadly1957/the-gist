@@ -176,7 +176,9 @@ export default function AdminDealsPage() {
     if (!confirm(`Send the weekly digest to ${digest?.buyerCount || 0} buyers?`)) return;
     const res = await workspaceFetch("/api/admin/deals/send-digest", { method: "POST" });
     const data = await res.json();
-    alert(res.ok ? `Sent to ${data.sent} buyers (${data.failed} failed).` : `Error: ${data.error || data.skipped}`);
+    if (!res.ok) { alert(`Error: ${data.error || "Failed to send."}`); return; }
+    if (data.skipped) { alert(`Not sent: ${data.skipped}`); return; }
+    alert(`Sent to ${data.sent} buyers (${data.failed} failed).`);
     load();
   }
 
@@ -189,7 +191,10 @@ export default function AdminDealsPage() {
       body: JSON.stringify({ testEmail: testEmail.trim() }),
     });
     const data = await res.json();
-    alert(res.ok ? `Test email sent to ${testEmail.trim()}.` : `Error: ${data.error || data.skipped}`);
+    if (!res.ok) { alert(`Error: ${data.error || "Failed to send."}`); return; }
+    if (data.skipped) { alert(`Not sent: ${data.skipped}`); return; }
+    if (data.failed) { alert(`The test email failed to send. Check the email configuration.`); return; }
+    alert(`Test email sent to ${testEmail.trim()}.`);
   }
 
   function openCfg(r: Retailer) {

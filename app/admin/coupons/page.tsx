@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { workspaceFetch } from "@/lib/workspace-client";
 
 interface Coupon {
   id: string;
@@ -44,7 +45,7 @@ export default function AdminCouponsPage() {
 
   async function load() {
     setLoading(true);
-    const [cRes, rRes] = await Promise.all([fetch("/api/admin/coupons"), fetch("/api/admin/coupons/redemptions")]);
+    const [cRes, rRes] = await Promise.all([workspaceFetch("/api/admin/coupons"), workspaceFetch("/api/admin/coupons/redemptions")]);
     const cData = await cRes.json();
     const rData = await rRes.json();
     if (cRes.ok) {
@@ -75,7 +76,7 @@ export default function AdminCouponsPage() {
       contactEmail: form.contactEmail,
       sortOrder: Number(form.sortOrder) || 0,
     };
-    const res = await fetch(editingId ? `/api/admin/coupons/${editingId}` : "/api/admin/coupons", {
+    const res = await workspaceFetch(editingId ? `/api/admin/coupons/${editingId}` : "/api/admin/coupons", {
       method: editingId ? "PATCH" : "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
@@ -105,7 +106,7 @@ export default function AdminCouponsPage() {
   }
 
   async function toggleActive(c: Coupon) {
-    await fetch(`/api/admin/coupons/${c.id}`, {
+    await workspaceFetch(`/api/admin/coupons/${c.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ active: !c.active }),
@@ -115,7 +116,7 @@ export default function AdminCouponsPage() {
 
   async function remove(c: Coupon) {
     if (!confirm(`Delete "${c.title}"?${c._count.redemptions > 0 ? " It has redemptions, so it will be deactivated instead." : ""}`)) return;
-    await fetch(`/api/admin/coupons/${c.id}`, { method: "DELETE" });
+    await workspaceFetch(`/api/admin/coupons/${c.id}`, { method: "DELETE" });
     load();
   }
 
