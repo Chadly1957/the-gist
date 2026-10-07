@@ -198,7 +198,7 @@ function DealsPageInner() {
           <div className="bg-stone-200 rounded-3xl p-6 mb-4 text-center shadow-sm">
             {book.dealsEmailHeaderUrl ? (
               /* eslint-disable-next-line @next/next/no-img-element */
-              <img src={book.dealsEmailHeaderUrl} alt="The Gist Deals" className="mx-auto max-h-24 w-auto mb-3 rounded-xl" />
+              <img src={book.dealsEmailHeaderUrl} alt="The Gist Deals" className="w-full h-auto mb-4 rounded-xl" />
             ) : book.dealsLogoUrl ? (
               /* eslint-disable-next-line @next/next/no-img-element */
               <img src={book.dealsLogoUrl} alt="The Gist Deals" className="mx-auto h-16 w-auto mb-3" />
