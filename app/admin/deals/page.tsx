@@ -179,6 +179,18 @@ export default function AdminDealsPage() {
     load();
   }
 
+  const [testEmail, setTestEmail] = useState("");
+  async function sendTestDigest() {
+    if (!testEmail.includes("@")) { alert("Enter a valid email address."); return; }
+    const res = await fetch("/api/admin/deals/send-digest", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ testEmail: testEmail.trim() }),
+    });
+    const data = await res.json();
+    alert(res.ok ? `Test email sent to ${testEmail.trim()}.` : `Error: ${data.error || data.skipped}`);
+  }
+
   function openCfg(r: Retailer) {
     setEditingRetailer(r);
     setCfgText(r.storeConfig);
@@ -442,6 +454,22 @@ export default function AdminDealsPage() {
               <button onClick={sendDigest} className="mt-3 px-4 py-2 bg-green-700 text-white rounded-lg text-sm">
                 Send weekly digest now
               </button>
+              <div className="mt-4 pt-3 border-t border-gray-100">
+                <p className="text-xs font-medium text-gray-600 mb-2">Preview as a buyer</p>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="email"
+                    value={testEmail}
+                    onChange={(e) => setTestEmail(e.target.value)}
+                    placeholder="you@example.com"
+                    className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                  />
+                  <button onClick={sendTestDigest} className="px-4 py-2 bg-gray-700 text-white rounded-lg text-sm whitespace-nowrap">
+                    Send test email
+                  </button>
+                </div>
+                <p className="text-xs text-gray-400 mt-1">Sends exactly what buyers would get to one address. Not logged as a send.</p>
+              </div>
             </>
           ) : (
             <p className="text-sm text-gray-500">Loading…</p>
