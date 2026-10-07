@@ -233,6 +233,7 @@ model SponsorProfile {
   events        Event[]
   wordyBookings WordyBooking[]
   coupons       Coupon[]
+  retailers     Retailer[]
 
   @@unique([id, workspaceId])
   // One person can own several businesses: email alone is not unique.
@@ -647,6 +648,9 @@ model Coupon {
   terms          String             @default("")
   // 1 = one-time use, null = unlimited recurring. Enforced server-side.
   maxRedemptions Int?
+  // Renewing coupon: "daily" | "weekly" | "monthly" — one redemption per interval,
+  // auto-refreshes. Null = legacy maxRedemptions behavior.
+  refreshInterval String?
   active         Boolean            @default(true)
   sortOrder      Int                @default(0)
   contactEmail   String?
@@ -689,6 +693,9 @@ model Retailer {
   displayName          String
   // Retailer brand logo for the Deals Book bento UI (Chad approved using brand logos).
   logoUrl              String?
+  // Self-serve sponsor deals: null = Chad-managed retailer, set = this sponsor's own deals section.
+  sponsorId            String?
+  sponsor              SponsorProfile? @relation(fields: [sponsorId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
   // hobby-lobby | target | aldi | dollar-general | kroger | manual
   pipeline             String
   // JSON: { zip, storeId, locationId } — whatever the pipeline needs.
@@ -740,6 +747,8 @@ model Deal {
   dealUrl      String?
   // True when dealUrl points at the specific item (not just the weekly ad).
   isItemUrl    Boolean  @default(false)
+  // Sponsor deals: weekly = +7d, monthly = +30d. Null = lives with its week.
+  expiresAt    DateTime?
   // Manual/evergreen deals: any business Chad finds (no per-retailer obligation).
   businessName String?
   validFrom    String?
