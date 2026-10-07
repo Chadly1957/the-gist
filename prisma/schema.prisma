@@ -669,6 +669,8 @@ model CouponRedemption {
   purchaseId  String
   purchase    CouponBookPurchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
   redeemedAt  DateTime           @default(now())
+  // Optional note the cashier adds at scan time (new per-coupon QR flow).
+  notes       String             @default("")
 
   @@unique([id, workspaceId])
   @@index([couponId])
@@ -685,6 +687,8 @@ model Retailer {
   id                   String     @id @default(cuid())
   slug                 String
   displayName          String
+  // Retailer brand logo for the Deals Book bento UI (Chad approved using brand logos).
+  logoUrl              String?
   // hobby-lobby | target | aldi | dollar-general | kroger | manual
   pipeline             String
   // JSON: { zip, storeId, locationId } — whatever the pipeline needs.

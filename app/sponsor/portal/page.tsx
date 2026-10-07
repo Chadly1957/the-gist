@@ -215,6 +215,7 @@ function PortalContent() {
 
   // Coupons (self-serve, live immediately)
   const [coupons, setCoupons] = useState<PortalCoupon[] | null>(null);
+  const [couponRedemptions, setCouponRedemptions] = useState<Array<{ id: string; couponTitle: string; buyerEmail: string; redeemedAt: string; notes: string }> | null>(null);
   const [cForm, setCForm] = useState({ title: "", description: "", terms: "", kind: "recurring" as "recurring" | "one-time", maxRedemptions: "" });
   const [cSubmitting, setCSubmitting] = useState(false);
   const [cError, setCError] = useState("");
@@ -226,6 +227,10 @@ function PortalContent() {
     workspaceFetch(`/api/sponsor/coupons?token=${encodeURIComponent(token)}`)
       .then((r) => r.json())
       .then((data) => { if (!data.error) setCoupons(data.coupons); })
+      .catch(() => {});
+    workspaceFetch(`/api/sponsor/coupons/redemptions?token=${encodeURIComponent(token)}`)
+      .then((r) => r.json())
+      .then((data) => { if (!data.error) setCouponRedemptions(data.redemptions); })
       .catch(() => {});
   }
 
@@ -1199,6 +1204,25 @@ function PortalContent() {
                         Delete
                       </button>
                     </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            <h2 className="text-lg font-bold text-gray-900 mb-3 mt-8">Recent redemptions</h2>
+            {couponRedemptions === null ? (
+              <p className="text-sm text-gray-400">Loading…</p>
+            ) : couponRedemptions.length === 0 ? (
+              <p className="text-sm text-gray-400">No redemptions yet. When someone redeems one of your coupons, it shows up here.</p>
+            ) : (
+              <div className="space-y-2">
+                {couponRedemptions.map((r) => (
+                  <div key={r.id} className="bg-white rounded-xl border border-gray-200 p-3 text-sm">
+                    <div className="flex items-baseline justify-between gap-2">
+                      <p className="font-semibold text-gray-800">{r.couponTitle}</p>
+                      <p className="text-xs text-gray-400 shrink-0">{new Date(r.redeemedAt).toLocaleString()}</p>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-0.5">{r.buyerEmail}</p>
+                    {r.notes && <p className="text-xs text-gray-600 mt-1 italic">“{r.notes}”</p>}
                   </div>
                 ))}
               </div>

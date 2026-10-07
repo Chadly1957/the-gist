@@ -9,8 +9,18 @@ interface RetailerSeed {
   displayName: string;
   pipeline: PipelineType;
   storeConfig: StoreConfig;
+  logoUrl?: string;
   notes?: string;
 }
+
+// Brand logos (Wikimedia Commons, verified hotlinkable SVGs).
+const LOGOS: Record<string, string> = {
+  "hobby-lobby": "https://upload.wikimedia.org/wikipedia/commons/4/4c/Hobby_Lobby_logo.svg",
+  target: "https://upload.wikimedia.org/wikipedia/commons/9/9a/Target_logo.svg",
+  aldi: "https://upload.wikimedia.org/wikipedia/commons/7/7e/Aldi_S%C3%BCd_Logo_%282006%29.svg",
+  "dollar-general": "https://upload.wikimedia.org/wikipedia/commons/0/05/Dollar_General_logo.svg",
+  kroger: "https://upload.wikimedia.org/wikipedia/commons/6/69/Kroger_logo_%281961-2019%29.svg",
+};
 
 const COMMON_MANUAL: RetailerSeed[] = [
   {
@@ -52,7 +62,7 @@ export async function seedRetailers(workspaceId: string): Promise<{ created: num
   const market = PER_MARKET[workspaceId] || { zip: "", targetStoreId: "1951", aldiStoreCode: "" };
 
   const seeds: RetailerSeed[] = [
-    { slug: "hobby-lobby", displayName: "Hobby Lobby", pipeline: "hobby-lobby", storeConfig: {} },
+    { slug: "hobby-lobby", displayName: "Hobby Lobby", pipeline: "hobby-lobby", storeConfig: {}, logoUrl: LOGOS["hobby-lobby"] },
     {
       slug: "target",
       displayName: "Target",
@@ -60,18 +70,21 @@ export async function seedRetailers(workspaceId: string): Promise<{ created: num
       // Effingham reuses Decatur's store: the circular is effectively identical;
       // the store ID is editable in retailer settings if that changes.
       storeConfig: { zip: market.zip, storeId: market.targetStoreId },
+      logoUrl: LOGOS["target"],
     },
     {
       slug: "aldi",
       displayName: "Aldi",
       pipeline: "aldi",
       storeConfig: { zip: market.zip, storeCode: market.aldiStoreCode },
+      logoUrl: LOGOS["aldi"],
     },
     {
       slug: "dollar-general",
       displayName: "Dollar General",
       pipeline: "dollar-general",
       storeConfig: { zip: market.zip, merchant: "dollargeneral" },
+      logoUrl: LOGOS["dollar-general"],
       notes: "Needs one-time flyerkit token paste (see retailer settings).",
     },
     {
@@ -79,6 +92,7 @@ export async function seedRetailers(workspaceId: string): Promise<{ created: num
       displayName: "Kroger",
       pipeline: "kroger",
       storeConfig: { zip: market.zip },
+      logoUrl: LOGOS["kroger"],
       notes: "Needs free API key at developer.kroger.com (KROGER_CLIENT_ID/SECRET).",
     },
     ...COMMON_MANUAL,
@@ -91,6 +105,12 @@ export async function seedRetailers(workspaceId: string): Promise<{ created: num
       where: { workspaceId_slug: { workspaceId, slug: s.slug } },
     });
     if (existing) {
+      if (s.logoUrl && !existing.logoUrl) {
+        await basePrisma.retailer.update({
+          where: { id: existing.id },
+          data: { logoUrl: s.logoUrl },
+        });
+      }
       kept++;
       continue;
     }
@@ -101,6 +121,7 @@ export async function seedRetailers(workspaceId: string): Promise<{ created: num
         displayName: s.displayName,
         pipeline: s.pipeline,
         storeConfig: JSON.stringify(s.storeConfig),
+        logoUrl: s.logoUrl || null,
         active: true,
       },
     });

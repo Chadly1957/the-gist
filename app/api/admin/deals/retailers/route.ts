@@ -32,7 +32,7 @@ export async function PUT(req: Request) {
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const workspace = await getWorkspace();
-  const { id, storeConfig, affiliateUrlTemplate, active, displayName } = await req.json();
+  const { id, storeConfig, affiliateUrlTemplate, active, displayName, logoUrl } = await req.json();
   if (!id) return NextResponse.json({ error: "Retailer id required." }, { status: 400 });
 
   const existing = await prisma.retailer.findFirst({ where: { id, workspaceId: workspace.id } });
@@ -55,6 +55,7 @@ export async function PUT(req: Request) {
       ...(affiliateUrlTemplate !== undefined ? { affiliateUrlTemplate: affiliateUrlTemplate || null } : {}),
       ...(active !== undefined ? { active: !!active } : {}),
       ...(displayName ? { displayName: String(displayName).slice(0, 80) } : {}),
+      ...(logoUrl !== undefined ? { logoUrl: String(logoUrl).trim().slice(0, 500) || null } : {}),
     },
   });
   return NextResponse.json({ retailer });

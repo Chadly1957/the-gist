@@ -9,6 +9,7 @@ interface Retailer {
   displayName: string;
   pipeline: string;
   storeConfig: string;
+  logoUrl: string | null;
   affiliateUrlTemplate: string | null;
   active: boolean;
   dealWeeks: Array<{ id: string; weekStart: string; status: string; _count: { deals: number } }>;
@@ -197,9 +198,11 @@ export default function AdminDealsPage() {
     alert(`Test email sent to ${testEmail.trim()}.`);
   }
 
+  const [logoText, setLogoText] = useState("");
   function openCfg(r: Retailer) {
     setEditingRetailer(r);
     setCfgText(r.storeConfig);
+    setLogoText(r.logoUrl || "");
   }
 
   async function saveCfg() {
@@ -207,7 +210,7 @@ export default function AdminDealsPage() {
     const res = await workspaceFetch("/api/admin/deals/retailers", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: editingRetailer.id, storeConfig: cfgText }),
+      body: JSON.stringify({ id: editingRetailer.id, storeConfig: cfgText, logoUrl: logoText.trim() }),
     });
     const data = await res.json();
     if (!res.ok) { alert(data.error); return; }
@@ -301,6 +304,13 @@ export default function AdminDealsPage() {
               onChange={(e) => setCfgText(e.target.value)}
               rows={4}
               className="w-full border rounded-lg p-2 font-mono text-xs mb-2"
+            />
+            <p className="text-xs text-gray-500 mb-1">Brand logo URL (shown in the Deals Book; blank = none).</p>
+            <input
+              value={logoText}
+              onChange={(e) => setLogoText(e.target.value)}
+              placeholder="https://…"
+              className="w-full border rounded-lg p-2 text-xs mb-2"
             />
             <div className="flex gap-2">
               <button onClick={saveCfg} className="px-3 py-1 text-sm bg-green-700 text-white rounded-lg">Save</button>
