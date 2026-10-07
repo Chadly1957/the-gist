@@ -4,13 +4,15 @@ import { sendCouponRedemptionEmail } from "@/lib/coupon-book-email";
 
 export const dynamic = "force-dynamic";
 
-// Cashier flow: scan the buyer's QR (buyerToken, no login), tap a coupon.
-// One-time coupons are enforced server-side inside a transaction.
+// Cashier flow: scan a coupon's unique QR (buyerToken + couponId, no login),
+// optionally add notes, and confirm. One-time coupons are enforced
+// server-side inside a transaction.
 export async function POST(req: NextRequest) {
-  const { buyerToken, couponId } = await req.json();
+  const { buyerToken, couponId, notes } = await req.json();
   if (!buyerToken || !couponId) {
     return NextResponse.json({ error: "Missing token or coupon." }, { status: 400 });
   }
+  const cleanNotes = typeof notes === "string" ? notes.trim().slice(0, 500) : "";
 
   const purchase = await basePrisma.couponBookPurchase.findUnique({
     where: { buyerToken },
@@ -40,6 +42,7 @@ export async function POST(req: NextRequest) {
         workspaceId: purchase.workspaceId,
         couponId: coupon.id,
         purchaseId: purchase.id,
+        notes: cleanNotes,
       },
     });
     return { ok: true as const, redemption, coupon };
@@ -55,6 +58,8 @@ export async function POST(req: NextRequest) {
       businessName: result.coupon.businessName,
       couponTitle: result.coupon.title,
       buyerEmail: purchase.email,
+      redeemedAt: result.redemption.redeemedAt,
+      notes: cleanNotes,
     });
   }
 

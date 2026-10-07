@@ -61,6 +61,8 @@ export async function sendCouponRedemptionEmail(opts: {
   businessName: string;
   couponTitle: string;
   buyerEmail: string;
+  redeemedAt: Date;
+  notes: string;
 }): Promise<void> {
   try {
     await withWorkspaceById(opts.workspaceId, async () => {
@@ -68,17 +70,27 @@ export async function sendCouponRedemptionEmail(opts: {
       const settings = Object.fromEntries(rows.map((r) => [r.key, r.value]));
       const client = await getEmailClient(settings);
       if (!client) return;
+      const ws = await getWorkspace();
+      const logoHtml = ws.dealsLogoUrl
+        ? `<img src="${escapeHtml(ws.dealsLogoUrl)}" alt="The Gist Deals" style="height: 48px; width: auto; display: block; margin: 0 0 16px;" />`
+        : "";
+      const when = opts.redeemedAt.toLocaleString("en-US", { timeZone: ws.timezone || "America/Chicago" });
       await client.sendEmail({
         to: opts.to,
-        subject: `Coupon redeemed: ${opts.couponTitle}`,
+        subject: `Deal redeemed: ${opts.couponTitle}`,
         htmlBody: `
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 480px; margin: 0 auto; padding: 32px 24px;">
-      <h2 style="color: #111827; margin: 0 0 12px;">Coupon redeemed</h2>
+      ${logoHtml}
+      <h2 style="color: #111827; margin: 0 0 12px;">Deal redeemed</h2>
       <p style="color: #4b5563; font-size: 14px; line-height: 1.5;">
-        A reader just redeemed <strong>${escapeHtml(opts.couponTitle)}</strong> at ${escapeHtml(opts.businessName)}
-        via the Gist Coupon Book.
+        <strong>${escapeHtml(opts.buyerEmail)}</strong> just redeemed <strong>${escapeHtml(opts.couponTitle)}</strong>
+        at ${escapeHtml(opts.businessName)} via The Gist Deals.
       </p>
-      <p style="color: #9ca3af; font-size: 12px;">This is an automated notification from the Gist Coupon Book.</p>
+      <p style="color: #4b5563; font-size: 14px; line-height: 1.5;">
+        <span style="color: #9ca3af;">When:</span> ${escapeHtml(when)}
+      </p>
+      ${opts.notes ? `<p style="color: #4b5563; font-size: 14px; line-height: 1.5;"><span style="color: #9ca3af;">Notes:</span> ${escapeHtml(opts.notes)}</p>` : ""}
+      <p style="color: #9ca3af; font-size: 12px;">This is an automated notification from The Gist Deals. Redemptions are also logged in your sponsor portal.</p>
     </div>
   `,
       });

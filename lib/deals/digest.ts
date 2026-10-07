@@ -17,6 +17,7 @@ export interface DigestDeal {
 
 export interface DigestRetailer {
   displayName: string;
+  logoUrl: string | null;
   deals: DigestDeal[];
 }
 
@@ -62,7 +63,7 @@ export async function getPublishedDigestData(workspaceId: string): Promise<Diges
       dealUrl: d.dealUrl,
       isTopPick: d.isTopPick,
     }));
-    out.push({ displayName: r.displayName, deals });
+    out.push({ displayName: r.displayName, logoUrl: r.logoUrl, deals });
     for (const d of deals) if (d.isTopPick) topPicks.push(d);
   }
   const coupons = await basePrisma.coupon.findMany({

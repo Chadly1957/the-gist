@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { basePrisma } from "@/lib/db-base";
 import QRCode from "qrcode";
 import { getPublishedDigestData } from "@/lib/deals/digest";
+import { getGasPrices } from "@/lib/deals/gas";
 
 export const dynamic = "force-dynamic";
 
@@ -20,8 +21,6 @@ export async function GET(req: NextRequest) {
   if (!purchase) return NextResponse.json({ error: "Invalid or expired link." }, { status: 404 });
 
   const appUrl = await getWorkspaceUrl();
-  const cashierUrl = `${appUrl}/b/${purchase.buyerToken}`;
-  const qrDataUrl = await QRCode.toDataURL(cashierUrl, { width: 480, margin: 1 });
 
   const coupons = await basePrisma.coupon.findMany({
     where: { workspaceId: workspace.id, active: true },
@@ -48,16 +47,26 @@ export async function GET(req: NextRequest) {
   const settingRows = await basePrisma.setting.findMany({ where: { workspaceId: workspace.id } });
   const settings = Object.fromEntries(settingRows.map((r) => [r.key, r.value]));
 
-  return NextResponse.json({
-    email: purchase.email,
-    cashierUrl,
-    qrDataUrl,
-    dealsLogoUrl: workspace.dealsLogoUrl,
-    coupons: coupons.map((c) => ({
+  const couponsWithQr = await Promise.all(
+    coupons.map(async (c) => ({
       ...c,
       redemptionsByMe: usedCounts[c.id] ?? 0,
       usedUp: c.maxRedemptions != null && (usedCounts[c.id] ?? 0) >= c.maxRedemptions,
-    })),
+      // Unique QR per coupon: the cashier scans it, adds notes, and confirms.
+      qrDataUrl: await QRCode.toDataURL(`${appUrl}/r/${purchase.buyerToken}/${c.id}`, {
+        width: 360,
+        margin: 1,
+      }),
+    }))
+  );
+
+  const gas = await getGasPrices(workspace.id);
+
+  return NextResponse.json({
+    email: purchase.email,
+    dealsLogoUrl: workspace.dealsLogoUrl,
+    gas,
+    coupons: couponsWithQr,
     deals: {
       topPicks: digestData.topPicks,
       retailers: digestData.retailers,

@@ -14,6 +14,7 @@ interface BookCoupon {
   maxRedemptions: number | null;
   redemptionsByMe: number;
   usedUp: boolean;
+  qrDataUrl: string;
 }
 
 interface BookDeal {
@@ -26,14 +27,21 @@ interface BookDeal {
 
 interface BookRetailerDeals {
   displayName: string;
+  logoUrl?: string | null;
   deals: BookDeal[];
+}
+
+interface GasData {
+  live: boolean;
+  stations: Array<{ name: string; regular: number | null; updatedAt: string }>;
+  updatedAt: string | null;
 }
 
 interface BookData {
   email: string;
   dealsLogoUrl?: string | null;
-  qrDataUrl: string;
   coupons: BookCoupon[];
+  gas?: GasData;
   deals?: {
     topPicks: BookDeal[];
     retailers: BookRetailerDeals[];
@@ -50,7 +58,52 @@ function cents(n: number) {
   return `$${(n / 100).toFixed(2).replace(/\.00$/, "")}`;
 }
 
-function CouponsPageInner() {
+// Sleek scrolling ticker for top picks. One marquee, used sparingly.
+function TopPicksMarquee({ picks }: { picks: BookDeal[] }) {
+  if (!picks.length) return null;
+  const items = picks.map((d, i) => (
+    <span key={i} className="mx-6 inline-flex items-center gap-2 whitespace-nowrap text-sm">
+      <span>⭐</span>
+      <span className="font-medium">{d.title}</span>
+      {d.price && <span className="font-bold text-amber-300">{d.price}</span>}
+    </span>
+  ));
+  return (
+    <div className="overflow-hidden bg-stone-900 text-white rounded-2xl py-2.5 mb-4">
+      <style>{`@keyframes gist-marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }`}</style>
+      <div className="flex w-max" style={{ animation: "gist-marquee 30s linear infinite" }}>
+        <div className="flex items-center">{items}</div>
+        <div className="flex items-center" aria-hidden="true">{items}</div>
+      </div>
+    </div>
+  );
+}
+
+function GasBox({ gas }: { gas?: GasData }) {
+  return (
+    <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-5">
+      <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-3">⛽ Current gas prices</p>
+      {!gas?.live ? (
+        <p className="text-sm text-gray-500">Live local prices coming soon.</p>
+      ) : gas.stations.length === 0 ? (
+        <p className="text-sm text-gray-500">No stations reporting right now.</p>
+      ) : (
+        <ul className="space-y-2">
+          {gas.stations.slice(0, 5).map((s, i) => (
+            <li key={i} className="flex items-baseline justify-between text-sm">
+              <span className="text-gray-700 font-medium truncate mr-2">{s.name}</span>
+              <span className="font-bold text-gray-900">
+                {s.regular != null ? `$${s.regular.toFixed(2)}` : "—"}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function DealsPageInner() {
   const searchParams = useSearchParams();
   const token = searchParams.get("token");
   const [book, setBook] = useState<BookData | null>(null);
@@ -108,7 +161,7 @@ function CouponsPageInner() {
     }
   }
 
-  // Logged-in book view.
+  // Logged-in book view: bento grid.
   if (token) {
     if (bookError) {
       return (
@@ -121,106 +174,124 @@ function CouponsPageInner() {
       );
     }
     if (!book) return <div className="min-h-screen flex items-center justify-center"><p className="text-gray-500">Opening your book…</p></div>;
+
+    const hasDeals = book.deals && (book.deals.topPicks.length > 0 || book.deals.retailers.length > 0);
     return (
-      <div className="min-h-screen bg-gray-50 p-4">
-        <div className="max-w-md mx-auto">
-          {book.dealsLogoUrl && (
-            /* eslint-disable-next-line @next/next/no-img-element */
-            <img src={book.dealsLogoUrl} alt="The Gist Deals" className="mx-auto h-14 w-auto mt-4" />
-          )}
-          <h1 className="text-2xl font-bold text-center mt-4">My Gist Deals Book</h1>
-          <p className="text-center text-gray-500 text-sm mb-4">{book.email}</p>
-          <div className="bg-white rounded-2xl shadow p-6 text-center mb-6">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={book.qrDataUrl} alt="Your Gist Deals Book QR code" className="mx-auto w-56 h-56" />
+      <div className="min-h-screen bg-gradient-to-b from-stone-100 to-gray-200 p-4 pb-10">
+        <div className="max-w-2xl mx-auto">
+          {/* Header */}
+          <div className="bg-stone-900 text-white rounded-3xl p-6 mb-4 text-center shadow-sm">
+            {book.dealsLogoUrl && (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img src={book.dealsLogoUrl} alt="The Gist Deals" className="mx-auto h-16 w-auto mb-3" />
+            )}
+            <h1 className="text-2xl font-bold">My Gist Deals Book</h1>
+            <p className="text-stone-400 text-sm mt-1">{book.email}</p>
           </div>
-          {book.deals && (book.deals.topPicks.length > 0 || book.deals.retailers.length > 0) && (
-            <div className="mb-6">
-              <h2 className="text-xl font-bold mb-1">This Week&apos;s Deals</h2>
-              {book.deals.weekLabel && (
-                <p className="text-gray-500 text-xs mb-3">{book.deals.weekLabel}</p>
-              )}
-              {book.deals.topPicks.length > 0 && (
-                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-3">
-                  <p className="font-bold text-sm mb-2">⭐ Top picks</p>
-                  <ul className="space-y-1.5">
-                    {book.deals.topPicks.map((d, i) => (
-                      <li key={i} className="text-sm">
-                        {d.businessName && <span className="text-gray-500">{d.businessName}: </span>}
-                        <span className="font-medium">{d.title}</span>
-                        {d.price && <span className="font-bold"> {d.price}</span>}
-                        {d.dealUrl && (
-                          <a href={d.dealUrl} target="_blank" rel="noreferrer" className="text-teal-700 underline ml-1">
-                            view →
-                          </a>
+
+          {book.deals && <TopPicksMarquee picks={book.deals.topPicks} />}
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* This Week's Deals — wide box */}
+            {hasDeals && (
+              <div className="sm:col-span-2 bg-white rounded-3xl border border-gray-100 shadow-sm p-5">
+                <div className="flex items-baseline justify-between mb-3">
+                  <h2 className="font-bold text-lg">This Week&apos;s Deals</h2>
+                  {book.deals!.weekLabel && (
+                    <p className="text-gray-400 text-xs">{book.deals!.weekLabel}</p>
+                  )}
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {book.deals!.retailers.map((r) => (
+                    <div key={r.displayName} className="bg-gray-50 rounded-2xl p-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        {r.logoUrl && (
+                          /* eslint-disable-next-line @next/next/no-img-element */
+                          <img src={r.logoUrl} alt={r.displayName} className="h-7 w-auto object-contain" />
                         )}
-                      </li>
-                    ))}
-                  </ul>
+                        <p className="font-bold text-sm">{r.displayName}</p>
+                      </div>
+                      <ul className="space-y-1.5">
+                        {r.deals
+                          .filter((d) => !d.isTopPick)
+                          .slice(0, 6)
+                          .map((d, i) => (
+                            <li key={i} className="text-[13px] text-gray-700 leading-snug">
+                              {d.businessName && <span className="text-gray-400">{d.businessName}: </span>}
+                              {d.title}
+                              {d.price && <span className="font-bold"> {d.price}</span>}
+                              {d.dealUrl && (
+                                <a href={d.dealUrl} target="_blank" rel="noreferrer" className="text-teal-700 underline ml-1">
+                                  view →
+                                </a>
+                              )}
+                            </li>
+                          ))}
+                      </ul>
+                    </div>
+                  ))}
                 </div>
-              )}
-              {book.deals.retailers.map((r) => (
-                <div key={r.displayName} className="bg-white rounded-xl shadow p-4 mb-3">
-                  <p className="font-bold text-sm mb-2">{r.displayName}</p>
-                  <ul className="space-y-1.5">
-                    {r.deals
-                      .filter((d) => !d.isTopPick)
-                      .slice(0, 12)
-                      .map((d, i) => (
-                        <li key={i} className="text-sm text-gray-700">
-                          {d.businessName && <span className="text-gray-500">{d.businessName}: </span>}
-                          {d.title}
-                          {d.price && <span className="font-bold"> {d.price}</span>}
-                          {d.dealUrl && (
-                            <a href={d.dealUrl} target="_blank" rel="noreferrer" className="text-teal-700 underline ml-1">
-                              view →
-                            </a>
-                          )}
-                        </li>
-                      ))}
-                  </ul>
-                </div>
-              ))}
-              {(book.referrals?.rakuten || book.referrals?.ibotta) && (
-                <div className="bg-green-50 border border-green-200 rounded-xl p-4 mb-3">
-                  <p className="font-bold text-sm mb-1">💰 Stack your savings</p>
-                  {book.referrals.note && <p className="text-xs text-gray-600 mb-2">{book.referrals.note}</p>}
-                  <p className="text-xs">
-                    {book.referrals.rakuten && (
-                      <a href={book.referrals.rakuten} target="_blank" rel="noreferrer" className="text-teal-700 underline">
-                        Get cash back with Rakuten
-                      </a>
-                    )}
-                    {book.referrals.rakuten && book.referrals.ibotta && " · "}
-                    {book.referrals.ibotta && (
-                      <a href={book.referrals.ibotta} target="_blank" rel="noreferrer" className="text-teal-700 underline">
-                        Get the Ibotta app
-                      </a>
-                    )}
-                  </p>
-                </div>
-              )}
-              <p className="text-gray-400 text-[11px] mt-2">
-                As an Amazon Associate and affiliate partner we may earn from qualifying purchases.
-              </p>
-            </div>
-          )}
-          <div className="space-y-3">
-            {book.coupons.map((c) => (
-              <div key={c.id} className={`bg-white rounded-xl shadow p-4 ${c.usedUp ? "opacity-50" : ""}`}>
-                <p className="text-xs text-gray-500 uppercase tracking-wide">{c.businessName}</p>
-                <p className="font-bold text-lg">{c.title}</p>
-                {c.description && <p className="text-gray-600 text-sm mt-1">{c.description}</p>}
-                {c.terms && <p className="text-gray-400 text-xs mt-1">{c.terms}</p>}
-                <p className={`text-xs mt-2 font-semibold ${c.usedUp ? "text-red-600" : "text-gray-400"}`}>
-                  {c.usedUp ? "Used up" : c.maxRedemptions === 1 ? "One-time use" : "Reusable"}
+                <p className="text-gray-400 text-[11px] mt-3">
+                  As an Amazon Associate and affiliate partner we may earn from qualifying purchases.
                 </p>
               </div>
-            ))}
+            )}
+
+            {/* Local coupons — each tile has its own QR */}
+            <div className="sm:col-span-2">
+              <h2 className="font-bold text-lg mb-3 px-1">Local Coupons</h2>
+              {book.coupons.length === 0 ? (
+                <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-5">
+                  <p className="text-center text-gray-500 text-sm">Coupons are on the way. Check back soon!</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {book.coupons.map((c) => (
+                    <div key={c.id} className={`bg-white rounded-3xl border border-gray-100 shadow-sm p-5 ${c.usedUp ? "opacity-50" : ""}`}>
+                      <p className="text-[11px] text-gray-400 uppercase tracking-widest">{c.businessName}</p>
+                      <p className="font-bold text-lg leading-tight mt-0.5">{c.title}</p>
+                      {c.description && <p className="text-gray-600 text-sm mt-1">{c.description}</p>}
+                      {c.terms && <p className="text-gray-400 text-xs mt-1">{c.terms}</p>}
+                      {!c.usedUp && (
+                        <div className="mt-3 flex items-center gap-3">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={c.qrDataUrl} alt={`QR code for ${c.title}`} className="w-20 h-20 rounded-lg" />
+                          <p className="text-xs text-gray-500">Show at {c.businessName} to redeem</p>
+                        </div>
+                      )}
+                      <p className={`text-xs mt-2 font-semibold ${c.usedUp ? "text-red-600" : "text-gray-400"}`}>
+                        {c.usedUp ? "Used up" : c.maxRedemptions === 1 ? "One-time use" : "Reusable"}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Gas prices */}
+            <GasBox gas={book.gas} />
+
+            {/* Stack your savings */}
+            {(book.referrals?.rakuten || book.referrals?.ibotta) && (
+              <div className="bg-green-50 border border-green-100 rounded-3xl shadow-sm p-5">
+                <p className="text-xs font-semibold uppercase tracking-widest text-green-700 mb-2">💰 Stack your savings</p>
+                {book.referrals.note && <p className="text-xs text-gray-600 mb-2">{book.referrals.note}</p>}
+                <p className="text-sm">
+                  {book.referrals.rakuten && (
+                    <a href={book.referrals.rakuten} target="_blank" rel="noreferrer" className="text-teal-700 underline font-medium">
+                      Get cash back with Rakuten
+                    </a>
+                  )}
+                  {book.referrals.rakuten && book.referrals.ibotta && <span className="text-gray-400"> · </span>}
+                  {book.referrals.ibotta && (
+                    <a href={book.referrals.ibotta} target="_blank" rel="noreferrer" className="text-teal-700 underline font-medium">
+                      Get the Ibotta app
+                    </a>
+                  )}
+                </p>
+              </div>
+            )}
           </div>
-          {book.coupons.length === 0 && (
-            <p className="text-center text-gray-500 mt-8">Coupons are on the way. Check back soon!</p>
-          )}
         </div>
       </div>
     );
@@ -228,8 +299,8 @@ function CouponsPageInner() {
 
   // Landing / buy view.
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
-      <div className="max-w-md w-full bg-white rounded-2xl shadow p-8">
+    <div className="min-h-screen bg-gradient-to-b from-stone-100 to-gray-200 flex items-center justify-center p-6">
+      <div className="max-w-md w-full bg-white rounded-3xl shadow-sm border border-gray-100 p-8">
         <h1 className="text-2xl font-bold mb-2">The Gist Deals</h1>
         <p className="text-gray-600 text-sm mb-6">
           Real discounts from local businesses, right on your phone. No apps, no printing, no hassle.
@@ -260,10 +331,10 @@ function CouponsPageInner() {
   );
 }
 
-export default function CouponsPage() {
+export default function DealsPage() {
   return (
     <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><p className="text-gray-500">Loading…</p></div>}>
-      <CouponsPageInner />
+      <DealsPageInner />
     </Suspense>
   );
 }
