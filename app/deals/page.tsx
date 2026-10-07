@@ -210,30 +210,31 @@ function DealsPageInner() {
           {book.deals && <TopPicksMarquee picks={book.deals.topPicks} />}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* This Week's Deals — wide box */}
+            {/* This Week's Deals — one wide box per retailer, all deals nested inside */}
             {hasDeals && (
-              <div className="sm:col-span-2 bg-white rounded-3xl border border-gray-100 shadow-sm p-5">
-                <div className="flex items-baseline justify-between mb-3">
+              <div className="sm:col-span-2">
+                <div className="flex items-baseline justify-between mb-3 px-1">
                   <h2 className="font-bold text-lg">This Week&apos;s Deals</h2>
                   {book.deals!.weekLabel && (
                     <p className="text-gray-400 text-xs">{book.deals!.weekLabel}</p>
                   )}
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {book.deals!.retailers.map((r) => (
-                    <div key={r.displayName} className="bg-gray-50 rounded-2xl p-4">
-                      <div className="flex items-center gap-2 mb-2">
-                        {r.logoUrl && (
-                          /* eslint-disable-next-line @next/next/no-img-element */
-                          <img src={r.logoUrl} alt={r.displayName} className="h-7 w-auto object-contain" />
-                        )}
-                        <p className="font-bold text-sm">{r.displayName}</p>
-                      </div>
-                      <ul className="space-y-1.5">
-                        {r.deals
-                          .filter((d) => !d.isTopPick)
-                          .slice(0, 6)
-                          .map((d, i) => (
+                <div className="space-y-4">
+                  {book.deals!.retailers.map((r) => {
+                    const deals = r.deals.filter((d) => !d.isTopPick);
+                    if (!deals.length) return null;
+                    return (
+                      <div key={r.displayName} className="bg-white rounded-3xl border border-gray-100 shadow-sm p-5">
+                        <div className="flex items-center gap-2 mb-3">
+                          {r.logoUrl && (
+                            /* eslint-disable-next-line @next/next/no-img-element */
+                            <img src={r.logoUrl} alt={r.displayName} className="h-8 w-auto object-contain" />
+                          )}
+                          <p className="font-bold">{r.displayName}</p>
+                          <span className="text-xs text-gray-400">{deals.length} deals</span>
+                        </div>
+                        <ul className="space-y-1.5 max-h-[26rem] overflow-y-auto pr-2">
+                          {deals.map((d, i) => (
                             <li key={i} className="text-[13px] text-gray-700 leading-snug">
                               {d.businessName && <span className="text-gray-400">{d.businessName}: </span>}
                               {d.title}
@@ -245,11 +246,12 @@ function DealsPageInner() {
                               )}
                             </li>
                           ))}
-                      </ul>
-                    </div>
-                  ))}
+                        </ul>
+                      </div>
+                    );
+                  })}
                 </div>
-                <p className="text-gray-400 text-[11px] mt-3">
+                <p className="text-gray-400 text-[11px] mt-3 px-1">
                   As an Amazon Associate and affiliate partner we may earn from qualifying purchases.
                 </p>
               </div>
