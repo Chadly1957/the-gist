@@ -649,7 +649,7 @@ function PortalContent() {
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-gray-800">Coupons</p>
-                  <p className="text-xs text-gray-400">Free — goes live in the coupon book instantly</p>
+                  <p className="text-xs text-gray-400">Free — goes live in The Gist Deals instantly</p>
                 </div>
               </button>
               <button
@@ -1111,7 +1111,7 @@ function PortalContent() {
         {view === "coupons" && (
           <div>
             <h1 className="text-2xl font-bold text-gray-900 mb-1">Coupons</h1>
-            <p className="text-sm text-gray-500 mb-6">Free for Community Partners. Your coupon goes live in the coupon book immediately — no review, no waiting.</p>
+            <p className="text-sm text-gray-500 mb-6">Free for Community Partners. Your coupon goes live in The Gist Deals immediately — no review, no waiting.</p>
 
             {cSuccess ? (
               <div className="bg-green-50 border border-green-100 rounded-xl p-6 text-center mb-6">

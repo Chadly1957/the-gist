@@ -31,7 +31,7 @@ function OptOutInner() {
           <>
             <h1 className="text-xl font-bold text-gray-900 mb-2">You&apos;re unsubscribed</h1>
             <p className="text-gray-600 text-sm">
-              You won&apos;t get the weekly deals email anymore. Your coupon book still works —
+              You won&apos;t get the weekly deals email anymore. Your Gist Deals Book still works —
               your personal link is unchanged.
             </p>
           </>

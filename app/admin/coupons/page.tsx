@@ -152,7 +152,7 @@ export default function AdminCouponsPage() {
 
   return (
     <div className="p-8 max-w-5xl">
-      <h1 className="text-2xl font-bold mb-1">Coupon Book</h1>
+      <h1 className="text-2xl font-bold mb-1">The Gist Deals</h1>
       <p className="text-gray-500 text-sm mb-6">{purchaseCount} book{purchaseCount === 1 ? "" : "s"} sold · {coupons.filter((c) => c.active).length} active coupons</p>
 
       {error && <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg p-3 mb-4 text-sm">{error}</div>}

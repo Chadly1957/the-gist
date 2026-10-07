@@ -29,6 +29,6 @@ export async function POST(req: NextRequest) {
   }
 
   return NextResponse.json({
-    message: "If that email bought a coupon book, we've sent your personal link.",
+    message: "If that email has a Gist Deals Book, we've sent your personal link.",
   });
 }

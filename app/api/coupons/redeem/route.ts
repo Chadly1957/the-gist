@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
     select: { id: true, workspaceId: true, email: true, active: true },
   });
   if (!purchase || !purchase.active) {
-    return NextResponse.json({ error: "This coupon book isn't valid." }, { status: 404 });
+    return NextResponse.json({ error: "This Gist Deals Book isn't valid." }, { status: 404 });
   }
 
   const result = await basePrisma.$transaction(async (tx) => {

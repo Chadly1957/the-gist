@@ -222,7 +222,7 @@ export default function AdminDealsPage() {
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-8">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Coupon Book Deals</h1>
+        <h1 className="text-2xl font-bold">The Gist Deals</h1>
         <div className="space-x-2">
           <button onClick={seed} className="px-3 py-2 text-sm border rounded-lg hover:bg-gray-50">Seed retailers</button>
           <button

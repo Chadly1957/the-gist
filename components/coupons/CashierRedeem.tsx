@@ -54,7 +54,7 @@ export default function CashierRedeem({ buyerToken, coupons }: { buyerToken: str
   return (
     <div className="min-h-screen bg-gray-50 p-4">
       <div className="max-w-md mx-auto">
-        <h1 className="text-xl font-bold text-center my-4">Gist Coupon Book</h1>
+        <h1 className="text-xl font-bold text-center my-4">The Gist Deals</h1>
         <p className="text-center text-gray-500 text-sm mb-4">
           Tap the coupon the customer is using, then apply the discount at the register.
         </p>

@@ -128,12 +128,12 @@ function CouponsPageInner() {
             /* eslint-disable-next-line @next/next/no-img-element */
             <img src={book.dealsLogoUrl} alt="The Gist Deals" className="mx-auto h-14 w-auto mt-4" />
           )}
-          <h1 className="text-2xl font-bold text-center mt-4">My Coupon Book</h1>
+          <h1 className="text-2xl font-bold text-center mt-4">My Gist Deals Book</h1>
           <p className="text-center text-gray-500 text-sm mb-4">{book.email}</p>
           <div className="bg-white rounded-2xl shadow p-6 text-center mb-6">
             <p className="text-sm text-gray-600 mb-3">Show this code at any participating business. They scan it to apply your discount.</p>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={book.qrDataUrl} alt="Your coupon book QR code" className="mx-auto w-56 h-56" />
+            <img src={book.qrDataUrl} alt="Your Gist Deals Book QR code" className="mx-auto w-56 h-56" />
           </div>
           {book.deals && (book.deals.topPicks.length > 0 || book.deals.retailers.length > 0) && (
             <div className="mb-6">
@@ -231,7 +231,7 @@ function CouponsPageInner() {
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
       <div className="max-w-md w-full bg-white rounded-2xl shadow p-8">
-        <h1 className="text-2xl font-bold mb-2">The Gist Coupon Book</h1>
+        <h1 className="text-2xl font-bold mb-2">The Gist Deals</h1>
         <p className="text-gray-600 text-sm mb-6">
           Real discounts from local businesses, right on your phone. Show your personal QR code at the
           register and the cashier scans it to apply your discount. No apps, no printing, no hassle.

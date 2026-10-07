@@ -46,8 +46,8 @@ export async function POST(req: NextRequest) {
         },
       ],
       customer_email: normalizedEmail,
-      success_url: `${appUrl}/coupons/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${appUrl}/coupons?cancelled=1`,
+      success_url: `${appUrl}/deals/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${appUrl}/deals?cancelled=1`,
       metadata: { workspaceId: workspace.id, kind: COUPON_BOOK_STRIPE_KIND, email: normalizedEmail },
     });
   } catch (err) {
