@@ -35,14 +35,27 @@ export async function GET() {
   });
 }
 
-// Send the weekly digest to all opted-in buyers.
-export async function POST(_req: NextRequest) {
+// Send the weekly digest to all opted-in buyers, or a single test email.
+export async function POST(req: NextRequest) {
   const session = await getAdminSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const workspace = await getWorkspace();
+  let testEmail: string | undefined;
   try {
-    const result = await sendWeeklyDigest(workspace.id);
+    const body = await req.json();
+    if (body?.testEmail) {
+      const v = String(body.testEmail).trim().toLowerCase();
+      if (!v.includes("@")) {
+        return NextResponse.json({ error: "Enter a valid email address." }, { status: 400 });
+      }
+      testEmail = v;
+    }
+  } catch {
+    // No JSON body: full buyer send.
+  }
+  try {
+    const result = await sendWeeklyDigest(workspace.id, testEmail ? { testEmail } : undefined);
     return NextResponse.json(result);
   } catch (err) {
     return NextResponse.json(

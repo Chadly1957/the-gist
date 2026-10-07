@@ -138,10 +138,35 @@ export interface DigestSendResult {
   skipped: string;
 }
 
-export async function sendWeeklyDigest(workspaceId: string): Promise<DigestSendResult> {
+export async function sendWeeklyDigest(
+  workspaceId: string,
+  opts?: { testEmail?: string }
+): Promise<DigestSendResult> {
   const data = await getPublishedDigestData(workspaceId);
   if (!data.retailers.length) {
     return { sent: 0, failed: 0, skipped: "No published deal weeks to send." };
+  }
+
+  // Test send: renders exactly what a buyer would get (minus the personal magic
+  // link) to a single address. Not logged as a digest send.
+  if (opts?.testEmail) {
+    const ws = (await basePrisma.workspace.findUnique({ where: { id: workspaceId } }))!;
+    return withWorkspace(ws, async () => {
+      const workspaceUrl = await getWorkspaceUrl();
+      const settings = Object.fromEntries(
+        (await basePrisma.setting.findMany({ where: { workspaceId } })).map((r) => [r.key, r.value])
+      );
+      const client = await getEmailClient(settings);
+      if (!client) throw new Error("Email is not configured for this workspace.");
+      const subject = `[TEST] Your Coupon Book: fresh deals for ${data.weekLabel.replace("Week of ", "")}`;
+      const bookUrl = `${workspaceUrl}/coupons`;
+      const html = await renderDigestHtml(workspaceId, data, bookUrl, bookUrl);
+      const batch = await client.sendBatch([
+        { to: opts.testEmail!, subject, htmlBody: html, textBody: htmlToText(html) },
+      ]);
+      const failed = batch.data?.filter((r) => !r.id).length ?? 0;
+      return { sent: 1 - failed, failed, skipped: "" };
+    });
   }
 
   const buyers = await basePrisma.couponBookPurchase.findMany({
