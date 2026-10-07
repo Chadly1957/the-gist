@@ -145,7 +145,7 @@ export async function renderDigestHtml(
                  `<li style="margin: 0 0 8px; font-size: 14px; line-height: 1.45; color: #1f2937;"><strong>${escapeHtml(c.businessName)}</strong>: ${escapeHtml(c.title)}${c.terms ? ` <span style="color: #6b7280; font-size: 12px;">(${escapeHtml(c.terms)})</span>` : ""}</li>`
              )
              .join("")}</ul>
-           <p style="color: #6b7280; font-size: 12px; margin: 8px 0 0;">Show your book's QR code at these businesses to redeem. <a href="${escapeHtml(bookUrl)}" style="color: #24726f;">Open My Gist Deals Book</a></p>`
+           <p style="color: #6b7280; font-size: 12px; margin: 8px 0 0;"><a href="${escapeHtml(bookUrl)}" style="color: #24726f;">Open My Gist Deals Book</a> to see all your local coupons.</p>`
         : "";
 
       return `
