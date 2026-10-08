@@ -59,7 +59,10 @@ const PER_MARKET: Record<string, { zip: string; targetStoreId: string; aldiStore
 };
 
 export async function seedRetailers(workspaceId: string): Promise<{ created: number; kept: number }> {
-  const market = PER_MARKET[workspaceId] || { zip: "", targetStoreId: "1951", aldiStoreCode: "" };
+  // PER_MARKET is keyed by workspace slug ("decatur"/"effingham"), not the
+  // database ID (Decatur's ID happens to be "decatur"; other workspaces use cuids).
+  const ws = await basePrisma.workspace.findUnique({ where: { id: workspaceId }, select: { slug: true } });
+  const market = PER_MARKET[ws?.slug || workspaceId] || { zip: "", targetStoreId: "1951", aldiStoreCode: "" };
 
   const seeds: RetailerSeed[] = [
     { slug: "hobby-lobby", displayName: "Hobby Lobby", pipeline: "hobby-lobby", storeConfig: {}, logoUrl: LOGOS["hobby-lobby"] },
@@ -111,6 +114,23 @@ export async function seedRetailers(workspaceId: string): Promise<{ created: num
           data: { logoUrl: s.logoUrl },
         });
       }
+      // Backfill market config (zip/storeCode/storeId) when the existing row
+      // was seeded without it (e.g. seeded before the slug lookup was fixed).
+      // Never overwrites a value Chad set by hand.
+      try {
+        const cfg = JSON.parse(existing.storeConfig || "{}");
+        const seedCfg = s.storeConfig as Record<string, string>;
+        let patched = false;
+        for (const k of ["zip", "storeCode", "storeId"]) {
+          if (!cfg[k] && seedCfg[k]) { cfg[k] = seedCfg[k]; patched = true; }
+        }
+        if (patched) {
+          await basePrisma.retailer.update({
+            where: { id: existing.id },
+            data: { storeConfig: JSON.stringify(cfg) },
+          });
+        }
+      } catch { /* leave a hand-edited config alone if it isn't JSON */ }
       kept++;
       continue;
     }
