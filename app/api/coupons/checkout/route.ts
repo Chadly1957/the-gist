@@ -11,11 +11,14 @@ export const dynamic = "force-dynamic";
 // Start Stripe Checkout for a coupon book purchase. The webhook fulfills it
 // (creates the purchase row + emails the magic link) on checkout.session.completed.
 export async function POST(req: NextRequest) {
-  const { email } = await req.json();
+  const { email, src } = await req.json();
   const normalizedEmail = email?.trim().toLowerCase();
   if (!normalizedEmail || !normalizedEmail.includes("@")) {
     return NextResponse.json({ error: "A valid email is required." }, { status: 400 });
   }
+  // Attribution: which signup touchpoint drove this purchase. Allowlisted so
+  // junk never lands in Stripe metadata.
+  const attribution = src === "thankyou" || src === "welcome" ? src : undefined;
   if (!process.env.STRIPE_SECRET_KEY) {
     return NextResponse.json({ error: "Payments are not configured right now. Please try again later." }, { status: 503 });
   }
@@ -48,7 +51,12 @@ export async function POST(req: NextRequest) {
       customer_email: normalizedEmail,
       success_url: `${appUrl}/deals/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${appUrl}/deals?cancelled=1`,
-      metadata: { workspaceId: workspace.id, kind: COUPON_BOOK_STRIPE_KIND, email: normalizedEmail },
+      metadata: {
+        workspaceId: workspace.id,
+        kind: COUPON_BOOK_STRIPE_KIND,
+        email: normalizedEmail,
+        ...(attribution ? { src: attribution } : {}),
+      },
     });
   } catch (err) {
     console.error("coupon checkout stripe error:", err);
