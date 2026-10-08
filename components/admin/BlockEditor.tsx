@@ -8,7 +8,7 @@ import UrlInput from "@/components/UrlInput";
 
 export interface Block {
   id: string;
-  type: "header" | "text" | "image" | "articles" | "divider" | "button" | "footer" | "spotlight" | "presenting_sponsor" | "events" | "referral" | "poll" | "wordy" | "match" | "games" | "tip_jar" | "weather";
+  type: "header" | "text" | "image" | "articles" | "divider" | "button" | "footer" | "spotlight" | "presenting_sponsor" | "events" | "referral" | "poll" | "wordy" | "match" | "games" | "tip_jar" | "deals_signup" | "weather";
   content: Record<string, string>;
 }
 
@@ -35,6 +35,7 @@ const BLOCK_TYPES: { type: Block["type"]; label: string; icon: string }[] = [
   { type: "match", label: "Gist Match", icon: "🧩" },
   { type: "games", label: "Games (Wordy + Match)", icon: "🎮" },
   { type: "tip_jar", label: "Tip Jar", icon: "☕" },
+  { type: "deals_signup", label: "Gist Deals Signup", icon: "🎟️" },
   { type: "weather", label: "Weather Snapshot", icon: "🌤️" },
 ];
 
@@ -77,6 +78,11 @@ export default function BlockEditor({ blocks, onChange }: BlockEditorProps) {
         headline: "Like what The Gist is doing?",
         body: "Support the newsletter with a cup of coffee!",
         buttonLabel: "Tip $3",
+      },
+      deals_signup: {
+        headline: "Introducing The Gist Deals",
+        body: "Hundreds of deals from local businesses and your favorite stores. $15 once, yours for life.",
+        buttonLabel: "Get the Book",
       },
       weather: {
         label: "Today's Weather",
@@ -430,6 +436,17 @@ function BlockPreview({ block }: { block: Block }) {
           </span>
         </div>
       );
+    case "deals_signup":
+      return (
+        <div className="bg-green-50 border border-green-200 rounded-xl p-4 text-center">
+          <div className="text-xs font-semibold text-green-700 uppercase tracking-wide mb-1">Gist Deals Signup</div>
+          <p className="text-sm font-bold text-gray-900 mb-1">🎟️ {block.content.headline || "Introducing The Gist Deals"}</p>
+          <p className="text-xs text-gray-500 mb-2">{block.content.body || "Hundreds of deals from local businesses and your favorite stores."}</p>
+          <span className="inline-block bg-green-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg">
+            {block.content.buttonLabel || "Get the Book"}
+          </span>
+        </div>
+      );
     case "weather":
       return (
         <div className="flex items-center gap-3 py-2">
@@ -720,6 +737,15 @@ function BlockFields({
           {field("body", "Body", { placeholder: "Support the newsletter with a cup of coffee!" })}
           {field("buttonLabel", "Button Label", { placeholder: "Tip $3" })}
           <p className="text-xs text-gray-400"><WorkspaceText>{"Links to your workspace tip page with $3 pre-selected — readers can still enter their own amount."}</WorkspaceText></p>
+        </div>
+      );
+    case "deals_signup":
+      return (
+        <div className="space-y-3">
+          {field("headline", "Headline", { placeholder: "Introducing The Gist Deals" })}
+          {field("body", "Body", { placeholder: "Hundreds of deals from local businesses and your favorite stores. $15 once, yours for life." })}
+          {field("buttonLabel", "Button Label", { placeholder: "Get the Book" })}
+          <p className="text-xs text-gray-400">Links to this workspace&apos;s Deals Book signup page ({"/deals"}).</p>
         </div>
       );
     case "weather":

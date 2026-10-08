@@ -2,7 +2,7 @@
 
 export interface Block {
   id: string;
-  type: "header" | "text" | "image" | "articles" | "divider" | "footer" | "button" | "spotlight" | "presenting_sponsor" | "events" | "referral" | "poll" | "wordy" | "match" | "games" | "tip_jar" | "weather";
+  type: "header" | "text" | "image" | "articles" | "divider" | "footer" | "button" | "spotlight" | "presenting_sponsor" | "events" | "referral" | "poll" | "wordy" | "match" | "games" | "tip_jar" | "deals_signup" | "weather";
   content: Record<string, unknown>;
 }
 
@@ -489,6 +489,29 @@ function renderTipJar(content: Record<string, unknown>): string {
     </div>`;
 }
 
+function renderDealsSignup(content: Record<string, unknown>): string {
+  const headline = String(content.headline || "Introducing The Gist Deals");
+  const body = String(content.body || "Hundreds of deals from local businesses and your favorite stores. $15 once, yours for life.");
+  const buttonLabel = String(content.buttonLabel || "Get the Book");
+  const dealsUrl = "{{APP_URL}}/deals?source=newsletter";
+
+  return `
+    <div style="padding:20px 40px;">
+      <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:24px;text-align:center;">
+        <div style="font-size:28px;margin-bottom:8px;">&#x1F39F;&#xFE0F;</div>
+        <div style="font-size:17px;font-weight:700;color:#14532d;font-family:Georgia,serif;line-height:1.4;margin-bottom:6px;">
+          ${headline}
+        </div>
+        <div style="font-size:13px;color:#166534;font-family:sans-serif;margin-bottom:18px;">
+          ${body}
+        </div>
+        <a href="${dealsUrl}" style="display:inline-block;background:#15803d;color:#ffffff;padding:12px 28px;border-radius:6px;text-decoration:none;font-size:14px;font-family:sans-serif;font-weight:700;">
+          ${buttonLabel}
+        </a>
+      </div>
+    </div>`;
+}
+
 function renderDivider(): string {
   return `<div class="block" style="padding:8px 40px;"><hr class="divider" style="border:none;border-top:1px solid #e5e7eb;margin:0;" /></div>`;
 }
@@ -621,6 +644,8 @@ export function renderTemplate(
           return renderGames(block.content, wordyData);
         case "tip_jar":
           return renderTipJar(block.content);
+        case "deals_signup":
+          return renderDealsSignup(block.content);
         case "weather":
           return renderWeather(block.content, weatherData);
         default:
