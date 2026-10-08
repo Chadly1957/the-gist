@@ -77,15 +77,19 @@ export async function POST(req: NextRequest) {
 
   // Notify the business owner (fire and forget; the redemption is already logged).
   if (result.coupon.contactEmail) {
-    await sendCouponRedemptionEmail({
-      workspaceId: purchase.workspaceId,
-      to: result.coupon.contactEmail,
-      businessName: result.coupon.businessName,
-      couponTitle: result.coupon.title,
-      buyerEmail: purchase.email,
-      redeemedAt: result.redemption.redeemedAt,
-      notes: cleanNotes,
-    });
+    try {
+      await sendCouponRedemptionEmail({
+        workspaceId: purchase.workspaceId,
+        to: result.coupon.contactEmail,
+        businessName: result.coupon.businessName,
+        couponTitle: result.coupon.title,
+        buyerEmail: purchase.email,
+        redeemedAt: result.redemption.redeemedAt,
+        notes: cleanNotes,
+      });
+    } catch (err) {
+      console.error("Redemption logged but business notification email failed:", err);
+    }
   }
 
   return NextResponse.json({

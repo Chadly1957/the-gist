@@ -46,6 +46,12 @@ export default function AdminCouponsPage() {
   const [compEmail, setCompEmail] = useState("");
   const [comping, setComping] = useState(false);
   const [compMsg, setCompMsg] = useState<string | null>(null);
+  interface Purchase { id: string; email: string; createdAt: string; active: boolean; paid: boolean; magicLink: string; }
+  const [buyerQuery, setBuyerQuery] = useState("");
+  const [buyers, setBuyers] = useState<Purchase[]>([]);
+  const [buyerMsg, setBuyerMsg] = useState<string | null>(null);
+  const [resending, setResending] = useState<string | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   async function load() {
     setLoading(true);
@@ -63,6 +69,49 @@ export default function AdminCouponsPage() {
   useEffect(() => {
     load();
   }, []);
+
+  async function lookupBuyers() {
+    setBuyerMsg(null);
+    setBuyers([]);
+    try {
+      const res = await workspaceFetch(`/api/admin/coupons/purchases?email=${encodeURIComponent(buyerQuery.trim())}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Lookup failed.");
+      setBuyers(data.purchases);
+      setBuyerMsg(data.purchases.length === 0 ? "No buyers found." : `${data.purchases.length} buyer${data.purchases.length === 1 ? "" : "s"} found.`);
+    } catch (err) {
+      setBuyerMsg(err instanceof Error ? err.message : "Lookup failed.");
+    }
+  }
+
+  async function copyBuyerLink(b: Purchase) {
+    try {
+      await navigator.clipboard.writeText(b.magicLink);
+      setCopiedId(b.id);
+      setTimeout(() => setCopiedId(null), 2000);
+    } catch {
+      setBuyerMsg("Could not copy to clipboard — copy it manually from a resend instead.");
+    }
+  }
+
+  async function resendBuyerLink(b: Purchase) {
+    setResending(b.id);
+    setBuyerMsg(null);
+    try {
+      const res = await workspaceFetch("/api/admin/coupons/purchases", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ purchaseId: b.id }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) throw new Error(data.error || "Resend failed.");
+      setBuyerMsg(`Magic link re-sent to ${b.email}.`);
+    } catch (err) {
+      setBuyerMsg(`Resend failed: ${err instanceof Error ? err.message : "unknown error"}`);
+    } finally {
+      setResending(null);
+    }
+  }
 
   async function compBook(e: React.FormEvent) {
     e.preventDefault();
@@ -166,6 +215,54 @@ export default function AdminCouponsPage() {
           <button disabled={comping} className="px-4 py-2 bg-gray-700 text-white rounded-lg text-sm whitespace-nowrap disabled:opacity-50">{comping ? "Adding…" : "Comp book"}</button>
         </form>
         {compMsg && <p className="text-xs text-gray-600 mt-2">{compMsg}</p>}
+      </div>
+
+      <div className="bg-white rounded-xl shadow p-6 mb-8">
+        <h2 className="font-bold mb-1">Buyer lookup</h2>
+        <p className="text-xs text-gray-500 mb-3">Find a buyer to copy their personal book link or resend their magic-link email.</p>
+        <form
+          onSubmit={(e) => { e.preventDefault(); lookupBuyers(); }}
+          className="flex gap-2 mb-3"
+        >
+          <input
+            type="text"
+            value={buyerQuery}
+            onChange={(e) => setBuyerQuery(e.target.value)}
+            placeholder="buyer email…"
+            className="flex-1 border rounded-lg px-3 py-2"
+          />
+          <button className="px-4 py-2 bg-gray-700 text-white rounded-lg text-sm whitespace-nowrap">Search</button>
+        </form>
+        {buyerMsg && <p className="text-xs text-gray-600 mb-2">{buyerMsg}</p>}
+        {buyers.length > 0 && (
+          <ul className="divide-y border rounded-lg">
+            {buyers.map((b) => (
+              <li key={b.id} className="p-3 flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold truncate">{b.email}</p>
+                  <p className="text-xs text-gray-400">
+                    {new Date(b.createdAt).toLocaleDateString()} · {b.paid ? "paid" : "comped"}{!b.active && " · inactive"}
+                  </p>
+                </div>
+                <div className="flex gap-2 shrink-0">
+                  <button
+                    onClick={() => copyBuyerLink(b)}
+                    className="px-3 py-1.5 text-xs border rounded-lg hover:bg-gray-50"
+                  >
+                    {copiedId === b.id ? "Copied!" : "Copy link"}
+                  </button>
+                  <button
+                    onClick={() => resendBuyerLink(b)}
+                    disabled={resending === b.id}
+                    className="px-3 py-1.5 text-xs bg-green-700 text-white rounded-lg disabled:opacity-50"
+                  >
+                    {resending === b.id ? "Sending…" : "Resend email"}
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
 
       <div className="bg-white rounded-xl shadow p-6 mb-8">

@@ -23,7 +23,7 @@ export async function sendCouponBookMagicLinkEmail(opts: {
       const rows = await prisma.setting.findMany();
       const settings = Object.fromEntries(rows.map((r) => [r.key, r.value]));
       const client = await getEmailClient(settings);
-      if (!client) return;
+      if (!client) throw new Error("No email provider configured for this workspace");
       const ws = await getWorkspace();
       const logoHtml = ws.dealsLogoUrl
         ? `<img src="${escapeHtml(ws.dealsLogoUrl)}" alt="The Gist Deals" style="height: 96px; width: auto; display: block; margin: 0 0 16px;" />`
@@ -51,6 +51,7 @@ export async function sendCouponBookMagicLinkEmail(opts: {
     });
   } catch (err) {
     console.error("Failed to send coupon book magic link email:", err);
+    throw err instanceof Error ? err : new Error(String(err));
   }
 }
 
@@ -69,7 +70,7 @@ export async function sendCouponRedemptionEmail(opts: {
       const rows = await prisma.setting.findMany();
       const settings = Object.fromEntries(rows.map((r) => [r.key, r.value]));
       const client = await getEmailClient(settings);
-      if (!client) return;
+      if (!client) throw new Error("No email provider configured for this workspace");
       const ws = await getWorkspace();
       const logoHtml = ws.dealsLogoUrl
         ? `<img src="${escapeHtml(ws.dealsLogoUrl)}" alt="The Gist Deals" style="height: 48px; width: auto; display: block; margin: 0 0 16px;" />`
@@ -97,5 +98,6 @@ export async function sendCouponRedemptionEmail(opts: {
     });
   } catch (err) {
     console.error("Failed to send coupon redemption email:", err);
+    throw err instanceof Error ? err : new Error(String(err));
   }
 }
