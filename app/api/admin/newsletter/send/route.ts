@@ -27,9 +27,9 @@ export async function POST(req: NextRequest) {
 
   const { subject, templateId, articleIds, blurb, newsletterDate } = await req.json();
 
-  if (!subject || !templateId || !articleIds?.length) {
+  if (!subject || !templateId) {
     return NextResponse.json(
-      { error: "Subject, template, and at least one article are required." },
+      { error: "Subject and template are required." },
       { status: 400 }
     );
   }
@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
 
   // Fetch selected articles
   const articles = await prisma.article.findMany({
-    where: { id: { in: articleIds } },
+    where: { id: { in: articleIds ?? [] } },
     orderBy: { publishedAt: "desc" },
   });
 

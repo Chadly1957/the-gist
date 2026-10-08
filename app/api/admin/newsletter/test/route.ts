@@ -16,9 +16,9 @@ export async function POST(req: NextRequest) {
   const { testEmail, subject, templateId, articleIds, blurb, newsletterDate } = await req.json();
 
   if (!testEmail) return NextResponse.json({ error: "Test email address is required." }, { status: 400 });
-  if (!subject || !templateId || !articleIds?.length) {
+  if (!subject || !templateId) {
     return NextResponse.json(
-      { error: "Subject, template, and at least one article are required." },
+      { error: "Subject and template are required." },
       { status: 400 }
     );
   }
@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
   if (!template) return NextResponse.json({ error: "Template not found." }, { status: 404 });
 
   const articles = await prisma.article.findMany({
-    where: { id: { in: articleIds } },
+    where: { id: { in: articleIds ?? [] } },
     orderBy: { publishedAt: "desc" },
   });
 
