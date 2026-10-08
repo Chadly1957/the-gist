@@ -224,6 +224,17 @@ export default function AdminDealsPage() {
 
   const manualRetailers = retailers.filter((r) => r.pipeline === "manual");
 
+  async function toggleRetailer(r: Retailer) {
+    const res = await workspaceFetch("/api/admin/deals/retailers", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: r.id, active: !r.active }),
+    });
+    const data = await res.json();
+    if (!res.ok) { alert(data.error); return; }
+    load();
+  }
+
   if (loading) return <div className="p-8"><p className="text-gray-500">Loading deals…</p></div>;
 
   return (
@@ -281,6 +292,13 @@ export default function AdminDealsPage() {
               </div>
               <div className="flex gap-2 shrink-0">
                 <button onClick={() => openCfg(r)} className="px-2 py-1 text-xs border rounded hover:bg-gray-50">Settings</button>
+                <button
+                  onClick={() => toggleRetailer(r)}
+                  title={r.active ? "Hide this retailer from the deals book" : "Show this retailer in the deals book"}
+                  className="px-2 py-1 text-xs border rounded hover:bg-gray-50"
+                >
+                  {r.active ? "Hide" : "Show"}
+                </button>
                 {r.pipeline !== "manual" && (
                   <button
                     onClick={() => refresh(r.id)}
