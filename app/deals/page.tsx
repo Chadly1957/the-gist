@@ -556,17 +556,14 @@ function DealsPageInner() {
           Every deal worth knowing about, in one little book on your phone.
         </p>
         <div className="mt-5">
-          <span className="inline-block bg-green-700 text-white text-sm font-bold px-5 py-2.5 rounded-full">
+          <a
+            href="#get-the-book"
+            className="inline-block bg-green-700 text-white text-sm font-bold px-5 py-2.5 rounded-full"
+          >
             $15 once — yours for life
-          </span>
+          </a>
         </div>
-        <p className="text-xs text-gray-400 mt-2">No subscription. No renewals. No funny business.</p>
-        <a
-          href="#get-the-book"
-          className="inline-block mt-5 text-sm font-semibold text-green-700 underline underline-offset-4"
-        >
-          Get the Book
-        </a>
+        <p className="text-xs text-gray-400 mt-2">No subscription. No renewals.</p>
       </div>
 
       {/* Preview */}
