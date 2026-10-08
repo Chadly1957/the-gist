@@ -122,12 +122,12 @@ export default function AdminDealsPage() {
   }
 
   async function openReview(id: string) {
-    const res = await fetch(`/api/admin/deals/weeks/${id}`);
+    const res = await workspaceFetch(`/api/admin/deals/weeks/${id}`);
     if (res.ok) setReview((await res.json()).week);
   }
 
   async function setStatus(id: string, status: string) {
-    const res = await fetch(`/api/admin/deals/weeks/${id}`, {
+    const res = await workspaceFetch(`/api/admin/deals/weeks/${id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status }),
@@ -136,7 +136,7 @@ export default function AdminDealsPage() {
   }
 
   async function toggleTopPick(deal: Deal) {
-    await fetch(`/api/admin/deals/deals/${deal.id}`, {
+    await workspaceFetch(`/api/admin/deals/deals/${deal.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ isTopPick: !deal.isTopPick }),
@@ -146,7 +146,7 @@ export default function AdminDealsPage() {
 
   async function deleteDeal(id: string) {
     if (!confirm("Delete this deal?")) return;
-    await fetch(`/api/admin/deals/deals/${id}`, { method: "DELETE" });
+    await workspaceFetch(`/api/admin/deals/deals/${id}`, { method: "DELETE" });
     if (review) openReview(review.id);
   }
 
