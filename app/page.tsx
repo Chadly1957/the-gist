@@ -4,10 +4,39 @@ import { workspaceFetch } from "@/lib/workspace-client";
 import { useState, useEffect } from "react";
 import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
 import Image from "next/image";
-import Link from "@/components/workspace/WorkspaceLink";
+import Link, { WorkspaceAnchor } from "@/components/workspace/WorkspaceLink";
 import Logo from "@/components/Logo";
 import SponsorsMarquee from "@/components/SponsorsMarquee";
 import RecentIssues from "@/components/RecentIssues";
+
+// Compact "one more thing" upsell shown below the signup confirmation.
+// Framed as a separate thing Chad built, never as part of the free newsletter.
+function DealsUpsell({ area, email }: { area: string; email: string }) {
+  const href =
+    "/deals?src=thankyou" + (email ? `&email=${encodeURIComponent(email)}` : "");
+  return (
+    <div className="mt-5 max-w-md rounded-2xl border border-amber-200 bg-amber-50 p-5">
+      <p className="text-[11px] font-bold uppercase tracking-widest text-amber-700 mb-2">
+        One more thing&hellip;
+      </p>
+      <p className="text-sm text-gray-700 leading-relaxed mb-4">
+        The newsletter is free forever. Separately, I built{" "}
+        <strong className="text-gray-900">The Gist Deals</strong>: a digital book
+        of real discounts from local {area} businesses, right on your phone.{" "}
+        <strong className="text-gray-900">$15 once, yours for life.</strong>
+      </p>
+      <WorkspaceAnchor
+        href={href}
+        className="inline-flex items-center gap-2 bg-green-700 hover:bg-green-800 text-white font-bold px-5 py-3 rounded-xl text-sm transition-colors"
+      >
+        See what&apos;s inside
+        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3" />
+        </svg>
+      </WorkspaceAnchor>
+    </div>
+  );
+}
 
 function CityLandingPage() {
   const { workspace } = useWorkspace();
@@ -16,6 +45,9 @@ function CityLandingPage() {
   const brand = workspace.slug || workspace.id;
   const [email, setEmail] = useState("");
   const [firstName, setFirstName] = useState("");
+  // Keep the just-subscribed email around after the form clears so the
+  // Deals upsell can carry it through to /deals (no re-typing).
+  const [subscribedEmail, setSubscribedEmail] = useState("");
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [message, setMessage] = useState("");
   const [subCount, setSubCount] = useState<number | null>(null);
@@ -44,6 +76,7 @@ function CityLandingPage() {
       if (res.ok) {
         setStatus("success");
         setMessage(data.message || "You're in! Welcome to " + workspace.name + ".");
+        setSubscribedEmail(email);
         setEmail("");
         setFirstName("");
       } else {
@@ -165,17 +198,20 @@ function CityLandingPage() {
               </p>
 
               {status === "success" ? (
-                <div className="flex items-start gap-4 bg-green-50 border border-green-100 rounded-2xl p-6 max-w-md">
-                  <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center shrink-0">
-                    <svg className="w-5 h-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                    </svg>
+                <>
+                  <div className="flex items-start gap-4 bg-green-50 border border-green-100 rounded-2xl p-6 max-w-md">
+                    <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center shrink-0">
+                      <svg className="w-5 h-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="font-bold text-gray-900 mb-0.5">You&apos;re subscribed!</p>
+                      <p className="text-sm text-gray-500">{message}</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="font-bold text-gray-900 mb-0.5">You&apos;re subscribed!</p>
-                    <p className="text-sm text-gray-500">{message}</p>
-                  </div>
-                </div>
+                  <DealsUpsell area={workspace.area} email={subscribedEmail} />
+                </>
               ) : (
                 <form onSubmit={handleSubmit} className="max-w-md space-y-3 w-full">
                   <input
@@ -354,10 +390,17 @@ function CityLandingPage() {
             </h2>
             <p className="text-gray-500 mb-8">Free forever. One email a day. No fluff.</p>
             {status === "success" ? (
-              <div className="bg-green-50 border border-green-100 rounded-2xl p-6">
-                <p className="font-bold text-green-800 mb-1">You&apos;re subscribed!</p>
-                <p className="text-sm text-green-600">{message}</p>
-              </div>
+              <>
+                <div className="bg-green-50 border border-green-100 rounded-2xl p-6">
+                  <p className="font-bold text-green-800 mb-1">You&apos;re subscribed!</p>
+                  <p className="text-sm text-green-600">{message}</p>
+                </div>
+                <div className="flex justify-center text-left mt-2">
+                  <div className="w-full max-w-md">
+                    <DealsUpsell area={workspace.area} email={subscribedEmail} />
+                  </div>
+                </div>
+              </>
             ) : (
               <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-3 max-w-md mx-auto">
                 <input

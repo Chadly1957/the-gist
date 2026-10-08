@@ -300,9 +300,18 @@ function PhonePreview() {
 function DealsPageInner() {
   const searchParams = useSearchParams();
   const token = searchParams.get("token");
+  // Attribution: which signup touchpoint sent this buyer (thank-you page vs
+  // welcome email). Passed through to Stripe metadata at checkout.
+  const srcParam = searchParams.get("src");
+  const src = srcParam === "thankyou" || srcParam === "welcome" ? srcParam : null;
+  // Email passthrough: fresh subscribers arrive with ?email= so they are
+  // never asked to re-type the address they just gave us.
+  const emailParam = searchParams.get("email");
+  const initialEmail = emailParam && emailParam.includes("@") ? emailParam.trim() : "";
   const [book, setBook] = useState<BookData | null>(null);
   const [bookError, setBookError] = useState<string | null>(null);
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(initialEmail);
+  const [emailFromLink, setEmailFromLink] = useState(initialEmail !== "");
   const [buying, setBuying] = useState(false);
   const [linkSent, setLinkSent] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
@@ -328,7 +337,7 @@ function DealsPageInner() {
       const res = await workspaceFetch("/api/coupons/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email, src }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Checkout failed.");
@@ -636,15 +645,32 @@ function DealsPageInner() {
           <p className="text-sm text-gray-500 mb-5">$15 once, yours for life.</p>
           {formError && <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg p-3 mb-4 text-sm">{formError}</div>}
           {linkSent && <div className="bg-green-50 border border-green-200 text-green-700 rounded-lg p-3 mb-4 text-sm">{linkSent}</div>}
-          <label className="block text-sm font-semibold mb-1" htmlFor="coupon-email">Email</label>
-          <input
-            id="coupon-email"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="you@example.com"
-            className="w-full border rounded-lg px-3 py-2 mb-4"
-          />
+          {emailFromLink ? (
+            <div className="bg-green-50 border border-green-100 rounded-xl px-4 py-3 mb-4">
+              <p className="text-sm text-gray-700">
+                Your book link will go to <strong className="text-gray-900">{email}</strong>
+              </p>
+              <button
+                type="button"
+                onClick={() => setEmailFromLink(false)}
+                className="text-xs text-green-700 underline mt-1"
+              >
+                Use a different email
+              </button>
+            </div>
+          ) : (
+            <>
+              <label className="block text-sm font-semibold mb-1" htmlFor="coupon-email">Email</label>
+              <input
+                id="coupon-email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@example.com"
+                className="w-full border rounded-lg px-3 py-2 mb-4"
+              />
+            </>
+          )}
           <button
             onClick={buy}
             disabled={buying || !email.includes("@")}
