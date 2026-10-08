@@ -355,10 +355,6 @@ export default function ComposePage() {
   }
 
   async function handleSend() {
-    if (selectedArticles.length === 0) {
-      alert("Select at least one article before sending.");
-      return;
-    }
     if (!selectedTemplateId) {
       alert("Please select a template.");
       return;
@@ -385,10 +381,6 @@ export default function ComposePage() {
 
   async function handleTestSend() {
     if (!testEmail) return;
-    if (selectedArticles.length === 0) {
-      setSendResult({ ok: false, message: "Select at least one article before sending a test." });
-      return;
-    }
     setTestSending(true);
     setSendResult(null);
     try {
@@ -767,7 +759,7 @@ export default function ComposePage() {
               </button>
               <button
                 onClick={handleSend}
-                disabled={sending || selectedArticles.length === 0}
+                disabled={sending}
                 className="bg-green-700 hover:bg-green-800 disabled:bg-green-300 text-white px-5 py-1.5 rounded-lg text-sm font-semibold transition-colors"
               >
                 {sending ? "Sending…" : "Send to List"}
@@ -921,7 +913,8 @@ export default function ComposePage() {
                 <div className="rounded-xl border-2 border-dashed border-gray-200 p-6 text-center text-gray-400">
                   <p className="text-sm">No articles selected yet.</p>
                   <p className="text-xs mt-1">
-                    Fetch &amp; select articles from the left panel.
+                    Fetch &amp; select articles from the left panel — or send with
+                    none for an announcement-style issue.
                   </p>
                 </div>
               )}
