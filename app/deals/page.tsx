@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, createContext, useEffect, useState } from "react";
 import { workspaceFetch } from "@/lib/workspace-client";
 import { useSearchParams } from "next/navigation";
 import { COUPON_BOOK_PRICE_CENTS } from "@/lib/coupon-book";
@@ -73,37 +73,133 @@ function cents(n: number) {
   return `$${(n / 100).toFixed(2).replace(/\.00$/, "")}`;
 }
 
-// Sleek scrolling ticker for top picks. One marquee, used sparingly.
-function TopPicksMarquee({ picks }: { picks: BookDeal[] }) {
-  if (!picks.length) return null;
-  const items = picks.map((d, i) => {
-    const inner = (
-      <>
-        <span>⭐</span>
-        {d.businessName && <span className="text-stone-400">{d.businessName}:</span>}
-        <span className="font-medium">{d.title}</span>
-        {d.price && <span className="font-bold text-amber-300">{d.price}</span>}
-      </>
-    );
-    return d.dealUrl ? (
-      <a key={i} href={d.dealUrl} target="_blank" rel="noreferrer"
-         className="mx-6 inline-flex items-center gap-2 whitespace-nowrap text-sm hover:underline">
-        {inner}
-      </a>
-    ) : (
-      <span key={i} className="mx-6 inline-flex items-center gap-2 whitespace-nowrap text-sm">
-        {inner}
-      </span>
-    );
-  });
+function domainOf(url: string | null | undefined): string | null {
+  if (!url) return null;
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return null;
+  }
+}
+
+interface OutboundLink {
+  url: string;
+  domain: string;
+  store: string;
+  kind: string;
+  checked: string | null;
+}
+
+// One calm, honest button for every outbound link. Tapping opens a preview
+// sheet first so the buyer always knows exactly where a tap goes.
+function DealLinkButton({
+  url, store, kind, checked, children, className,
+}: {
+  url: string; store: string; kind: string; checked: string | null;
+  children: React.ReactNode; className?: string;
+}) {
   return (
-    <div className="overflow-hidden bg-stone-900 text-white rounded-2xl py-2.5 mb-4">
-      <style>{`@keyframes gist-marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }`}</style>
-      <div className="flex w-max" style={{ animation: "gist-marquee 30s linear infinite" }}>
-        <div className="flex items-center">{items}</div>
-        <div className="flex items-center" aria-hidden="true">{items}</div>
+    <OutboundLinkContext.Consumer>
+      {(openPreview) => (
+        <button
+          type="button"
+          onClick={() => {
+            const domain = domainOf(url);
+            if (!domain) return;
+            openPreview({ url, domain, store, kind, checked });
+          }}
+          className={className}
+        >
+          {children}
+        </button>
+      )}
+    </OutboundLinkContext.Consumer>
+  );
+}
+
+const OutboundLinkContext = createContext<(l: OutboundLink) => void>(() => {});
+
+function LinkPreviewSheet({ link, onClose }: { link: OutboundLink | null; onClose: () => void }) {
+  if (!link) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center" role="dialog" aria-modal="true">
+      <div className="absolute inset-0 bg-stone-900/50" onClick={onClose} />
+      <div className="relative bg-white w-full sm:max-w-sm rounded-t-3xl sm:rounded-3xl p-6 shadow-xl">
+        <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-2">You&apos;re heading to</p>
+        <p className="text-xl font-bold text-stone-900 break-all">{link.domain}</p>
+        <p className="text-sm text-gray-600 mt-2">
+          {link.store}&apos;s {link.kind === "item" ? "product page" : link.kind === "referral" ? "site" : "official weekly ad"}.
+          {link.checked ? ` We checked this link ${link.checked}.` : " We checked this link this week."}
+        </p>
+        <a
+          href={link.url}
+          target="_blank"
+          rel="noreferrer"
+          className="block text-center w-full mt-5 py-3 rounded-xl bg-green-700 text-white font-bold"
+        >
+          Open {link.domain}
+        </a>
+        <button onClick={onClose} className="block w-full mt-2 py-2 text-sm text-gray-500">
+          Stay here
+        </button>
       </div>
     </div>
+  );
+}
+
+// This week's best: calm snap-scroll cards instead of an auto-scrolling ticker.
+function PicksRow({
+  picks, retailers, checked,
+}: {
+  picks: BookDeal[]; retailers: BookRetailerDeals[]; checked: string | null;
+}) {
+  if (!picks.length) return null;
+  const logoFor = (d: BookDeal) => {
+    const r = retailers.find((x) =>
+      d.businessName ? x.displayName.toLowerCase() === d.businessName.toLowerCase() : false
+    );
+    return r?.logoUrl || null;
+  };
+  return (
+    <section className="mb-6">
+      <div className="flex items-baseline justify-between mb-1 px-1">
+        <h2 className="font-bold text-lg text-stone-900">This week&apos;s best</h2>
+      </div>
+      <p className="text-sm text-gray-500 mb-3 px-1">The standouts, hand-picked Monday morning.</p>
+      <div className="flex gap-3 overflow-x-auto snap-x snap-mandatory pb-2 -mx-4 px-4">
+        {picks.map((d, i) => {
+          const logo = logoFor(d);
+          const domain = domainOf(d.dealUrl);
+          return (
+            <div key={i} className="snap-start shrink-0 w-64 bg-white rounded-3xl border border-gray-100 shadow-sm p-5 flex flex-col">
+              <div className="flex items-center gap-2 mb-3 min-h-[2rem]">
+                {logo ? (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img src={logo} alt={d.businessName || ""} className="h-7 w-auto object-contain" />
+                ) : d.businessName ? (
+                  <p className="text-xs font-bold uppercase tracking-widest text-gray-400">{d.businessName}</p>
+                ) : null}
+              </div>
+              <p className="font-bold text-stone-900 leading-snug flex-1">{d.title}</p>
+              {d.price && <p className="text-2xl font-extrabold text-green-700 mt-2">{d.price}</p>}
+              {d.dealUrl && domain ? (
+                <DealLinkButton
+                  url={d.dealUrl}
+                  store={d.businessName || "This retailer"}
+                  kind={d.isItemUrl ? "item" : "ad"}
+                  checked={checked}
+                  className="mt-4 w-full py-2.5 rounded-xl border border-green-700 text-green-700 text-sm font-bold"
+                >
+                  See it at {domain}
+                </DealLinkButton>
+              ) : (
+                <p className="mt-4 text-xs text-gray-400">In-store deal, no link needed.</p>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 
@@ -140,6 +236,7 @@ function DealsPageInner() {
   const [buying, setBuying] = useState(false);
   const [linkSent, setLinkSent] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const [preview, setPreview] = useState<OutboundLink | null>(null);
 
   const priceCents = COUPON_BOOK_PRICE_CENTS;
 
@@ -189,7 +286,7 @@ function DealsPageInner() {
     }
   }
 
-  // Logged-in book view: bento grid.
+  // Logged-in book view: Local Member Wallet.
   if (token) {
     if (bookError) {
       return (
@@ -203,86 +300,57 @@ function DealsPageInner() {
     }
     if (!book) return <div className="min-h-screen flex items-center justify-center"><p className="text-gray-500">Opening your book…</p></div>;
 
-    const hasDeals = book.deals && (book.deals.topPicks.length > 0 || book.deals.retailers.length > 0);
+    const retailers = book.deals?.retailers || [];
+    const totalDeals = retailers.reduce((n, r) => n + r.deals.length, 0);
+    const weekLabel = book.deals?.weekLabel || null;
+    const hasDeals = totalDeals > 0;
+
     return (
-      <div className="min-h-screen bg-gradient-to-b from-stone-100 to-gray-200 p-4 pb-10">
-        <div className="max-w-2xl mx-auto">
-          {/* Header */}
-          <div className="bg-stone-200 rounded-3xl p-6 mb-4 text-center shadow-sm">
-            {book.dealsEmailHeaderUrl ? (
-              /* eslint-disable-next-line @next/next/no-img-element */
-              <img src={book.dealsEmailHeaderUrl} alt="The Gist Deals" className="w-full h-auto mb-4 rounded-xl" />
-            ) : book.dealsLogoUrl ? (
-              /* eslint-disable-next-line @next/next/no-img-element */
-              <img src={book.dealsLogoUrl} alt="The Gist Deals" className="mx-auto h-16 w-auto mb-3" />
-            ) : null}
-            <h1 className="text-2xl font-bold text-stone-900">My Gist Deals Book</h1>
-            <p className="text-stone-500 text-sm mt-1">{book.email}</p>
-          </div>
+      <OutboundLinkContext.Provider value={setPreview}>
+        <div className="min-h-screen bg-[#faf8f4] p-4 pb-10">
+          <div className="max-w-2xl mx-auto">
+            {/* Header */}
+            <div className="bg-white rounded-3xl p-6 mb-4 text-center shadow-sm border border-stone-100">
+              {book.dealsEmailHeaderUrl ? (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img src={book.dealsEmailHeaderUrl} alt="The Gist Deals" className="w-full h-auto mb-4 rounded-xl" />
+              ) : book.dealsLogoUrl ? (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img src={book.dealsLogoUrl} alt="The Gist Deals" className="mx-auto h-16 w-auto mb-3" />
+              ) : null}
+              <h1 className="text-2xl font-bold text-stone-900">My Gist Deals Book</h1>
+              <p className="text-stone-500 text-sm mt-1">{book.email}</p>
+            </div>
 
-          {book.deals && <TopPicksMarquee picks={book.deals.topPicks} />}
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* This Week's Deals — one wide box per retailer, all deals nested inside */}
+            {/* Trust bar */}
             {hasDeals && (
-              <div className="sm:col-span-2">
-                <div className="flex items-baseline justify-between mb-3 px-1">
-                  <h2 className="font-bold text-lg">This Week&apos;s Deals</h2>
-                  {book.deals!.weekLabel && (
-                    <p className="text-gray-400 text-xs">{book.deals!.weekLabel}</p>
-                  )}
-                </div>
-                <div className="space-y-4">
-                  {book.deals!.retailers.map((r) => {
-                    const deals = r.deals.filter((d) => !d.isTopPick);
-                    if (!deals.length) return null;
-                    return (
-                      <div key={r.displayName} className="bg-white rounded-3xl border border-gray-100 shadow-sm p-5">
-                        <div className="flex items-center gap-2 mb-3">
-                          {r.logoUrl && (
-                            /* eslint-disable-next-line @next/next/no-img-element */
-                            <img src={r.logoUrl} alt={r.displayName} className="h-8 w-auto object-contain" />
-                          )}
-                          <p className="font-bold">{r.displayName}</p>
-                          <span className="text-xs text-gray-400">{deals.length} deals</span>
-                        </div>
-                        <ul className="space-y-1.5 max-h-[26rem] overflow-y-auto pr-2">
-                          {deals.map((d, i) => (
-                            <li key={i} className="text-[13px] text-gray-700 leading-snug">
-                              {d.businessName && <span className="text-gray-400">{d.businessName}: </span>}
-                              {d.title}
-                              {d.price && <span className="font-bold"> {d.price}</span>}
-                              {d.dealUrl && (
-                                <a href={d.dealUrl} target="_blank" rel="noreferrer" className="text-teal-700 underline ml-1">
-                                  {d.isItemUrl ? "view item →" : "weekly ad →"}
-                                </a>
-                              )}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    );
-                  })}
-                </div>
-                <p className="text-gray-400 text-[11px] mt-3 px-1">
-                  As an Amazon Associate and affiliate partner we may earn from qualifying purchases.
+              <div className="flex items-center gap-2 bg-green-50 border border-green-100 rounded-2xl px-4 py-2.5 mb-6">
+                <span className="text-green-700 font-bold">✓</span>
+                <p className="text-sm text-green-900">
+                  <strong>{totalDeals} deals</strong> hand-checked{weekLabel ? ` for ${weekLabel}` : " this week"}.
                 </p>
               </div>
             )}
 
-            {/* Local coupons — each tile has its own QR */}
-            <div className="sm:col-span-2">
-              <h2 className="font-bold text-lg mb-3 px-1">Local Coupons</h2>
+            {/* This week's best */}
+            {book.deals && (
+              <PicksRow picks={book.deals.topPicks} retailers={retailers} checked={weekLabel} />
+            )}
+
+            {/* Local coupons */}
+            <section className="mb-6">
+              <h2 className="font-bold text-lg text-stone-900 mb-1 px-1">From your neighbors</h2>
+              <p className="text-sm text-gray-500 mb-3 px-1">Coupons from local businesses. Show the QR code at checkout.</p>
               {book.coupons.length === 0 ? (
-                <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-5">
-                  <p className="text-center text-gray-500 text-sm">Coupons are on the way. Check back soon!</p>
+                <div className="bg-white rounded-3xl border border-stone-100 shadow-sm p-5">
+                  <p className="text-center text-gray-500 text-sm">Local coupons are on the way. Check back soon!</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {book.coupons.map((c) => (
-                    <div key={c.id} className={`bg-white rounded-3xl border border-gray-100 shadow-sm p-5 ${c.usedUp ? "opacity-50" : ""}`}>
+                    <div key={c.id} className={`bg-white rounded-3xl border border-stone-100 shadow-sm p-5 ${c.usedUp ? "opacity-50" : ""}`}>
                       <p className="text-[11px] text-gray-400 uppercase tracking-widest">{c.businessName}</p>
-                      <p className="font-bold text-lg leading-tight mt-0.5">{c.title}</p>
+                      <p className="font-bold text-lg leading-tight mt-0.5 text-stone-900">{c.title}</p>
                       {c.description && <p className="text-gray-600 text-sm mt-1">{c.description}</p>}
                       {c.terms && <p className="text-gray-400 text-xs mt-1">{c.terms}</p>}
                       {!c.usedUp && (
@@ -304,34 +372,106 @@ function DealsPageInner() {
                   ))}
                 </div>
               )}
-            </div>
+            </section>
 
-            {/* Gas prices */}
-            <GasBox gas={book.gas} />
-
-            {/* Stack your savings */}
-            {(book.referrals?.rakuten || book.referrals?.ibotta) && (
-              <div className="bg-green-50 border border-green-100 rounded-3xl shadow-sm p-5">
-                <p className="text-xs font-semibold uppercase tracking-widest text-green-700 mb-2">💰 Stack your savings</p>
-                {book.referrals.note && <p className="text-xs text-gray-600 mb-2">{book.referrals.note}</p>}
-                <p className="text-sm">
-                  {book.referrals.rakuten && (
-                    <a href={book.referrals.rakuten} target="_blank" rel="noreferrer" className="text-teal-700 underline font-medium">
-                      Get cash back with Rakuten
-                    </a>
-                  )}
-                  {book.referrals.rakuten && book.referrals.ibotta && <span className="text-gray-400"> · </span>}
-                  {book.referrals.ibotta && (
-                    <a href={book.referrals.ibotta} target="_blank" rel="noreferrer" className="text-teal-700 underline font-medium">
-                      Get the Ibotta app
-                    </a>
-                  )}
+            {/* The full book */}
+            {hasDeals && (
+              <section className="mb-6">
+                <h2 className="font-bold text-lg text-stone-900 mb-1 px-1">The full book</h2>
+                <p className="text-sm text-gray-500 mb-3 px-1">Every deal we found this week, organized by store.</p>
+                <div className="space-y-4">
+                  {retailers.map((r) => {
+                    if (!r.deals.length) return null;
+                    return (
+                      <div key={r.displayName} className="bg-white rounded-3xl border border-stone-100 shadow-sm p-5">
+                        <div className="flex items-center gap-2 mb-1">
+                          {r.logoUrl && (
+                            /* eslint-disable-next-line @next/next/no-img-element */
+                            <img src={r.logoUrl} alt={r.displayName} className="h-8 w-auto object-contain" />
+                          )}
+                          <p className="font-bold text-stone-900">{r.displayName}</p>
+                          <span className="text-xs text-gray-400">{r.deals.length} deals</span>
+                        </div>
+                        {weekLabel && (
+                          <p className="text-[11px] text-gray-400 mb-3 flex items-center gap-1">
+                            <span className="text-green-600 font-bold">✓</span> Checked {weekLabel}
+                          </p>
+                        )}
+                        <ul className="space-y-3 max-h-[26rem] overflow-y-auto pr-2">
+                          {r.deals.map((d, i) => {
+                            const domain = domainOf(d.dealUrl);
+                            return (
+                              <li key={i} className="text-[13px] text-gray-700 leading-snug border-b border-stone-50 pb-3 last:border-0 last:pb-0">
+                                {d.businessName && <span className="text-gray-400">{d.businessName}: </span>}
+                                <span className="font-medium text-stone-900">{d.title}</span>
+                                {d.price && <span className="font-bold text-stone-900"> {d.price}</span>}
+                                {d.dealUrl && domain && (
+                                  <span className="block mt-1">
+                                    <DealLinkButton
+                                      url={d.dealUrl}
+                                      store={r.displayName}
+                                      kind={d.isItemUrl ? "item" : "ad"}
+                                      checked={weekLabel}
+                                      className="text-xs font-semibold text-green-700 bg-green-50 hover:bg-green-100 rounded-full px-3 py-1"
+                                    >
+                                      {d.isItemUrl ? "View item" : "Weekly ad"} · {domain}
+                                    </DealLinkButton>
+                                  </span>
+                                )}
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </div>
+                    );
+                  })}
+                </div>
+                <p className="text-gray-400 text-[11px] mt-3 px-1">
+                  When you shop through some links we may earn a commission. It never changes the price you pay.
                 </p>
-              </div>
+              </section>
             )}
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Gas prices */}
+              <GasBox gas={book.gas} />
+
+              {/* Stack your savings */}
+              {(book.referrals?.rakuten || book.referrals?.ibotta) && (
+                <div className="bg-green-50 border border-green-100 rounded-3xl shadow-sm p-5">
+                  <p className="text-xs font-semibold uppercase tracking-widest text-green-700 mb-2">Stack your savings</p>
+                  {book.referrals.note && <p className="text-xs text-gray-600 mb-2">{book.referrals.note}</p>}
+                  <div className="flex flex-col gap-2">
+                    {book.referrals.rakuten && (
+                      <DealLinkButton
+                        url={book.referrals.rakuten}
+                        store="Rakuten"
+                        kind="referral"
+                        checked={null}
+                        className="text-sm text-green-800 font-semibold bg-white border border-green-200 rounded-xl px-3 py-2 text-left"
+                      >
+                        Get cash back with Rakuten · rakuten.com
+                      </DealLinkButton>
+                    )}
+                    {book.referrals.ibotta && (
+                      <DealLinkButton
+                        url={book.referrals.ibotta}
+                        store="Ibotta"
+                        kind="referral"
+                        checked={null}
+                        className="text-sm text-green-800 font-semibold bg-white border border-green-200 rounded-xl px-3 py-2 text-left"
+                      >
+                        Get the Ibotta app · ibotta.com
+                      </DealLinkButton>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
-      </div>
+        <LinkPreviewSheet link={preview} onClose={() => setPreview(null)} />
+      </OutboundLinkContext.Provider>
     );
   }
 
