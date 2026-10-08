@@ -44,6 +44,7 @@ export default function AdminCouponsPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [compEmail, setCompEmail] = useState("");
+  const [compSessionId, setCompSessionId] = useState("");
   const [comping, setComping] = useState(false);
   const [compMsg, setCompMsg] = useState<string | null>(null);
   interface Purchase { id: string; email: string; createdAt: string; active: boolean; paid: boolean; magicLink: string; }
@@ -122,14 +123,15 @@ export default function AdminCouponsPage() {
       const res = await workspaceFetch("/api/admin/coupons/comped", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: compEmail.trim() }),
+        body: JSON.stringify({ email: compEmail.trim(), stripeSessionId: compSessionId.trim() || undefined }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Could not comp the book.");
       setCompMsg(data.created
-        ? `Book comped for ${data.email}. Magic link emailed.`
+        ? `Book ${compSessionId.trim() ? "recorded as paid" : "comped"} for ${data.email}. Magic link emailed.`
         : `${data.email} already had a book — magic link re-sent.`);
       setCompEmail("");
+      setCompSessionId("");
       load();
     } catch (err) {
       setCompMsg(err instanceof Error ? err.message : "Could not comp the book.");
@@ -210,9 +212,12 @@ export default function AdminCouponsPage() {
       <div className="bg-white rounded-xl shadow p-6 mb-8">
         <h2 className="font-bold mb-1">Comp a book</h2>
         <p className="text-xs text-gray-500 mb-3">Add someone free of charge — no Stripe. They get full lifetime access and their magic link by email.</p>
-        <form onSubmit={compBook} className="flex gap-2">
-          <input type="email" value={compEmail} onChange={(e) => setCompEmail(e.target.value)} placeholder="you@example.com" className="flex-1 border rounded-lg px-3 py-2" />
-          <button disabled={comping} className="px-4 py-2 bg-gray-700 text-white rounded-lg text-sm whitespace-nowrap disabled:opacity-50">{comping ? "Adding…" : "Comp book"}</button>
+        <form onSubmit={compBook} className="flex flex-col gap-2">
+          <div className="flex gap-2">
+            <input type="email" value={compEmail} onChange={(e) => setCompEmail(e.target.value)} placeholder="you@example.com" className="flex-1 border rounded-lg px-3 py-2" />
+            <button disabled={comping} className="px-4 py-2 bg-gray-700 text-white rounded-lg text-sm whitespace-nowrap disabled:opacity-50">{comping ? "Adding…" : "Comp book"}</button>
+          </div>
+          <input type="text" value={compSessionId} onChange={(e) => setCompSessionId(e.target.value)} placeholder="Stripe session ID (optional — for paid purchases the webhook missed)" className="border rounded-lg px-3 py-2 text-sm text-gray-500" />
         </form>
         {compMsg && <p className="text-xs text-gray-600 mt-2">{compMsg}</p>}
       </div>
