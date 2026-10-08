@@ -9,12 +9,17 @@ export const dynamic = "force-dynamic";
 // Comp a Gist Deals Book: add a buyer free of charge (no Stripe). Creates an active
 // lifetime purchase and emails them their magic link. Idempotent per email:
 // if they already have an active book, we just resend the link.
+// Also used to manually record a paid purchase whose Stripe webhook never
+// arrived: pass stripeSessionId and the buyer shows as paid, not comped.
 export async function POST(req: NextRequest) {
   const session = await getAdminSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const workspace = await getWorkspace();
-  const { email } = (await req.json().catch(() => ({}))) as { email?: string };
+  const { email, stripeSessionId } = (await req.json().catch(() => ({}))) as {
+    email?: string;
+    stripeSessionId?: string;
+  };
   const normalized = email?.trim().toLowerCase();
   if (!normalized || !normalized.includes("@")) {
     return NextResponse.json({ error: "A valid email address is required." }, { status: 400 });
@@ -30,11 +35,18 @@ export async function POST(req: NextRequest) {
       data: {
         workspaceId: workspace.id,
         email: normalized,
+        stripeSessionId: stripeSessionId?.trim() || undefined,
         active: true,
         isLifetime: true,
       },
     });
     created = true;
+  } else if (stripeSessionId?.trim() && !purchase.stripeSessionId) {
+    // Backfill the Stripe session on an existing record (missed webhook).
+    purchase = await basePrisma.couponBookPurchase.update({
+      where: { id: purchase.id },
+      data: { stripeSessionId: stripeSessionId.trim() },
+    });
   }
 
   try {
