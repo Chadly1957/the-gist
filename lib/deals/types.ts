@@ -33,6 +33,8 @@ export interface StoreConfig {
   merchant?: string;
   /** Kroger: location id from the official API. */
   locationId?: string;
+  /** Kirby Foods: weekly ad page URL (image URLs extracted weekly). */
+  adPageUrl?: string;
 }
 
 export interface FetchResult {

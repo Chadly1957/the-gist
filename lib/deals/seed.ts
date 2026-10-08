@@ -2,6 +2,7 @@
 // Run once per workspace from the admin deals page ("Seed retailers").
 
 import { basePrisma } from "@/lib/db-base";
+import { KIRBY_DEALS, KIRBY_WEEK_START, KIRBY_WEEK_END } from "./kirby-week-2026-10-07";
 import { PipelineType, StoreConfig } from "./types";
 
 interface RetailerSeed {
@@ -11,6 +12,8 @@ interface RetailerSeed {
   storeConfig: StoreConfig;
   logoUrl?: string;
   notes?: string;
+  // If set, only seed in these workspace slugs (e.g. local chains).
+  onlyWorkspaces?: string[];
 }
 
 // Brand logos (Wikimedia Commons, verified hotlinkable SVGs).
@@ -58,6 +61,44 @@ const PER_MARKET: Record<string, { zip: string; targetStoreId: string; aldiStore
   effingham: { zip: "62401", targetStoreId: "1951", aldiStoreCode: "441-071" },
 };
 
+// One-time v1: load the vision-extracted Kirby Foods IGA week (2026-10-07)
+// as a draft DealWeek for review/publish. Idempotent per weekStart.
+export async function seedKirbyWeek(workspaceId: string): Promise<{ created: boolean }> {
+  const retailer = await basePrisma.retailer.findUnique({
+    where: { workspaceId_slug: { workspaceId, slug: "kirby-foods" } },
+  });
+  if (!retailer) return { created: false };
+  const existing = await basePrisma.dealWeek.findFirst({
+    where: { workspaceId, retailerId: retailer.id, weekStart: KIRBY_WEEK_START },
+  });
+  if (existing) return { created: false };
+  const week = await basePrisma.dealWeek.create({
+    data: {
+      workspaceId,
+      retailerId: retailer.id,
+      weekStart: KIRBY_WEEK_START,
+      weekEnd: KIRBY_WEEK_END,
+      sourceUrl: "https://www.kirbyfoods.com/weekly-ads/6/Kirby Foods Effingham",
+      status: "draft",
+    },
+  });
+  await basePrisma.deal.createMany({
+    data: KIRBY_DEALS.map((d, i) => ({
+      workspaceId,
+      dealWeekId: week.id,
+      title: d.title,
+      price: d.price,
+      category: d.category,
+      summary: [d.size ? `${d.size}` : "", d.summary || ""].filter(Boolean).join(" ").trim(),
+      dealUrl: "https://www.kirbyfoods.com/weekly-ads/6/Kirby Foods Effingham",
+      validFrom: KIRBY_WEEK_START,
+      validTo: KIRBY_WEEK_END,
+      sortOrder: i,
+    })),
+  });
+  return { created: true };
+}
+
 export async function seedRetailers(workspaceId: string): Promise<{ created: number; kept: number }> {
   // PER_MARKET is keyed by workspace slug ("decatur"/"effingham"), not the
   // database ID (Decatur's ID happens to be "decatur"; other workspaces use cuids).
@@ -98,12 +139,22 @@ export async function seedRetailers(workspaceId: string): Promise<{ created: num
       logoUrl: LOGOS["kroger"],
       notes: "Needs free API key at developer.kroger.com (KROGER_CLIENT_ID/SECRET).",
     },
+    {
+      slug: "kirby-foods",
+      displayName: "Kirby Foods IGA",
+      pipeline: "manual",
+      storeConfig: { adPageUrl: "https://www.kirbyfoods.com/weekly-ads/6/Kirby Foods Effingham" },
+      notes: "Local IGA chain (Effingham store). Weekly ad is S3 images; deals vision-extracted weekly.",
+      onlyWorkspaces: ["effingham"],
+    },
     ...COMMON_MANUAL,
   ];
 
+  const slug = ws?.slug || workspaceId;
   let created = 0;
   let kept = 0;
   for (const s of seeds) {
+    if (s.onlyWorkspaces && !s.onlyWorkspaces.includes(slug)) continue;
     const existing = await basePrisma.retailer.findUnique({
       where: { workspaceId_slug: { workspaceId, slug: s.slug } },
     });
@@ -147,5 +198,6 @@ export async function seedRetailers(workspaceId: string): Promise<{ created: num
     });
     created++;
   }
+  if (slug === "effingham") await seedKirbyWeek(workspaceId);
   return { created, kept };
 }
