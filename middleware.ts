@@ -26,7 +26,8 @@ export async function middleware(req: NextRequest) {
     // Only bypass the session check when the matching secret is configured.
     const secretIngest =
       (pathname === "/api/admin/deals/gas-prices" && process.env.GAS_INGEST_SECRET) ||
-      (pathname === "/api/admin/deals/kirby-week" && process.env.KIRBY_INGEST_SECRET);
+      (pathname === "/api/admin/deals/kirby-week" && process.env.KIRBY_INGEST_SECRET) ||
+      (pathname === "/api/admin/deals/weekly-run" && process.env.WEEKLY_RUN_SECRET);
     if (!valid && !cron && !secretIngest) {
       if (pathname.startsWith("/api/")) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
       const login = new URL(`${scoped?.prefix || ""}/admin/login`, req.url);
