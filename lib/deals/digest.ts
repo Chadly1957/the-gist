@@ -203,9 +203,16 @@ export interface DigestSendResult {
   skipped: string;
 }
 
+// Never send two digests for the same workspace inside this window unless
+// explicitly forced. The Friday cron runs weekly; the window only guards
+// against accidental double-triggers (double POST, endpoint + admin button
+// overlapping). A failed send writes no DealDigestSend row, so genuine
+// retries after failures are unaffected by the guard.
+const DIGEST_IDEMPOTENCY_HOURS = 24;
+
 export async function sendWeeklyDigest(
   workspaceId: string,
-  opts?: { testEmail?: string }
+  opts?: { testEmail?: string; force?: boolean }
 ): Promise<DigestSendResult> {
   const data = await getPublishedDigestData(workspaceId);
   if (!data.retailers.length) {
@@ -234,11 +241,39 @@ export async function sendWeeklyDigest(
     });
   }
 
+  // Idempotency guard: skip when this workspace already got a digest inside
+  // the window (unless forced). Test sends above return before this point,
+  // so they are never blocked and never count as a real send.
+  if (!opts?.force) {
+    const cutoff = new Date(Date.now() - DIGEST_IDEMPOTENCY_HOURS * 3600 * 1000);
+    const recent = await basePrisma.dealDigestSend.findFirst({
+      where: { workspaceId, sentAt: { gte: cutoff } },
+      orderBy: { sentAt: "desc" },
+      select: { sentAt: true, recipientCount: true },
+    });
+    if (recent) {
+      return {
+        sent: 0,
+        failed: 0,
+        skipped: `Digest already sent at ${recent.sentAt.toISOString()} (${recent.recipientCount} recipients).`,
+      };
+    }
+  }
+
   const buyers = await basePrisma.couponBookPurchase.findMany({
     where: { workspaceId, active: true, digestOptOut: false },
     select: { email: true, magicToken: true },
   });
-  if (!buyers.length) {
+  // One email per buyer even if duplicate purchase rows ever exist for the
+  // same address (e.g. a webhook replay after a manual comp).
+  const seen = new Set<string>();
+  const uniqueBuyers = buyers.filter((b) => {
+    const key = b.email.trim().toLowerCase();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  if (!uniqueBuyers.length) {
     return { sent: 0, failed: 0, skipped: "No buyers on the list yet." };
   }
 
@@ -254,7 +289,7 @@ export async function sendWeeklyDigest(
 
       const subject = `Your Gist Deals Book: fresh deals for ${data.weekLabel.replace("Week of ", "")}`;
       const emails = await Promise.all(
-        buyers.map(async (b) => {
+        uniqueBuyers.map(async (b) => {
           const bookUrl = `${workspaceUrl}/deals?token=${b.magicToken}`;
           const optOutUrl = `${workspaceUrl}/deals/digest-optout?token=${b.magicToken}`;
           const html = await renderDigestHtml(workspaceId, data, bookUrl, optOutUrl);
