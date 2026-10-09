@@ -21,7 +21,13 @@ export async function middleware(req: NextRequest) {
     // Preserve authenticated scheduled daily digest requests.
     const cron = pathname === "/api/admin/daily-digest" && process.env.CRON_SECRET &&
       (req.headers.get("authorization") === `Bearer ${process.env.CRON_SECRET}` || req.nextUrl.searchParams.get("secret") === process.env.CRON_SECRET);
-    if (!valid && !cron) {
+    // Secret-authenticated ingest endpoints. The cron agents can't hold an admin
+    // session, so these validate a bearer secret in the route handler instead.
+    // Only bypass the session check when the matching secret is configured.
+    const secretIngest =
+      (pathname === "/api/admin/deals/gas-prices" && process.env.GAS_INGEST_SECRET) ||
+      (pathname === "/api/admin/deals/kirby-week" && process.env.KIRBY_INGEST_SECRET);
+    if (!valid && !cron && !secretIngest) {
       if (pathname.startsWith("/api/")) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
       const login = new URL(`${scoped?.prefix || ""}/admin/login`, req.url);
       login.searchParams.set("from", req.nextUrl.pathname);
