@@ -25,6 +25,33 @@ interface Redemption {
   purchase: { email: string };
 }
 
+interface SponsorCoupon {
+  id: string;
+  businessName: string;
+  title: string;
+  description: string;
+  refreshInterval: string | null;
+  maxRedemptions: number | null;
+  active: boolean;
+  createdAt: string;
+  sponsor: { businessName: string } | null;
+}
+
+interface SponsorDeal {
+  id: string;
+  title: string;
+  price: string | null;
+  summary: string;
+  expiresAt: string | null;
+  isTopPick: boolean;
+  dealWeek: {
+    weekStart: string;
+    weekEnd: string;
+    status: string;
+    retailer: { displayName: string };
+  };
+}
+
 const emptyForm = {
   businessName: "",
   title: "",
@@ -38,6 +65,8 @@ const emptyForm = {
 export default function AdminCouponsPage() {
   const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [redemptions, setRedemptions] = useState<Redemption[]>([]);
+  const [sponsorCoupons, setSponsorCoupons] = useState<SponsorCoupon[]>([]);
+  const [sponsorDeals, setSponsorDeals] = useState<SponsorDeal[]>([]);
   const [purchaseCount, setPurchaseCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState(emptyForm);
@@ -56,14 +85,23 @@ export default function AdminCouponsPage() {
 
   async function load() {
     setLoading(true);
-    const [cRes, rRes] = await Promise.all([workspaceFetch("/api/admin/coupons"), workspaceFetch("/api/admin/coupons/redemptions")]);
+    const [cRes, rRes, sRes] = await Promise.all([
+      workspaceFetch("/api/admin/coupons"),
+      workspaceFetch("/api/admin/coupons/redemptions"),
+      workspaceFetch("/api/admin/coupons/sponsor-submissions"),
+    ]);
     const cData = await cRes.json();
     const rData = await rRes.json();
+    const sData = await sRes.json().catch(() => ({}));
     if (cRes.ok) {
       setCoupons(cData.coupons);
       setPurchaseCount(cData.purchaseCount);
     }
     if (rRes.ok) setRedemptions(rData.redemptions);
+    if (sRes.ok) {
+      setSponsorCoupons(sData.coupons || []);
+      setSponsorDeals(sData.deals || []);
+    }
     setLoading(false);
   }
 
@@ -344,6 +382,59 @@ export default function AdminCouponsPage() {
           ))}
           {coupons.length === 0 && <p className="text-gray-500 text-sm">No coupons yet.</p>}
         </div>
+      </div>
+
+      <div className="bg-white rounded-xl shadow p-6 mb-8">
+        <h2 className="font-bold mb-1">Sponsor portal submissions</h2>
+        <p className="text-xs text-gray-500 mb-5">Coupons and deals sponsors created themselves in their sponsor portals.</p>
+
+        <h3 className="text-sm font-semibold mb-2">Coupons ({sponsorCoupons.length})</h3>
+        {sponsorCoupons.length === 0 ? (
+          <p className="text-gray-500 text-sm mb-6">No sponsor-submitted coupons yet.</p>
+        ) : (
+          <div className="space-y-3 mb-6">
+            {sponsorCoupons.map((c) => (
+              <div key={c.id} className={`border rounded-lg p-4 ${c.active ? "" : "opacity-50"}`}>
+                <p className="text-xs text-gray-500 uppercase">{c.sponsor?.businessName || c.businessName}</p>
+                <p className="font-bold">
+                  {c.title}{" "}
+                  <span className="font-normal text-gray-500 text-sm">
+                    ({c.refreshInterval ? `refreshes ${c.refreshInterval}` : c.maxRedemptions === 1 ? "one-time" : "reusable"})
+                  </span>
+                </p>
+                {c.description && <p className="text-xs text-gray-500 mt-1 line-clamp-2">{c.description}</p>}
+                <p className="text-xs text-gray-400 mt-1">
+                  Added {new Date(c.createdAt).toLocaleDateString()} · {c.active ? "active" : "inactive"}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <h3 className="text-sm font-semibold mb-2">Deals ({sponsorDeals.length})</h3>
+        {sponsorDeals.length === 0 ? (
+          <p className="text-gray-500 text-sm">No sponsor-submitted deals yet.</p>
+        ) : (
+          <div className="space-y-3">
+            {sponsorDeals.map((d) => {
+              const expired = d.expiresAt ? new Date(d.expiresAt) < new Date() : false;
+              return (
+                <div key={d.id} className={`border rounded-lg p-4 ${expired ? "opacity-50" : ""}`}>
+                  <p className="text-xs text-gray-500 uppercase">{d.dealWeek.retailer.displayName}</p>
+                  <p className="font-bold">
+                    {d.title}{" "}
+                    {d.price && <span className="font-normal text-green-700 text-sm">{d.price}</span>}{" "}
+                    {d.isTopPick && <span className="text-xs bg-yellow-100 text-yellow-800 px-1.5 py-0.5 rounded font-medium">Top pick</span>}
+                  </p>
+                  {d.summary && <p className="text-xs text-gray-500 mt-1 line-clamp-2">{d.summary}</p>}
+                  <p className="text-xs text-gray-400 mt-1">
+                    Week of {d.dealWeek.weekStart} · {d.expiresAt ? (expired ? `expired ${new Date(d.expiresAt).toLocaleDateString()}` : `expires ${new Date(d.expiresAt).toLocaleDateString()}`) : "no expiry"}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       <div className="bg-white rounded-xl shadow p-6">
