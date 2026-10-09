@@ -34,6 +34,7 @@ export async function GET(req: NextRequest) {
       terms: true,
       maxRedemptions: true,
       refreshInterval: true,
+      onlineRedemption: true,
     },
   });
 
@@ -70,7 +71,8 @@ export async function GET(req: NextRequest) {
       ...c,
       redemptionsByMe: usedCounts[c.id] ?? 0,
       usedUp,
-      // Unique QR per coupon: the cashier scans it, adds notes, and confirms.
+      // Unique QR per coupon: scanned in store, or the link shared for email/online booking.
+      redeemUrl: `${appUrl}/r/${purchase.buyerToken}/${c.id}`,
       qrDataUrl: await QRCode.toDataURL(`${appUrl}/r/${purchase.buyerToken}/${c.id}`, {
         width: 360,
         margin: 1,

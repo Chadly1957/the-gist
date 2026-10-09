@@ -16,7 +16,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   });
   if (!existing) return NextResponse.json({ error: "Coupon not found." }, { status: 404 });
 
-  const { businessName, title, description, terms, maxRedemptions, refreshInterval, contactEmail, sortOrder, active } =
+  const { businessName, title, description, terms, maxRedemptions, refreshInterval, contactEmail, sortOrder, active, onlineRedemption } =
     await req.json();
 
   const data: Record<string, unknown> = {};
@@ -29,6 +29,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     if (isRefreshInterval(refreshInterval)) data.maxRedemptions = null;
   } else if (maxRedemptions !== undefined) data.maxRedemptions = maxRedemptions === 1 ? 1 : null;
   if (contactEmail !== undefined) data.contactEmail = contactEmail?.trim().toLowerCase() || null;
+  if (onlineRedemption !== undefined) data.onlineRedemption = onlineRedemption === true;
   if (sortOrder !== undefined && Number.isFinite(Number(sortOrder))) data.sortOrder = Number(sortOrder);
   if (active !== undefined) data.active = !!active;
 

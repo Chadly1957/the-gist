@@ -16,6 +16,35 @@ interface BookCoupon {
   redemptionsByMe: number;
   usedUp: boolean;
   qrDataUrl: string;
+  redeemUrl: string;
+  onlineRedemption: boolean;
+}
+
+function CopyLinkButton({ url }: { url: string }) {
+  const [copied, setCopied] = useState(false);
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(url);
+    } catch {
+      const ta = document.createElement("textarea");
+      ta.value = url;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta);
+    }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+  return (
+    <button
+      type="button"
+      onClick={copy}
+      className="mt-1.5 text-xs font-semibold text-green-800 bg-green-50 border border-green-200 rounded-lg px-2.5 py-1.5"
+    >
+      {copied ? "Copied!" : "Copy booking link"}
+    </button>
+  );
 }
 
 function couponCadenceLabel(c: BookCoupon): { text: string; used: boolean } {
@@ -436,7 +465,14 @@ function DealsPageInner() {
                         <div className="mt-3 flex items-center gap-3">
                           {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img src={c.qrDataUrl} alt={`QR code for ${c.title}`} className="w-20 h-20 rounded-lg" />
-                          <p className="text-xs text-gray-500">Show at {c.businessName} to redeem</p>
+                          <div className="min-w-0">
+                            <p className="text-xs text-gray-500">
+                              {c.onlineRedemption
+                                ? `Paste this link in your booking email to ${c.businessName}`
+                                : `Show at ${c.businessName} to redeem`}
+                            </p>
+                            <CopyLinkButton url={c.redeemUrl} />
+                          </div>
                         </div>
                       )}
                       {(() => {

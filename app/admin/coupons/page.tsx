@@ -14,6 +14,7 @@ interface Coupon {
   active: boolean;
   sortOrder: number;
   contactEmail: string | null;
+  onlineRedemption: boolean;
   createdAt: string;
   _count: { redemptions: number };
 }
@@ -60,6 +61,7 @@ const emptyForm = {
   refreshInterval: "weekly" as "daily" | "weekly" | "monthly",
   contactEmail: "",
   sortOrder: "0",
+  onlineRedemption: false,
 };
 
 export default function AdminCouponsPage() {
@@ -193,6 +195,7 @@ export default function AdminCouponsPage() {
       refreshInterval: form.refreshInterval,
       contactEmail: form.contactEmail,
       sortOrder: Number(form.sortOrder) || 0,
+      onlineRedemption: form.onlineRedemption,
     };
     const res = await workspaceFetch(editingId ? `/api/admin/coupons/${editingId}` : "/api/admin/coupons", {
       method: editingId ? "PATCH" : "POST",
@@ -219,6 +222,7 @@ export default function AdminCouponsPage() {
       refreshInterval: (c.refreshInterval === "daily" || c.refreshInterval === "monthly" ? c.refreshInterval : "weekly") as "daily" | "weekly" | "monthly",
       contactEmail: c.contactEmail || "",
       sortOrder: String(c.sortOrder),
+      onlineRedemption: c.onlineRedemption || false,
     });
     window.scrollTo({ top: 0 });
   }
@@ -335,6 +339,12 @@ export default function AdminCouponsPage() {
             <label className="block text-sm font-semibold mb-1">Sort order</label>
             <input type="number" value={form.sortOrder} onChange={(e) => set("sortOrder", e.target.value)} className="w-full border rounded-lg px-3 py-2" />
           </div>
+          <div className="md:col-span-2">
+            <label className="flex items-start gap-2 text-sm cursor-pointer">
+              <input type="checkbox" checked={form.onlineRedemption} onChange={(e) => set("onlineRedemption", e.target.checked)} className="mt-1" />
+              <span><span className="font-semibold">Online / email redemption.</span> <span className="text-gray-500">Buyer copies a booking link instead of showing a QR in store (for businesses with no physical location).</span></span>
+            </label>
+          </div>
           <div className="md:col-span-2 flex items-center gap-6 flex-wrap">
             <div className="flex items-center gap-2 text-sm">
               <span className="font-semibold">Refreshes:</span>
@@ -370,7 +380,7 @@ export default function AdminCouponsPage() {
             <div key={c.id} className={`border rounded-lg p-4 flex items-start justify-between gap-4 ${c.active ? "" : "opacity-50"}`}>
               <div>
                 <p className="text-xs text-gray-500 uppercase">{c.businessName}</p>
-                <p className="font-bold">{c.title} <span className="font-normal text-gray-500 text-sm">({c.refreshInterval ? `refreshes ${c.refreshInterval}` : c.maxRedemptions === 1 ? "one-time" : "reusable"})</span></p>
+                <p className="font-bold">{c.title} <span className="font-normal text-gray-500 text-sm">({c.refreshInterval ? `refreshes ${c.refreshInterval}` : c.maxRedemptions === 1 ? "one-time" : "reusable"}{c.onlineRedemption ? ", online" : ""})</span></p>
                 <p className="text-xs text-gray-500 mt-1">{c._count.redemptions} redemptions</p>
               </div>
               <div className="flex gap-2 shrink-0">

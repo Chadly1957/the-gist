@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const workspace = await getWorkspace();
-  const { businessName, title, description, terms, maxRedemptions, refreshInterval, contactEmail, sortOrder, active } =
+  const { businessName, title, description, terms, maxRedemptions, refreshInterval, contactEmail, sortOrder, active, onlineRedemption } =
     await req.json();
   if (!businessName?.trim() || !title?.trim()) {
     return NextResponse.json({ error: "Business name and title are required." }, { status: 400 });
@@ -43,6 +43,7 @@ export async function POST(req: NextRequest) {
       maxRedemptions: isRefreshInterval(refreshInterval) ? null : maxRedemptions === 1 ? 1 : null,
       refreshInterval: isRefreshInterval(refreshInterval) ? refreshInterval : null,
       contactEmail: contactEmail?.trim().toLowerCase() || null,
+      onlineRedemption: onlineRedemption === true,
       sortOrder: Number.isFinite(Number(sortOrder)) ? Number(sortOrder) : 0,
       active: active !== false,
     },
