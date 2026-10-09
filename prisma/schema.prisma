@@ -654,6 +654,8 @@ model Coupon {
   active         Boolean            @default(true)
   sortOrder      Int                @default(0)
   contactEmail   String?
+  // True = redeemed online/via email (buyer shares the link); false = in-store QR scan.
+  onlineRedemption Boolean @default(false)
   createdAt      DateTime           @default(now())
   redemptions    CouponRedemption[]
   // Self-serve portal submission: null = created by admin in the coupon book flow.
