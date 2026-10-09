@@ -10,6 +10,7 @@ export const maxDuration = 300;
 // One-call Friday morning run: refresh all automated retailers, publish the
 // fresh draft weeks, then send the weekly digest to opted-in buyers.
 // Secured by bearer secret (WEEKLY_RUN_SECRET): the scheduled agent can't
+// (rebuild to pick up env var)
 // hold an admin session. Body: { secret*, workspaceSlug*: "decatur" | "effingham" }
 export async function POST(req: NextRequest) {
   const configured = process.env.WEEKLY_RUN_SECRET;
