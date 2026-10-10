@@ -42,6 +42,7 @@ export async function POST(req: NextRequest) {
 
   const workspace = await getWorkspace();
   let testEmail: string | undefined;
+  let force = false;
   try {
     const body = await req.json();
     if (body?.testEmail) {
@@ -51,11 +52,16 @@ export async function POST(req: NextRequest) {
       }
       testEmail = v;
     }
+    // Bypass the 24h double-send guard for an intentional resend.
+    if (body?.force === true) force = true;
   } catch {
     // No JSON body: full buyer send.
   }
   try {
-    const result = await sendWeeklyDigest(workspace.id, testEmail ? { testEmail } : undefined);
+    const result = await sendWeeklyDigest(
+      workspace.id,
+      testEmail ? { testEmail } : force ? { force: true } : undefined
+    );
     return NextResponse.json(result);
   } catch (err) {
     return NextResponse.json(
