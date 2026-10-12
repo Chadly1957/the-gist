@@ -2,6 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { workspaceFetch } from "@/lib/workspace-client";
+import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
+import WsBadge from "@/app/admin/components/WsBadge";
+import AllDealsBrowser from "./AllDealsBrowser";
 
 interface Retailer {
   id: string;
@@ -62,6 +65,9 @@ const emptyManual = {
 };
 
 export default function AdminDealsPage() {
+  const { workspace: activeWorkspace } = useWorkspace();
+  const [workspaces, setWorkspaces] = useState<Array<{ id: string; slug: string; name: string; primaryColor: string }>>([]);
+  const [allMode, setAllMode] = useState(false);
   const [retailers, setRetailers] = useState<Retailer[]>([]);
   const [weeks, setWeeks] = useState<DealWeek[]>([]);
   const [review, setReview] = useState<WeekDetail | null>(null);
@@ -79,18 +85,20 @@ export default function AdminDealsPage() {
 
   async function load() {
     setLoading(true);
-    const [rRes, wRes, refRes, dRes, bRes] = await Promise.all([
+    const [rRes, wRes, refRes, dRes, bRes, wsRes] = await Promise.all([
       workspaceFetch("/api/admin/deals/retailers"),
       workspaceFetch("/api/admin/deals/weeks"),
       workspaceFetch("/api/admin/deals/referrals"),
       workspaceFetch("/api/admin/deals/send-digest"),
       workspaceFetch("/api/admin/deals/businesses"),
+      workspaceFetch("/api/admin/workspaces"),
     ]);
     if (rRes.ok) setRetailers((await rRes.json()).retailers);
     if (bRes.ok) setBusinesses((await bRes.json()).businesses);
     if (wRes.ok) setWeeks((await wRes.json()).weeks);
     if (refRes.ok) setReferrals((await refRes.json()).referrals);
     if (dRes.ok) setDigest(await dRes.json());
+    if (wsRes.ok) setWorkspaces((await wsRes.json()).workspaces || []);
     setLoading(false);
   }
 
@@ -237,21 +245,71 @@ export default function AdminDealsPage() {
 
   if (loading) return <div className="p-8"><p className="text-gray-500">Loading deals…</p></div>;
 
+  const tabCls = (active: boolean) =>
+    `px-4 py-2 text-sm font-semibold rounded-full border transition-colors ${
+      active ? "bg-gray-900 text-white border-gray-900" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
+    }`;
+
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-8">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">The Gist Deals</h1>
-        <div className="space-x-2">
-          <button onClick={seed} className="px-3 py-2 text-sm border rounded-lg hover:bg-gray-50">Seed retailers</button>
+      {/* Workspace tabs — impossible to miss which workspace you're managing */}
+      <div className="flex flex-wrap items-center gap-2">
+        {workspaces.map((w) => (
           <button
-            onClick={() => refresh()}
-            disabled={refreshing !== null}
-            className="px-3 py-2 text-sm bg-green-700 text-white rounded-lg disabled:opacity-50"
+            key={w.slug}
+            onClick={() => {
+              if (w.slug !== activeWorkspace.slug) window.location.assign(`/w/${w.slug}/admin/deals`);
+              else setAllMode(false);
+            }}
+            className={tabCls(!allMode && w.slug === activeWorkspace.slug)}
           >
-            {refreshing === "all" ? "Refreshing…" : "Refresh all (fetch weekly ads)"}
+            {w.name}
           </button>
-        </div>
+        ))}
+        <button onClick={() => setAllMode(true)} className={tabCls(allMode)}>
+          All deals
+        </button>
       </div>
+
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <h1 className="text-2xl font-bold">The Gist Deals</h1>
+          <WsBadge
+            name={allMode ? "All workspaces" : activeWorkspace.name}
+            color={allMode ? "#111827" : activeWorkspace.primaryColor}
+            size="md"
+          />
+        </div>
+        {!allMode && (
+          <div className="space-x-2">
+            <button onClick={seed} className="px-3 py-2 text-sm border rounded-lg hover:bg-gray-50">Seed retailers</button>
+            <button
+              onClick={() => refresh()}
+              disabled={refreshing !== null}
+              className="px-3 py-2 text-sm bg-green-700 text-white rounded-lg disabled:opacity-50"
+            >
+              {refreshing === "all" ? "Refreshing…" : "Refresh all (fetch weekly ads)"}
+            </button>
+          </div>
+        )}
+      </div>
+
+      <div className="flex items-center gap-3 bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 text-sm text-blue-900">
+        <WsBadge
+          name={allMode ? "All workspaces" : activeWorkspace.name}
+          color={allMode ? "#111827" : activeWorkspace.primaryColor}
+        />
+        <span>
+          {allMode
+            ? "Browsing deals across every workspace. Switch to a workspace tab to manage retailers, publish weeks, or send the digest."
+            : `Everything below belongs to the ${activeWorkspace.name} workspace — retailers, weeks, manual deals, and the digest all act on it. Switch tabs to change workspace.`}
+        </span>
+      </div>
+
+      {allMode ? (
+        <AllDealsBrowser />
+      ) : (
+        <>
 
       {outcomes.length > 0 && (
         <div className="bg-white border rounded-xl p-4">
@@ -355,6 +413,7 @@ export default function AdminDealsPage() {
                 <p className="text-xs text-gray-500">{w._count.deals} deals</p>
               </div>
               <div className="flex items-center gap-2">
+                <WsBadge name={activeWorkspace.name} color={activeWorkspace.primaryColor} />
                 <span className={`text-xs px-2 py-0.5 rounded-full ${w.status === "published" ? "bg-green-100 text-green-800" : "bg-yellow-100 text-yellow-800"}`}>
                   {w.status}
                 </span>
@@ -413,6 +472,7 @@ export default function AdminDealsPage() {
         <h2 className="text-lg font-bold mb-2">Add a deal by hand</h2>
         <p className="text-xs text-gray-500 mb-3">
           Any business you find, whenever you find it — no weekly obligation. Goes live in the book immediately.
+          This deal will be added to the <strong>{activeWorkspace.name}</strong> book.
         </p>
         <form onSubmit={submitManual} className="bg-white border rounded-xl p-4 grid grid-cols-2 gap-3">
           <label className="text-sm">Bucket
@@ -510,7 +570,10 @@ export default function AdminDealsPage() {
 
       {/* Digest */}
       <section>
-        <h2 className="text-lg font-bold mb-2">Weekly buyer digest</h2>
+        <h2 className="text-lg font-bold mb-2 flex items-center gap-2">
+          Weekly buyer digest
+          <WsBadge name={activeWorkspace.name} color={activeWorkspace.primaryColor} />
+        </h2>
         <div className="bg-white border rounded-xl p-4">
           {digest ? (
             <>
@@ -550,6 +613,8 @@ export default function AdminDealsPage() {
           )}
         </div>
       </section>
+        </>
+      )}
     </div>
   );
 }

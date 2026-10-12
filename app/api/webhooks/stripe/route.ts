@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { basePrisma } from "@/lib/db-base";
-import { DEFAULT_WORKSPACE_ID } from "@/lib/workspace-constants";
 import { withWorkspace } from "@/lib/workspace";
 import Stripe from "stripe";
 import { alertBookingFailureOnce } from "@/lib/sponsor-booking-alerts";
@@ -81,7 +80,16 @@ export async function POST(req: NextRequest) {
 
   const session = event.data.object as Stripe.Checkout.Session;
   const sessionId = session.id;
-  const workspaceId = session.metadata?.workspaceId || DEFAULT_WORKSPACE_ID;
+  const workspaceId = session.metadata?.workspaceId;
+  if (!workspaceId) {
+    // Fail closed: never silently attribute a purchase (and its magic-link
+    // book email) to the default workspace when the checkout metadata is
+    // missing. Every checkout session must carry metadata.workspaceId.
+    console.error(
+      `Stripe webhook: missing metadata.workspaceId on session ${sessionId} (${event.type}); skipping fulfillment.`
+    );
+    return NextResponse.json({ ok: true, skipped: "missing workspace metadata" });
+  }
 
   if (event.type === "checkout.session.completed") {
     const approvedAt = new Date();
