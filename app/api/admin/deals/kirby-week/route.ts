@@ -3,10 +3,12 @@ import { basePrisma } from "@/lib/db-base";
 
 export const dynamic = "force-dynamic";
 
-// Ingest a vision-extracted Kirby Foods IGA week as a DRAFT DealWeek.
+// Ingest a vision-extracted Kirby Foods IGA week as a PUBLISHED DealWeek.
 // Secured by bearer secret (KIRBY_INGEST_SECRET): the weekly cron agent can't
 // hold an admin session, so it authenticates with this shared secret instead.
-// Draft-only — Chad reviews and publishes from the deals admin.
+// Full automation (Chad's call, 2026-10-12): extracted weeks go straight live,
+// no draft review. Scoped to the Effingham workspace + the kirby-foods
+// retailer (Effingham IGA ad URL); no cross-workspace writes possible.
 // Body: { secret, weekStart*, weekEnd*, deals*: [{title*, price?, size?, summary?, category?}] }
 export async function POST(req: NextRequest) {
   const configured = process.env.KIRBY_INGEST_SECRET;
@@ -62,7 +64,8 @@ export async function POST(req: NextRequest) {
       weekStart: body.weekStart,
       weekEnd: body.weekEnd,
       sourceUrl: adUrl,
-      status: "draft",
+      status: "published",
+      publishedAt: new Date(),
     },
   });
   await basePrisma.deal.createMany({

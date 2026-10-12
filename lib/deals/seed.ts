@@ -62,7 +62,8 @@ const PER_MARKET: Record<string, { zip: string; targetStoreId: string; aldiStore
 };
 
 // One-time v1: load the vision-extracted Kirby Foods IGA week (2026-10-07)
-// as a draft DealWeek for review/publish. Idempotent per weekStart.
+// as a published DealWeek (full automation — no draft review).
+// Idempotent per weekStart.
 export async function seedKirbyWeek(workspaceId: string): Promise<{ created: boolean }> {
   const retailer = await basePrisma.retailer.findUnique({
     where: { workspaceId_slug: { workspaceId, slug: "kirby-foods" } },
@@ -79,7 +80,8 @@ export async function seedKirbyWeek(workspaceId: string): Promise<{ created: boo
       weekStart: KIRBY_WEEK_START,
       weekEnd: KIRBY_WEEK_END,
       sourceUrl: "https://www.kirbyfoods.com/weekly-ads/6/Kirby Foods Effingham",
-      status: "draft",
+      status: "published",
+      publishedAt: new Date(),
     },
   });
   await basePrisma.deal.createMany({
