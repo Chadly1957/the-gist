@@ -78,6 +78,12 @@ interface GasData {
   live: boolean;
   stations: Array<{ name: string; regular: number | null; updatedAt: string }>;
   updatedAt: string | null;
+  /** "stations" = fresh GasBuddy scrape, "eia" = weekly Chicago average fallback, "none" = nothing to show */
+  source?: "stations" | "eia" | "none";
+  /** dollars/gal, set when source === "eia" */
+  eiaPrice?: number | null;
+  /** EIA week label (e.g. "2026-10-05"), set when source === "eia" */
+  eiaPeriod?: string | null;
 }
 
 interface BookData {
@@ -232,25 +238,52 @@ function PicksRow({
   );
 }
 
+function formatGasDate(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return null;
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
 function GasBox({ gas }: { gas?: GasData }) {
+  const updated = formatGasDate(gas?.updatedAt);
+  const isEia = gas?.live && gas?.source === "eia" && gas?.eiaPrice != null;
+  const eiaWeek = formatGasDate(gas?.eiaPeriod);
   return (
     <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-5">
-      <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-3">⛽ Current gas prices</p>
-      {!gas?.live ? (
+      <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-3">
+        {isEia ? "⛽ Chicago average gas price" : "⛽ Current gas prices"}
+      </p>
+      {isEia ? (
+        <>
+          <p className="text-3xl font-extrabold text-gray-900">
+            ${(gas?.eiaPrice as number).toFixed(2)}
+            <span className="text-sm font-medium text-gray-400"> /gal</span>
+          </p>
+          <p className="text-xs text-gray-400 mt-2">
+            Weekly Chicago average via U.S. EIA{eiaWeek ? `, week of ${eiaWeek}` : ""}
+          </p>
+        </>
+      ) : !gas?.live ? (
         <p className="text-sm text-gray-500">Live local prices coming soon.</p>
       ) : gas.stations.length === 0 ? (
         <p className="text-sm text-gray-500">No stations reporting right now.</p>
       ) : (
-        <ul className="space-y-2">
-          {gas.stations.slice(0, 5).map((s, i) => (
-            <li key={i} className="flex items-baseline justify-between text-sm">
-              <span className="text-gray-700 font-medium truncate mr-2">{s.name}</span>
-              <span className="font-bold text-gray-900">
-                {s.regular != null ? `$${s.regular.toFixed(2)}` : "—"}
-              </span>
-            </li>
-          ))}
-        </ul>
+        <>
+          <ul className="space-y-2">
+            {gas.stations.slice(0, 5).map((s, i) => (
+              <li key={i} className="flex items-baseline justify-between text-sm">
+                <span className="text-gray-700 font-medium truncate mr-2">{s.name}</span>
+                <span className="font-bold text-gray-900">
+                  {s.regular != null ? `$${s.regular.toFixed(2)}` : "—"}
+                </span>
+              </li>
+            ))}
+          </ul>
+          {updated && (
+            <p className="text-xs text-gray-400 mt-3">Updated {updated}</p>
+          )}
+        </>
       )}
     </div>
   );
