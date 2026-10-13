@@ -1,0 +1,302 @@
+import { prisma } from "@/lib/db";
+import { getEmailClient, htmlToText } from "@/lib/email";
+import { getWorkspace, getWorkspaceUrl } from "@/lib/workspace";
+import { escapeHtml } from "@/lib/html";
+
+// Post-signup Deals nurture sequence. New subscribers see the one-time offer
+// on the thank-you page; anyone who doesn't buy enters this 4-touch email
+// sequence (2h / 24h / 72h / day 5). Stops when they buy the book, opt out of
+// deal reminders, or unsubscribe. Driven hourly by /api/cron/deals-nurture.
+
+// touch -> hours after subscribedAt before it's due, and minimum hours since
+// the previous touch was sent (keeps pacing sane for older subscribers who
+// enroll mid-sequence, e.g. the recent ad cohort).
+const SCHEDULE = [
+  { touch: 1, delayHours: 2, minGapHours: 0 },
+  { touch: 2, delayHours: 24, minGapHours: 20 },
+  { touch: 3, delayHours: 72, minGapHours: 40 },
+  { touch: 4, delayHours: 120, minGapHours: 40 },
+];
+const ENROLL_WINDOW_HOURS = 24 * 8;
+const MAX_TOUCH = 4;
+
+function dealsLink(appUrl: string, touch: number, email: string): string {
+  return `${appUrl}/deals?src=nurture${touch}&email=${encodeURIComponent(email)}`;
+}
+
+function remindersOptOutLink(appUrl: string, workspaceId: string, email: string): string {
+  return `${appUrl}/api/nurture-optout?wid=${encodeURIComponent(workspaceId)}&email=${encodeURIComponent(email)}`;
+}
+
+function footerHtml(opts: {
+  newsletterName: string;
+  appUrl: string;
+  workspaceId: string;
+  email: string;
+  unsubUrl: string;
+}): string {
+  return `
+    <div style="border-top: 1px solid #e5e7eb; margin: 24px 0 0; padding-top: 16px;">
+      <p style="color: #9ca3af; font-size: 12px; line-height: 1.6; margin: 0;">
+        You&apos;re getting this because you recently joined ${escapeHtml(opts.newsletterName)}.<br>
+        <a href="${remindersOptOutLink(opts.appUrl, opts.workspaceId, opts.email)}" style="color: #9ca3af;">Stop deal reminders</a>
+        &nbsp;&middot;&nbsp;
+        <a href="${opts.unsubUrl}" style="color: #9ca3af;">Unsubscribe from everything</a>
+      </p>
+    </div>`;
+}
+
+function bundleBoxHtml(area: string): string {
+  return `
+    <div style="background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px; margin: 16px 0;">
+      <p style="color: #111827; font-size: 14px; font-weight: bold; margin: 0 0 8px;">The new-subscriber bundle &mdash; $15 once, yours for life</p>
+      <p style="color: #4b5563; font-size: 14px; line-height: 1.6; margin: 0 0 4px;">📕 <strong>The Gist Deals book</strong> &mdash; weekly store deals, local ${escapeHtml(area)} coupons, the 10 best deals.</p>
+      <p style="color: #4b5563; font-size: 14px; line-height: 1.6; margin: 0 0 4px;">🎁 <strong>Bonus: The Friday Deal Drop</strong> <span style="color: #6b7280;">($29 value)</span> &mdash; buyers-only weekly email.</p>
+      <p style="color: #4b5563; font-size: 14px; line-height: 1.6; margin: 0;">🎁 <strong>Bonus: Deal Savings Tracker</strong> <span style="color: #6b7280;">($19 value)</span> &mdash; printable proof it pays for itself.</p>
+    </div>`;
+}
+
+function ctaHtml(url: string, label: string): string {
+  return `
+    <p style="margin: 20px 0;">
+      <a href="${url}" style="background: #15803d; color: #ffffff; padding: 13px 24px; border-radius: 10px; text-decoration: none; font-weight: 700; font-size: 15px; display: inline-block;">${label}</a>
+    </p>`;
+}
+
+function guaranteeHtml(): string {
+  return `
+    <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: 14px 16px; margin: 16px 0;">
+      <p style="color: #14532d; font-size: 14px; font-weight: bold; margin: 0 0 4px;">🛡️ The One-Deal Promise</p>
+      <p style="color: #166534; font-size: 13px; line-height: 1.6; margin: 0;">
+        If you don&apos;t save at least $15 with the book in your first 60 days, just email me and I&apos;ll refund every cent &mdash; and you keep the book.
+      </p>
+    </div>`;
+}
+
+interface TouchContent {
+  subject: string;
+  html: string;
+}
+
+function buildTouch(
+  touch: number,
+  opts: {
+    firstName: string | null;
+    area: string;
+    newsletterName: string;
+    link: string;
+  }
+): TouchContent {
+  const greeting = opts.firstName ? `Hey ${escapeHtml(opts.firstName)}` : "Hey";
+  const wrap = (inner: string) => `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 560px; margin: 0 auto; padding: 32px 24px;">
+      ${inner}
+    </div>`;
+  const sign = `<p style="color: #4b5563; font-size: 14px; line-height: 1.6;">&mdash; Chad</p>`;
+
+  if (touch === 1) {
+    return {
+      subject: "Quick reminder: your new-subscriber bundle",
+      html: wrap(`
+        <p style="color: #4b5563; font-size: 14px; line-height: 1.6;">${greeting} &mdash;</p>
+        <p style="color: #4b5563; font-size: 14px; line-height: 1.6;">
+          You joined <strong style="color: #111827;">${escapeHtml(opts.newsletterName)}</strong> a couple hours ago.
+          Did you catch the one-time offer on the thank-you page?
+        </p>
+        ${bundleBoxHtml(opts.area)}
+        <p style="color: #4b5563; font-size: 14px; line-height: 1.6;">
+          One deal pays for the whole book &mdash; and it&apos;s a one-time $15, yours for life. No subscription, no renewals.
+        </p>
+        ${ctaHtml(opts.link, "Get the bundle — $15 once")}
+        <p style="color: #9ca3af; font-size: 13px; line-height: 1.6;">
+          This bundle is only offered to new subscribers &mdash; after this week it&apos;s just the book at $15.
+        </p>
+        ${sign}`),
+    };
+  }
+
+  if (touch === 2) {
+    return {
+      subject: "Is the Deals book actually worth $15?",
+      html: wrap(`
+        <p style="color: #4b5563; font-size: 14px; line-height: 1.6;">${greeting} &mdash;</p>
+        <p style="color: #4b5563; font-size: 14px; line-height: 1.6;">Fair question. Here&apos;s the honest math:</p>
+        <p style="color: #4b5563; font-size: 14px; line-height: 1.6;">
+          The book has <strong style="color: #111827;">weekly grocery deals</strong> from stores like Aldi, Kroger, and Dollar General,
+          <strong style="color: #111827;"> real coupons from local ${escapeHtml(opts.area)} businesses</strong> with QR codes you flash at checkout,
+          and <strong style="color: #111827;">the 10 best deals</strong> hand-picked every Monday.
+        </p>
+        <p style="color: #4b5563; font-size: 14px; line-height: 1.6;">
+          Use <strong style="color: #111827;">one</strong> grocery deal in a week and you&apos;ve usually covered the $15. Everything after that is pure savings, forever.
+        </p>
+        ${guaranteeHtml()}
+        ${ctaHtml(opts.link, "Get the bundle — $15 once")}
+        ${sign}`),
+    };
+  }
+
+  if (touch === 3) {
+    return {
+      subject: "Tonight: the new-subscriber bundle comes down",
+      html: wrap(`
+        <p style="color: #4b5563; font-size: 14px; line-height: 1.6;">${greeting} &mdash;</p>
+        <p style="color: #4b5563; font-size: 14px; line-height: 1.6;">
+          Last call on the new-subscriber bundle: the <strong style="color: #111827;">Deals book + Friday Deal Drop + Savings Tracker</strong>, one-time $15.
+        </p>
+        <p style="color: #4b5563; font-size: 14px; line-height: 1.6;">
+          After tonight I&apos;m taking the bundle down. The book will still be $15 tomorrow &mdash; it always is &mdash; but the bonuses won&apos;t be bundled with it.
+        </p>
+        ${guaranteeHtml()}
+        ${ctaHtml(opts.link, "Get the bundle before tonight — $15")}
+        ${sign}`),
+    };
+  }
+
+  // touch 4: plain-text founder note
+  return {
+    subject: "quick question",
+    html: wrap(`
+      <p style="color: #4b5563; font-size: 14px; line-height: 1.7;">${greeting},</p>
+      <p style="color: #4b5563; font-size: 14px; line-height: 1.7;">It&apos;s Chad.</p>
+      <p style="color: #4b5563; font-size: 14px; line-height: 1.7;">
+        I noticed you didn&apos;t grab the Deals book, and that&apos;s totally fine &mdash; the newsletter is free forever either way.
+      </p>
+      <p style="color: #4b5563; font-size: 14px; line-height: 1.7;">
+        But I&apos;m trying to make the book something people actually want, so can I ask: <strong style="color: #111827;">what held you back?</strong>
+      </p>
+      <p style="color: #4b5563; font-size: 14px; line-height: 1.7;">
+        Just hit reply &mdash; I read every one.
+      </p>
+      <p style="color: #4b5563; font-size: 14px; line-height: 1.7;">Thanks,<br>Chad</p>`),
+  };
+}
+
+async function sendNurtureTouch(
+  subscriber: { id: string; email: string; firstName: string | null },
+  touch: number
+): Promise<boolean> {
+  const workspace = await getWorkspace();
+  const appUrl = await getWorkspaceUrl();
+  const allSettings = Object.fromEntries(
+    (await prisma.setting.findMany()).map((r) => [r.key, r.value])
+  );
+  const emailClient = await getEmailClient(allSettings);
+  if (!emailClient) return false;
+
+  // Need a sent newsletter to hang the recipient record (open/click tracking
+  // + working one-click unsubscribe) off of, same as the welcome email.
+  const latest = await prisma.newsletterSend.findFirst({
+    where: { status: "sent" },
+    orderBy: { sentAt: "desc" },
+    select: { id: true },
+  });
+  if (!latest) return false;
+
+  const recipient = await prisma.newsletterRecipient.create({
+    data: {
+      newsletterSendId: latest.id,
+      subscriberId: subscriber.id,
+      email: subscriber.email,
+    },
+  });
+  const unsubUrl = `${appUrl}/unsubscribe?r=${recipient.id}&email=${encodeURIComponent(subscriber.email)}`;
+
+  const content = buildTouch(touch, {
+    firstName: subscriber.firstName,
+    area: workspace.area,
+    newsletterName: workspace.name,
+    link: dealsLink(appUrl, touch, subscriber.email),
+  });
+
+  const htmlBody =
+    content.html +
+    footerHtml({
+      newsletterName: workspace.name,
+      appUrl,
+      workspaceId: workspace.id,
+      email: subscriber.email,
+      unsubUrl,
+    });
+
+  await emailClient.sendEmail({
+    to: subscriber.email,
+    subject: content.subject,
+    htmlBody,
+    textBody: htmlToText(htmlBody),
+    headers: {
+      "List-Unsubscribe": `<${unsubUrl}>`,
+      "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+    },
+  });
+
+  await prisma.dealsNurtureTouch.create({
+    data: {
+      subscriberId: subscriber.id,
+      email: subscriber.email,
+      touch,
+    },
+  });
+  return true;
+}
+
+export interface NurtureRunResult {
+  checked: number;
+  sent: number;
+  skippedPurchased: number;
+}
+
+/** Send the next due nurture touch to eligible new subscribers. Runs inside withWorkspace. */
+export async function runDealsNurture(now = new Date()): Promise<NurtureRunResult> {
+  const result: NurtureRunResult = { checked: 0, sent: 0, skippedPurchased: 0 };
+  const windowStart = new Date(now.getTime() - ENROLL_WINDOW_HOURS * 3600 * 1000);
+
+  const subscribers = await prisma.subscriber.findMany({
+    where: {
+      active: true,
+      dealsNurtureOptOut: false,
+      subscribedAt: { gte: windowStart },
+    },
+    orderBy: { subscribedAt: "asc" },
+    take: 200,
+    select: { id: true, email: true, firstName: true, subscribedAt: true },
+  });
+
+  for (const sub of subscribers) {
+    result.checked++;
+    // Already bought the book -> never nurture.
+    const purchase = await prisma.couponBookPurchase.findFirst({
+      where: { email: sub.email, active: true },
+      select: { id: true },
+    });
+    if (purchase) {
+      result.skippedPurchased++;
+      continue;
+    }
+
+    const sentTouches = await prisma.dealsNurtureTouch.findMany({
+      where: { subscriberId: sub.id },
+      select: { touch: true, sentAt: true },
+    });
+    const sentByTouch = new Map(sentTouches.map((t) => [t.touch, t.sentAt]));
+
+    for (const s of SCHEDULE) {
+      if (sentByTouch.has(s.touch)) continue;
+      const dueAt = new Date(sub.subscribedAt.getTime() + s.delayHours * 3600 * 1000);
+      if (now < dueAt) break; // touches are ordered; later ones aren't due either
+      if (s.touch > 1) {
+        const prevSentAt = sentByTouch.get(s.touch - 1);
+        if (!prevSentAt) break;
+        const gapOkAt = new Date(prevSentAt.getTime() + s.minGapHours * 3600 * 1000);
+        if (now < gapOkAt) break;
+      }
+      try {
+        const ok = await sendNurtureTouch(sub, s.touch);
+        if (ok) result.sent++;
+      } catch (err) {
+        console.error(`Deals nurture touch ${s.touch} failed for ${sub.email}:`, err);
+      }
+      break; // one touch per subscriber per run
+    }
+  }
+  return result;
+}

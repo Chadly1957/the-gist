@@ -4,39 +4,11 @@ import { workspaceFetch } from "@/lib/workspace-client";
 import { useState, useEffect } from "react";
 import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
 import Image from "next/image";
-import Link, { WorkspaceAnchor } from "@/components/workspace/WorkspaceLink";
+import Link from "@/components/workspace/WorkspaceLink";
 import Logo from "@/components/Logo";
+import DealsOto from "@/components/DealsOto";
 import SponsorsMarquee from "@/components/SponsorsMarquee";
 import RecentIssues from "@/components/RecentIssues";
-
-// Compact "one more thing" upsell shown below the signup confirmation.
-// Framed as a separate thing Chad built, never as part of the free newsletter.
-function DealsUpsell({ area, email }: { area: string; email: string }) {
-  const href =
-    "/deals?src=thankyou" + (email ? `&email=${encodeURIComponent(email)}` : "");
-  return (
-    <div className="mt-5 max-w-md rounded-2xl border border-amber-200 bg-amber-50 p-5">
-      <p className="text-[11px] font-bold uppercase tracking-widest text-amber-700 mb-2">
-        One more thing&hellip;
-      </p>
-      <p className="text-sm text-gray-700 leading-relaxed mb-4">
-        The newsletter is free forever. Separately, I built{" "}
-        <strong className="text-gray-900">The Gist Deals</strong>: a digital book
-        of real discounts from local {area} businesses, right on your phone.{" "}
-        <strong className="text-gray-900">$15 once, yours for life.</strong>
-      </p>
-      <WorkspaceAnchor
-        href={href}
-        className="inline-flex items-center gap-2 bg-green-700 hover:bg-green-800 text-white font-bold px-5 py-3 rounded-xl text-sm transition-colors"
-      >
-        See what&apos;s inside
-        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3" />
-        </svg>
-      </WorkspaceAnchor>
-    </div>
-  );
-}
 
 function CityLandingPage() {
   const { workspace } = useWorkspace();
@@ -210,7 +182,7 @@ function CityLandingPage() {
                       <p className="text-sm text-gray-500">{message}</p>
                     </div>
                   </div>
-                  <DealsUpsell area={workspace.area} email={subscribedEmail} />
+                  <DealsOto area={workspace.area} email={subscribedEmail} src="thankyou" />
                 </>
               ) : (
                 <form onSubmit={handleSubmit} className="max-w-md space-y-3 w-full">
@@ -397,7 +369,7 @@ function CityLandingPage() {
                 </div>
                 <div className="flex justify-center text-left mt-2">
                   <div className="w-full max-w-md">
-                    <DealsUpsell area={workspace.area} email={subscribedEmail} />
+                    <DealsOto area={workspace.area} email={subscribedEmail} src="thankyou" />
                   </div>
                 </div>
               </>
