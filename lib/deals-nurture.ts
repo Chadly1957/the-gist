@@ -7,6 +7,10 @@ import { escapeHtml } from "@/lib/html";
 // on the thank-you page; anyone who doesn't buy enters this 4-touch email
 // sequence (2h / 24h / 72h / day 5). Stops when they buy the book, opt out of
 // deal reminders, or unsubscribe. Driven hourly by /api/cron/deals-nurture.
+//
+// The offer is deliberately simple: the book, $15 once, backed by the
+// One-Deal Promise. No bundles, no bonus stack, no manufactured urgency.
+// Touch 3's urgency is real: it's the last email about the book.
 
 // touch -> hours after subscribedAt before it's due, and minimum hours since
 // the previous touch was sent (keeps pacing sane for older subscribers who
@@ -18,7 +22,6 @@ const SCHEDULE = [
   { touch: 4, delayHours: 120, minGapHours: 40 },
 ];
 const ENROLL_WINDOW_HOURS = 24 * 8;
-const MAX_TOUCH = 4;
 
 function dealsLink(appUrl: string, touch: number, email: string): string {
   return `${appUrl}/deals?src=nurture${touch}&email=${encodeURIComponent(email)}`;
@@ -46,16 +49,6 @@ function footerHtml(opts: {
     </div>`;
 }
 
-function bundleBoxHtml(area: string): string {
-  return `
-    <div style="background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px; margin: 16px 0;">
-      <p style="color: #111827; font-size: 14px; font-weight: bold; margin: 0 0 8px;">The new-subscriber bundle &mdash; $15 once, yours for life</p>
-      <p style="color: #4b5563; font-size: 14px; line-height: 1.6; margin: 0 0 4px;">📕 <strong>The Gist Deals book</strong> &mdash; weekly store deals, local ${escapeHtml(area)} coupons, the 10 best deals.</p>
-      <p style="color: #4b5563; font-size: 14px; line-height: 1.6; margin: 0 0 4px;">🎁 <strong>Bonus: The Friday Deal Drop</strong> <span style="color: #6b7280;">($29 value)</span> &mdash; buyers-only weekly email.</p>
-      <p style="color: #4b5563; font-size: 14px; line-height: 1.6; margin: 0;">🎁 <strong>Bonus: Deal Savings Tracker</strong> <span style="color: #6b7280;">($19 value)</span> &mdash; printable proof it pays for itself.</p>
-    </div>`;
-}
-
 function ctaHtml(url: string, label: string): string {
   return `
     <p style="margin: 20px 0;">
@@ -66,9 +59,9 @@ function ctaHtml(url: string, label: string): string {
 function guaranteeHtml(): string {
   return `
     <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: 14px 16px; margin: 16px 0;">
-      <p style="color: #14532d; font-size: 14px; font-weight: bold; margin: 0 0 4px;">🛡️ The One-Deal Promise</p>
+      <p style="color: #14532d; font-size: 14px; font-weight: bold; margin: 0 0 4px;">The One-Deal Promise</p>
       <p style="color: #166534; font-size: 13px; line-height: 1.6; margin: 0;">
-        If you don&apos;t save at least $15 with the book in your first 60 days, just email me and I&apos;ll refund every cent &mdash; and you keep the book.
+        If you don&apos;t save at least $15 with the book in your first 60 days, just email me and I&apos;ll refund every cent. You keep the book.
       </p>
     </div>`;
 }
@@ -92,62 +85,47 @@ function buildTouch(
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 560px; margin: 0 auto; padding: 32px 24px;">
       ${inner}
     </div>`;
-  const sign = `<p style="color: #4b5563; font-size: 14px; line-height: 1.6;">&mdash; Chad</p>`;
+  const sign = `<p style="color: #4b5563; font-size: 14px; line-height: 1.6;">- Chad</p>`;
+  const p = (inner: string) =>
+    `<p style="color: #4b5563; font-size: 14px; line-height: 1.6;">${inner}</p>`;
 
   if (touch === 1) {
     return {
-      subject: "Quick reminder: your new-subscriber bundle",
+      subject: "Quick reminder: The Gist Deals",
       html: wrap(`
-        <p style="color: #4b5563; font-size: 14px; line-height: 1.6;">${greeting} &mdash;</p>
-        <p style="color: #4b5563; font-size: 14px; line-height: 1.6;">
-          You joined <strong style="color: #111827;">${escapeHtml(opts.newsletterName)}</strong> a couple hours ago.
-          Did you catch the one-time offer on the thank-you page?
-        </p>
-        ${bundleBoxHtml(opts.area)}
-        <p style="color: #4b5563; font-size: 14px; line-height: 1.6;">
-          One deal pays for the whole book &mdash; and it&apos;s a one-time $15, yours for life. No subscription, no renewals.
-        </p>
-        ${ctaHtml(opts.link, "Get the bundle — $15 once")}
-        <p style="color: #9ca3af; font-size: 13px; line-height: 1.6;">
-          This bundle is only offered to new subscribers &mdash; after this week it&apos;s just the book at $15.
-        </p>
+        ${p(`${greeting},`)}
+        ${p(`You joined <strong style="color: #111827;">${escapeHtml(opts.newsletterName)}</strong> a couple hours ago. Did you see the offer on the thank-you page?`)}
+        ${p(`I built <strong style="color: #111827;">The Gist Deals</strong>: a digital book of real discounts from local ${escapeHtml(opts.area)} businesses, right on your phone. Weekly grocery deals, local coupons with QR codes, and the 10 best deals hand-picked every Monday.`)}
+        ${p(`It&apos;s <strong style="color: #111827;">$15 once, yours for life</strong>. One grocery run usually covers it.`)}
+        ${ctaHtml(opts.link, "Get the Book, $15 once")}
+        ${p(`You only see that offer right after you join, so I wanted to make sure you saw it.`)}
         ${sign}`),
     };
   }
 
   if (touch === 2) {
     return {
-      subject: "Is the Deals book actually worth $15?",
+      subject: "Is the Deals book worth $15?",
       html: wrap(`
-        <p style="color: #4b5563; font-size: 14px; line-height: 1.6;">${greeting} &mdash;</p>
-        <p style="color: #4b5563; font-size: 14px; line-height: 1.6;">Fair question. Here&apos;s the honest math:</p>
-        <p style="color: #4b5563; font-size: 14px; line-height: 1.6;">
-          The book has <strong style="color: #111827;">weekly grocery deals</strong> from stores like Aldi, Kroger, and Dollar General,
-          <strong style="color: #111827;"> real coupons from local ${escapeHtml(opts.area)} businesses</strong> with QR codes you flash at checkout,
-          and <strong style="color: #111827;">the 10 best deals</strong> hand-picked every Monday.
-        </p>
-        <p style="color: #4b5563; font-size: 14px; line-height: 1.6;">
-          Use <strong style="color: #111827;">one</strong> grocery deal in a week and you&apos;ve usually covered the $15. Everything after that is pure savings, forever.
-        </p>
+        ${p(`${greeting},`)}
+        ${p(`Fair question. Here&apos;s how I think about it:`)}
+        ${p(`The book has <strong style="color: #111827;">weekly grocery deals</strong> from stores like Aldi, Kroger, and Dollar General, <strong style="color: #111827;">real coupons from local ${escapeHtml(opts.area)} businesses</strong> you flash at checkout, and <strong style="color: #111827;">the 10 best deals</strong> hand-picked every Monday.`)}
+        ${p(`Use <strong style="color: #111827;">one</strong> grocery deal in a typical week and you&apos;ve covered the $15. Everything after that is money back in your pocket.`)}
         ${guaranteeHtml()}
-        ${ctaHtml(opts.link, "Get the bundle — $15 once")}
+        ${ctaHtml(opts.link, "Get the Book, $15 once")}
         ${sign}`),
     };
   }
 
   if (touch === 3) {
     return {
-      subject: "Tonight: the new-subscriber bundle comes down",
+      subject: "Last email about the Deals book",
       html: wrap(`
-        <p style="color: #4b5563; font-size: 14px; line-height: 1.6;">${greeting} &mdash;</p>
-        <p style="color: #4b5563; font-size: 14px; line-height: 1.6;">
-          Last call on the new-subscriber bundle: the <strong style="color: #111827;">Deals book + Friday Deal Drop + Savings Tracker</strong>, one-time $15.
-        </p>
-        <p style="color: #4b5563; font-size: 14px; line-height: 1.6;">
-          After tonight I&apos;m taking the bundle down. The book will still be $15 tomorrow &mdash; it always is &mdash; but the bonuses won&apos;t be bundled with it.
-        </p>
-        ${guaranteeHtml()}
-        ${ctaHtml(opts.link, "Get the bundle before tonight — $15")}
+        ${p(`${greeting},`)}
+        ${p(`This is the last email I&apos;ll send you about the Deals book. I don&apos;t want to be that guy.`)}
+        ${p(`If you want it, it&apos;s <strong style="color: #111827;">$15 once, yours for life</strong>, and the One-Deal Promise still applies: save $15 in 60 days or email me for a full refund.`)}
+        ${ctaHtml(opts.link, "Get the Book, $15 once")}
+        ${p(`Either way, the newsletter is free forever.`)}
         ${sign}`),
     };
   }
@@ -156,16 +134,16 @@ function buildTouch(
   return {
     subject: "quick question",
     html: wrap(`
-      <p style="color: #4b5563; font-size: 14px; line-height: 1.7;">${greeting},</p>
+      ${p(`${greeting},`)}
       <p style="color: #4b5563; font-size: 14px; line-height: 1.7;">It&apos;s Chad.</p>
       <p style="color: #4b5563; font-size: 14px; line-height: 1.7;">
-        I noticed you didn&apos;t grab the Deals book, and that&apos;s totally fine &mdash; the newsletter is free forever either way.
+        I noticed you didn&apos;t grab the Deals book, and that&apos;s totally fine. The newsletter is free forever either way.
       </p>
       <p style="color: #4b5563; font-size: 14px; line-height: 1.7;">
         But I&apos;m trying to make the book something people actually want, so can I ask: <strong style="color: #111827;">what held you back?</strong>
       </p>
       <p style="color: #4b5563; font-size: 14px; line-height: 1.7;">
-        Just hit reply &mdash; I read every one.
+        Just hit reply. I read every one.
       </p>
       <p style="color: #4b5563; font-size: 14px; line-height: 1.7;">Thanks,<br>Chad</p>`),
   };

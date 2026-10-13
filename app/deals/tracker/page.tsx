@@ -3,7 +3,7 @@
 import { useState } from "react";
 
 // Buyer bonus: printable Deal Savings Tracker.
-// Unlisted page (not linked anywhere public) — buyers get the link in their
+// Unlisted page (not linked anywhere public): buyers get the link in their
 // purchase confirmation email. Pairs with the One-Deal Promise: log every
 // deal you use and watch the book pay for itself.
 const ROWS = 24;
@@ -38,7 +38,7 @@ export default function SavingsTrackerPage() {
         <p className="text-sm text-gray-600 mb-6 max-w-lg">
           Every time you use a deal from the book, log it here. When your
           total passes <strong className="text-gray-900">$15</strong>, the book
-          has officially paid for itself &mdash; everything after that is pure
+          has officially paid for itself. Everything after that is pure
           savings.
         </p>
 
@@ -83,7 +83,7 @@ export default function SavingsTrackerPage() {
                     <input
                       value={dates[i]}
                       onChange={(e) => setAt(setDates, i, e.target.value)}
-                      placeholder="—"
+                      
                       className="w-full bg-transparent px-1 py-1 text-[13px] focus:outline-none focus:bg-green-50 rounded print:hidden"
                     />
                     <span className="hidden print:inline text-[13px]">&nbsp;</span>
@@ -92,7 +92,7 @@ export default function SavingsTrackerPage() {
                     <input
                       value={stores[i]}
                       onChange={(e) => setAt(setStores, i, e.target.value)}
-                      placeholder="—"
+                      
                       className="w-full bg-transparent px-1 py-1 text-[13px] focus:outline-none focus:bg-green-50 rounded print:hidden"
                     />
                     <span className="hidden print:inline text-[13px]">&nbsp;</span>
@@ -101,7 +101,7 @@ export default function SavingsTrackerPage() {
                     <input
                       value={deals[i]}
                       onChange={(e) => setAt(setDeals, i, e.target.value)}
-                      placeholder="—"
+                      
                       className="w-full bg-transparent px-1 py-1 text-[13px] focus:outline-none focus:bg-green-50 rounded print:hidden"
                     />
                     <span className="hidden print:inline text-[13px]">&nbsp;</span>
@@ -137,7 +137,7 @@ export default function SavingsTrackerPage() {
 
         <p className="text-xs text-gray-400 mt-8 text-center print:hidden">
           Remember the One-Deal Promise: if you don&apos;t save at least $15 in
-          your first 60 days, email us for a full refund &mdash; and keep the
+          your first 60 days, email us for a full refund. And keep the
           book.
         </p>
       </div>

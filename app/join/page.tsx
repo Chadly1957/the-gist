@@ -9,7 +9,7 @@ import DealsOto from "@/components/DealsOto";
 import RecentIssues from "@/components/RecentIssues";
 
 // Dedicated landing page for paid ad traffic. Single purpose: email signup.
-// No nav links, no sponsor section, no distractions — subscribe or leave.
+// No nav links, no sponsor section, no distractions: subscribe or leave.
 // NOTE for the next ad run: the ad's primary text should echo the hero
 // headline below word for word (message match is the #1 CRO lever).
 function JoinForm({ compact = false }: { compact?: boolean }) {
@@ -103,7 +103,7 @@ export default function JoinPage() {
   const faqs = [
     {
       q: "Is it really free?",
-      a: "Yes — free forever. The newsletter will never cost you anything. (There's a separate optional Deals book for $15, but the daily email is free.)",
+      a: "Yes. Free forever. The newsletter will never cost you anything. (There's a separate optional Deals book for $15, but the daily email is free.)",
     },
     {
       q: "Will you sell my email or spam me?",
@@ -114,12 +114,12 @@ export default function JoinPage() {
       a: "Every morning, in time for coffee. Two-minute read, then you're caught up.",
     },
     {
-      q: `I live between cities — ${workspace.area} or the other edition?`,
+      q: `I live between cities: ${workspace.area} or the other edition?`,
       a: "Pick the city you live and shop in most. Each edition is written specifically for its town.",
     },
     {
       q: "What if I don't like it?",
-      a: "Unsubscribe in one click from any issue. But give it a week — most people wonder how they kept up before.",
+      a: "Unsubscribe in one click from any issue. But give it a week. Most people wonder how they kept up before.",
     },
   ];
 
@@ -149,7 +149,7 @@ export default function JoinPage() {
           </h1>
           <p className="text-base sm:text-lg text-gray-500 leading-relaxed mb-8 max-w-lg">
             A free 2-minute daily email. The local stories, events, and deals
-            that actually matter &mdash; no algorithms, no doomscrolling.
+            that actually matter. No algorithms, no doomscrolling.
           </p>
 
           <JoinForm />
@@ -164,7 +164,7 @@ export default function JoinPage() {
             <div className="grid sm:grid-cols-3 gap-4">
               {[
                 { t: "Top local stories", d: `The day's most important ${workspace.area} news, curated from trusted local sources.` },
-                { t: "Events & things to do", d: "What's happening around town this week — so you never miss out." },
+                { t: "Events & things to do", d: "What's happening around town this week, so you never miss out." },
                 { t: "Deals worth knowing", d: "Local discounts and savings, plus a peek at the weekly store ads." },
               ].map((item) => (
                 <div key={item.t} className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
@@ -186,7 +186,7 @@ export default function JoinPage() {
               {[
                 { n: "1", t: "Drop in your email", d: "Ten seconds. That's the whole signup." },
                 { n: "2", t: "Get it every morning", d: "One email, two minutes, with your coffee." },
-                { n: "3", t: "Never miss local again", d: "News, events, and deals — before everyone else hears." },
+                { n: "3", t: "Never miss local again", d: "News, events, and deals, before everyone else hears." },
               ].map((s) => (
                 <li key={s.n} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex gap-4 items-start">
                   <span className="shrink-0 w-8 h-8 rounded-full bg-green-700 text-white font-bold flex items-center justify-center text-sm">
@@ -208,7 +208,7 @@ export default function JoinPage() {
         <section className="bg-gray-50 border-y border-gray-100 py-14">
           <div className="max-w-2xl mx-auto px-6">
             <h2 className="text-2xl font-extrabold text-gray-900 tracking-tight mb-8 text-center">
-              Questions? Good.
+              Questions, answered.
             </h2>
             <div className="space-y-3">
               {faqs.map((f) => (

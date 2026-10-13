@@ -51,7 +51,7 @@ function couponCadenceLabel(c: BookCoupon): { text: string; used: boolean } {
   if (c.refreshInterval === "daily" || c.refreshInterval === "weekly" || c.refreshInterval === "monthly") {
     const period = c.refreshInterval === "daily" ? "daily" : c.refreshInterval === "weekly" ? "weekly" : "monthly";
     const back = c.refreshInterval === "daily" ? "tomorrow" : c.refreshInterval === "weekly" ? "next week" : "next month";
-    return c.usedUp ? { text: `Used up — refreshes ${back}`, used: true } : { text: `Refreshes ${period}`, used: false };
+    return c.usedUp ? { text: `Used up. Refreshes ${back}`, used: true } : { text: `Refreshes ${period}`, used: false };
   }
   if (c.maxRedemptions != null) {
     return c.usedUp ? { text: "Used up", used: true } : { text: c.maxRedemptions === 1 ? "One-time use" : "Reusable", used: false };
@@ -751,7 +751,7 @@ function DealsPageInner() {
             <p className="text-[13px] font-bold text-green-900 mb-0.5">🛡️ The One-Deal Promise</p>
             <p className="text-xs text-green-800 leading-relaxed">
               If you don&apos;t save at least $15 with the book in your first 60 days, just email me and
-              I&apos;ll refund every cent &mdash; and you keep the book.
+              I&apos;ll refund every cent. You keep the book.
             </p>
           </div>
           <button onClick={resendLink} className="w-full py-2 text-sm text-gray-600 underline">
