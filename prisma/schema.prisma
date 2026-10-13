@@ -59,6 +59,7 @@ model Workspace {
   dealWeekRows                DealWeek[]
   dealRows                    Deal[]
   dealDigestSendRows          DealDigestSend[]
+  dealsNurtureTouchRows       DealsNurtureTouch[]
 }
 
 model AdminUser {
@@ -125,6 +126,9 @@ model Subscriber {
   firstName    String?
   subscribedAt DateTime  @default(now())
   active       Boolean   @default(true)
+  // Opt-out of the post-signup Deals nurture email sequence (stays subscribed
+  // to the newsletter itself).
+  dealsNurtureOptOut Boolean @default(false)
 
   @@unique([workspaceId, email])
   @@unique([id, workspaceId])
@@ -773,6 +777,23 @@ model DealDigestSend {
   // JSON array of DealWeek ids included in this send.
   dealWeekIds    String    @default("[]")
 
+  @@unique([id, workspaceId])
+  @@index([workspaceId])
+}
+
+// Post-signup Deals nurture sequence: one row per touch sent to a subscriber.
+// The cron walks new subscribers through touches 1-4 until they buy the book,
+// opt out of the sequence, or unsubscribe.
+model DealsNurtureTouch {
+  workspaceId  String    @default("decatur")
+  workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  id           String    @id @default(cuid())
+  subscriberId String
+  email        String
+  touch        Int       // 1..4
+  sentAt       DateTime  @default(now())
+
+  @@unique([workspaceId, subscriberId, touch])
   @@unique([id, workspaceId])
   @@index([workspaceId])
 }

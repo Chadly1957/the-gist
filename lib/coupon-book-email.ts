@@ -44,6 +44,16 @@ export async function sendCouponBookMagicLinkEmail(opts: {
         </a>
       </p>
       <p style="color: #9ca3af; font-size: 12px; word-break: break-all;">Or copy this link: ${bookUrl}</p>
+      <div style="border-top: 1px solid #e5e7eb; margin: 20px 0; padding-top: 16px;">
+        <p style="color: #111827; font-size: 14px; font-weight: bold; margin: 0 0 8px;">Also included with your book</p>
+        <p style="color: #4b5563; font-size: 14px; line-height: 1.5; margin: 0 0 8px;">
+          <strong>The Friday Deal Drop.</strong> Every Friday, the week&apos;s best new deals land in your inbox. You&apos;re on the list.
+        </p>
+        <p style="color: #4b5563; font-size: 14px; line-height: 1.5; margin: 0;">
+          <strong>Deal Savings Tracker.</strong> Log every deal you use and watch the book pay for itself:
+          <a href="${workspaceUrl}/deals/tracker" style="color: #24726f; font-weight: 600;">open your printable tracker</a>
+        </p>
+      </div>
       <p style="color: #9ca3af; font-size: 12px;">This link is unique to you. If you didn't get a Gist Deals Book, you can ignore this email.</p>
     </div>
   `,
