@@ -1,14 +1,28 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { basePrisma } from "@/lib/db-base";
 import { getAdminSession } from "@/lib/auth";
 import { getWorkspace } from "@/lib/workspace";
 
 export const dynamic = "force-dynamic";
 
 // List retailer configs for the current workspace, with latest week status.
-export async function GET() {
+export async function GET(req: NextRequest) {
   const session = await getAdminSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  if (new URL(req.url).searchParams.get("scope") === "all") {
+    // Cross-workspace option list for the All-deals browser. Unscoped client
+    // with an explicit read (the scoped `prisma` client cannot go cross-workspace).
+    const retailers = await basePrisma.retailer.findMany({
+      orderBy: [{ displayName: "asc" }],
+      select: {
+        id: true, slug: true, displayName: true, pipeline: true, active: true,
+        workspace: { select: { slug: true, name: true } },
+      },
+    });
+    return NextResponse.json({ retailers, scope: "all" });
+  }
 
   const workspace = await getWorkspace();
   const retailers = await prisma.retailer.findMany({

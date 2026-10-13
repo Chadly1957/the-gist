@@ -1,7 +1,16 @@
 "use client";
 import { workspaceFetch, workspacePath } from "@/lib/workspace-client";
+import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
+import WsBadge from "@/app/admin/components/WsBadge";
 
-import { useEffect, useState, useRef } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
+
+interface WsInfo {
+  id: string;
+  slug: string;
+  name: string;
+  primaryColor: string;
+}
 
 interface Subscriber {
   id: string;
@@ -9,41 +18,104 @@ interface Subscriber {
   firstName: string | null;
   subscribedAt: string;
   active: boolean;
+  workspace?: { slug: string; name: string };
 }
 
-export default function SubscribersPage() {
+interface DealsCustomer {
+  id: string;
+  email: string;
+  createdAt: string;
+  active: boolean;
+  digestOptOut: boolean;
+  workspace: { slug: string; name: string };
+}
+
+const PAGE_SIZE = 50;
+
+export default function ListsPage() {
+  const { workspace: activeWorkspace } = useWorkspace();
+  const [workspaces, setWorkspaces] = useState<WsInfo[]>([]);
+  const [wsSel, setWsSel] = useState("all");
+  const [listTab, setListTab] = useState<"newsletter" | "deals">("newsletter");
+
   const [subscribers, setSubscribers] = useState<Subscriber[]>([]);
-  const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const [newsTotal, setNewsTotal] = useState(0);
+  const [newsPage, setNewsPage] = useState(1);
+  const [newsLoading, setNewsLoading] = useState(true);
+
+  const [customers, setCustomers] = useState<DealsCustomer[]>([]);
+  const [dealsTotal, setDealsTotal] = useState(0);
+  const [dealsPage, setDealsPage] = useState(1);
+  const [dealsLoading, setDealsLoading] = useState(true);
+
   const [search, setSearch] = useState("");
-  const [page, setPage] = useState(1);
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<{ imported: number; skipped: number } | null>(null);
   const [importError, setImportError] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
 
-  async function fetchSubscribers(s = search, p = page) {
-    setLoading(true);
+  useEffect(() => {
+    workspaceFetch("/api/admin/workspaces").then(async (r) => {
+      if (r.ok) setWorkspaces((await r.json()).workspaces || []);
+    });
+  }, []);
+
+  const colorOf = useCallback(
+    (slug: string) => workspaces.find((w) => w.slug === slug)?.primaryColor,
+    [workspaces]
+  );
+
+  const fetchNewsletter = useCallback(async (s: string, p: number) => {
+    setNewsLoading(true);
     try {
-      const params = new URLSearchParams({ search: s, page: String(p) });
+      const params = new URLSearchParams({ search: s, page: String(p), workspace: wsSel });
       const res = await workspaceFetch(`/api/admin/subscribers?${params}`);
       const data = await res.json();
       setSubscribers(data.subscribers || []);
-      setTotal(data.total || 0);
+      setNewsTotal(data.total || 0);
     } finally {
-      setLoading(false);
+      setNewsLoading(false);
     }
-  }
+  }, [wsSel]);
 
+  const fetchDealsCustomers = useCallback(async (s: string, p: number) => {
+    setDealsLoading(true);
+    try {
+      const params = new URLSearchParams({ search: s, page: String(p), workspace: wsSel });
+      const res = await workspaceFetch(`/api/admin/deals/customers?${params}`);
+      const data = await res.json();
+      setCustomers(data.customers || []);
+      setDealsTotal(data.total || 0);
+    } finally {
+      setDealsLoading(false);
+    }
+  }, [wsSel]);
+
+  // Load both list totals whenever the workspace filter changes; load the
+  // visible tab's rows.
   useEffect(() => {
-    fetchSubscribers();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    setNewsPage(1);
+    setDealsPage(1);
+    fetchNewsletter(search, 1);
+    fetchDealsCustomers(search, 1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wsSel]);
 
   function handleSearchChange(val: string) {
     setSearch(val);
-    setPage(1);
-    fetchSubscribers(val, 1);
+    if (listTab === "newsletter") {
+      setNewsPage(1);
+      fetchNewsletter(val, 1);
+    } else {
+      setDealsPage(1);
+      fetchDealsCustomers(val, 1);
+    }
+  }
+
+  function switchTab(tab: "newsletter" | "deals") {
+    setListTab(tab);
+    if (tab === "newsletter") fetchNewsletter(search, newsPage);
+    else fetchDealsCustomers(search, dealsPage);
   }
 
   async function handleDelete(id: string, email: string) {
@@ -53,7 +125,7 @@ export default function SubscribersPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id }),
     });
-    fetchSubscribers();
+    fetchNewsletter(search, newsPage);
   }
 
   function parseCSV(text: string): { email: string; firstName?: string }[] {
@@ -115,7 +187,7 @@ export default function SubscribersPage() {
 
       if (res.ok) {
         setImportResult(data);
-        fetchSubscribers(search, 1);
+        fetchNewsletter(search, 1);
       } else {
         setImportError(data.error || "Import failed.");
       }
@@ -131,47 +203,93 @@ export default function SubscribersPage() {
     window.location.href = workspacePath("/api/admin/subscribers/export");
   }
 
-  const totalPages = Math.ceil(total / 50);
+  const tabCls = (active: boolean) =>
+    `px-4 py-2 text-sm font-semibold rounded-full border transition-colors ${
+      active ? "bg-gray-900 text-white border-gray-900" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
+    }`;
+
+  // Import/export act on the current admin workspace context, so they are
+  // only offered when the filter matches it — never silently import into the
+  // wrong workspace.
+  const canImportExport = wsSel === activeWorkspace.slug;
+
+  const newsPages = Math.ceil(newsTotal / PAGE_SIZE);
+  const dealsPages = Math.ceil(dealsTotal / PAGE_SIZE);
 
   return (
-    <div className="p-4 sm:p-8">
-      <div className="mb-6 flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Subscribers</h1>
-          <p className="text-gray-500 text-sm mt-1">
-            {total.toLocaleString()} total subscriber{total !== 1 ? "s" : ""}
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2">
-          {/* CSV Import */}
-          <input
-            ref={fileRef}
-            type="file"
-            accept=".csv,.txt"
-            onChange={handleFileImport}
-            className="hidden"
-            id="csv-upload"
+    <div className="p-4 sm:p-8 max-w-6xl mx-auto">
+      <div className="mb-6">
+        <div className="flex items-center gap-3">
+          <h1 className="text-2xl font-bold text-gray-900">Lists</h1>
+          <WsBadge
+            name={wsSel === "all" ? "All workspaces" : workspaces.find((w) => w.slug === wsSel)?.name || activeWorkspace.name}
+            color={wsSel === "all" ? "#111827" : colorOf(wsSel)}
+            size="md"
           />
-          <label
-            htmlFor="csv-upload"
-            className={`cursor-pointer flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors ${importing ? "opacity-60 pointer-events-none" : ""}`}
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-            </svg>
-            {importing ? "Importing…" : "Import CSV"}
-          </label>
+        </div>
+        <p className="text-gray-500 text-sm mt-1">
+          {newsTotal.toLocaleString()} newsletter subscriber{newsTotal !== 1 ? "s" : ""} ·{" "}
+          {dealsTotal.toLocaleString()} Deals customer{dealsTotal !== 1 ? "s" : ""}
+        </p>
+      </div>
 
-          <button
-            onClick={exportCSV}
-            className="flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-            </svg>
-            Export CSV
+      {/* Workspace filter */}
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        <button onClick={() => setWsSel("all")} className={tabCls(wsSel === "all")}>
+          All workspaces
+        </button>
+        {workspaces.map((w) => (
+          <button key={w.slug} onClick={() => setWsSel(w.slug)} className={tabCls(wsSel === w.slug)}>
+            {w.name}
           </button>
+        ))}
+      </div>
+
+      {/* List tabs */}
+      <div className="flex flex-wrap items-center gap-2 mb-6">
+        <button onClick={() => switchTab("newsletter")} className={tabCls(listTab === "newsletter")}>
+          Newsletter subscribers ({newsTotal.toLocaleString()})
+        </button>
+        <button onClick={() => switchTab("deals")} className={tabCls(listTab === "deals")}>
+          Deals customers ({dealsTotal.toLocaleString()})
+        </button>
+
+        <div className="flex items-center gap-2 ml-auto">
+          {listTab === "newsletter" && canImportExport && (
+            <>
+              <input
+                ref={fileRef}
+                type="file"
+                accept=".csv,.txt"
+                onChange={handleFileImport}
+                className="hidden"
+                id="csv-upload"
+              />
+              <label
+                htmlFor="csv-upload"
+                className={`cursor-pointer flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors ${importing ? "opacity-60 pointer-events-none" : ""}`}
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                </svg>
+                {importing ? "Importing…" : "Import CSV"}
+              </label>
+              <button
+                onClick={exportCSV}
+                className="flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                </svg>
+                Export CSV
+              </button>
+            </>
+          )}
+          {listTab === "newsletter" && !canImportExport && (
+            <p className="text-xs text-gray-400">
+              Import/export act on the {activeWorkspace.name} workspace — filter to it above to use them.
+            </p>
+          )}
         </div>
       </div>
 
@@ -189,94 +307,189 @@ export default function SubscribersPage() {
       )}
 
       {/* CSV format hint */}
-      <div className="mb-4 p-3 bg-blue-50 border border-blue-100 rounded-lg text-xs text-blue-700">
-        <strong>CSV format:</strong> Any CSV with an <code>email</code> column works. Optional <code>first_name</code> column is auto-detected. Headers are optional.
-      </div>
+      {listTab === "newsletter" && canImportExport && (
+        <div className="mb-4 p-3 bg-blue-50 border border-blue-100 rounded-lg text-xs text-blue-700">
+          <strong>CSV format:</strong> Any CSV with an <code>email</code> column works. Optional <code>first_name</code> column is auto-detected. Headers are optional.
+        </div>
+      )}
 
       {/* Search */}
       <div className="mb-4">
         <input
           type="text"
-          placeholder="Search by email or name…"
+          placeholder="Search by email…"
           value={search}
           onChange={(e) => handleSearchChange(e.target.value)}
           className="w-full max-w-sm px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
         />
       </div>
 
-      {/* Table */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        {loading ? (
-          <div className="p-8 text-center">
-            <div className="w-6 h-6 border-2 border-green-600 border-t-transparent rounded-full animate-spin mx-auto" />
-          </div>
-        ) : subscribers.length === 0 ? (
-          <div className="p-8 text-center text-gray-400 text-sm">
-            {search ? "No subscribers match your search." : "No subscribers yet. Import a CSV or share your signup page."}
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-gray-50 border-b border-gray-200">
-                <th className="text-left px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wide">Email</th>
-                <th className="text-left px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wide">Name</th>
-                <th className="text-left px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wide">Subscribed</th>
-                <th className="text-left px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wide">Status</th>
-                <th className="text-right px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wide">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {subscribers.map((sub) => (
-                <tr key={sub.id} className="border-b border-gray-100 last:border-0 hover:bg-gray-50">
-                  <td className="px-5 py-3 font-medium text-gray-800">{sub.email}</td>
-                  <td className="px-5 py-3 text-gray-500">{sub.firstName || <span className="text-gray-300">N/A</span>}</td>
-                  <td className="px-5 py-3 text-gray-500 text-xs">
-                    {new Date(sub.subscribedAt).toLocaleDateString("en-US", {
-                      month: "short", day: "numeric", year: "numeric",
-                    })}
-                  </td>
-                  <td className="px-5 py-3">
-                    <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${sub.active ? "bg-green-50 text-green-700" : "bg-gray-100 text-gray-500"}`}>
-                      <span className={`w-1.5 h-1.5 rounded-full ${sub.active ? "bg-green-500" : "bg-gray-400"}`} />
-                      {sub.active ? "Active" : "Inactive"}
-                    </span>
-                  </td>
-                  <td className="px-5 py-3 text-right">
-                    <button
-                      onClick={() => handleDelete(sub.id, sub.email)}
-                      className="text-gray-300 hover:text-red-500 transition-colors"
-                      title="Remove subscriber"
-                    >
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                      </svg>
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          </div>
-        )}
-      </div>
+      {/* Newsletter table */}
+      {listTab === "newsletter" && (
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          {newsLoading ? (
+            <div className="p-8 text-center">
+              <div className="w-6 h-6 border-2 border-green-600 border-t-transparent rounded-full animate-spin mx-auto" />
+            </div>
+          ) : subscribers.length === 0 ? (
+            <div className="p-8 text-center text-gray-400 text-sm">
+              {search ? "No subscribers match your search." : "No subscribers yet. Import a CSV or share your signup page."}
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-gray-200">
+                    <th className="text-left px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wide">Email</th>
+                    <th className="text-left px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wide">List</th>
+                    {wsSel === "all" && (
+                      <th className="text-left px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wide">Workspace</th>
+                    )}
+                    <th className="text-left px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wide">Name</th>
+                    <th className="text-left px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wide">Subscribed</th>
+                    <th className="text-left px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wide">Status</th>
+                    <th className="text-right px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wide">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {subscribers.map((sub) => (
+                    <tr key={sub.id} className="border-b border-gray-100 last:border-0 hover:bg-gray-50">
+                      <td className="px-5 py-3 font-medium text-gray-800">{sub.email}</td>
+                      <td className="px-5 py-3">
+                        <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-blue-50 text-blue-700">Newsletter</span>
+                      </td>
+                      {wsSel === "all" && (
+                        <td className="px-5 py-3">
+                          {sub.workspace && <WsBadge name={sub.workspace.name} color={colorOf(sub.workspace.slug)} />}
+                        </td>
+                      )}
+                      <td className="px-5 py-3 text-gray-500">{sub.firstName || <span className="text-gray-300">N/A</span>}</td>
+                      <td className="px-5 py-3 text-gray-500 text-xs">
+                        {new Date(sub.subscribedAt).toLocaleDateString("en-US", {
+                          month: "short", day: "numeric", year: "numeric",
+                        })}
+                      </td>
+                      <td className="px-5 py-3">
+                        <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${sub.active ? "bg-green-50 text-green-700" : "bg-gray-100 text-gray-500"}`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${sub.active ? "bg-green-500" : "bg-gray-400"}`} />
+                          {sub.active ? "Active" : "Inactive"}
+                        </span>
+                      </td>
+                      <td className="px-5 py-3 text-right">
+                        <button
+                          onClick={() => handleDelete(sub.id, sub.email)}
+                          className="text-gray-300 hover:text-red-500 transition-colors"
+                          title="Remove subscriber"
+                        >
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Deals customers table */}
+      {listTab === "deals" && (
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          {dealsLoading ? (
+            <div className="p-8 text-center">
+              <div className="w-6 h-6 border-2 border-green-600 border-t-transparent rounded-full animate-spin mx-auto" />
+            </div>
+          ) : customers.length === 0 ? (
+            <div className="p-8 text-center text-gray-400 text-sm">
+              {search ? "No Deals customers match your search." : "No Deals books sold yet."}
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-gray-200">
+                    <th className="text-left px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wide">Email</th>
+                    <th className="text-left px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wide">List</th>
+                    <th className="text-left px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wide">Workspace</th>
+                    <th className="text-left px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wide">Purchased</th>
+                    <th className="text-left px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wide">Status</th>
+                    <th className="text-left px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wide">Digest</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {customers.map((c) => (
+                    <tr key={c.id} className="border-b border-gray-100 last:border-0 hover:bg-gray-50">
+                      <td className="px-5 py-3 font-medium text-gray-800">{c.email}</td>
+                      <td className="px-5 py-3">
+                        <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-amber-50 text-amber-700">Deals customers</span>
+                      </td>
+                      <td className="px-5 py-3">
+                        <WsBadge name={c.workspace.name} color={colorOf(c.workspace.slug)} />
+                      </td>
+                      <td className="px-5 py-3 text-gray-500 text-xs">
+                        {new Date(c.createdAt).toLocaleDateString("en-US", {
+                          month: "short", day: "numeric", year: "numeric",
+                        })}
+                      </td>
+                      <td className="px-5 py-3">
+                        <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${c.active ? "bg-green-50 text-green-700" : "bg-gray-100 text-gray-500"}`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${c.active ? "bg-green-500" : "bg-gray-400"}`} />
+                          {c.active ? "Active" : "Inactive"}
+                        </span>
+                      </td>
+                      <td className="px-5 py-3 text-xs text-gray-500">
+                        {c.digestOptOut ? "Opted out" : "Subscribed"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Pagination */}
-      {totalPages > 1 && (
+      {listTab === "newsletter" && newsPages > 1 && (
         <div className="flex items-center justify-between mt-4 text-sm text-gray-500">
-          <p>Showing {((page - 1) * 50) + 1} to {Math.min(page * 50, total)} of {total.toLocaleString()}</p>
+          <p>Showing {((newsPage - 1) * PAGE_SIZE) + 1} to {Math.min(newsPage * PAGE_SIZE, newsTotal)} of {newsTotal.toLocaleString()}</p>
           <div className="flex items-center gap-2">
             <button
-              onClick={() => { setPage(page - 1); fetchSubscribers(search, page - 1); }}
-              disabled={page === 1}
+              onClick={() => { setNewsPage(newsPage - 1); fetchNewsletter(search, newsPage - 1); }}
+              disabled={newsPage === 1}
               className="px-3 py-1.5 border border-gray-200 rounded-lg disabled:opacity-40 hover:bg-gray-50 transition-colors"
             >
               Previous
             </button>
-            <span>Page {page} of {totalPages}</span>
+            <span>Page {newsPage} of {newsPages}</span>
             <button
-              onClick={() => { setPage(page + 1); fetchSubscribers(search, page + 1); }}
-              disabled={page === totalPages}
+              onClick={() => { setNewsPage(newsPage + 1); fetchNewsletter(search, newsPage + 1); }}
+              disabled={newsPage === newsPages}
+              className="px-3 py-1.5 border border-gray-200 rounded-lg disabled:opacity-40 hover:bg-gray-50 transition-colors"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
+      {listTab === "deals" && dealsPages > 1 && (
+        <div className="flex items-center justify-between mt-4 text-sm text-gray-500">
+          <p>Showing {((dealsPage - 1) * PAGE_SIZE) + 1} to {Math.min(dealsPage * PAGE_SIZE, dealsTotal)} of {dealsTotal.toLocaleString()}</p>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => { setDealsPage(dealsPage - 1); fetchDealsCustomers(search, dealsPage - 1); }}
+              disabled={dealsPage === 1}
+              className="px-3 py-1.5 border border-gray-200 rounded-lg disabled:opacity-40 hover:bg-gray-50 transition-colors"
+            >
+              Previous
+            </button>
+            <span>Page {dealsPage} of {dealsPages}</span>
+            <button
+              onClick={() => { setDealsPage(dealsPage + 1); fetchDealsCustomers(search, dealsPage + 1); }}
+              disabled={dealsPage === dealsPages}
               className="px-3 py-1.5 border border-gray-200 rounded-lg disabled:opacity-40 hover:bg-gray-50 transition-colors"
             >
               Next
