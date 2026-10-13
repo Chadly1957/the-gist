@@ -74,13 +74,12 @@ interface TouchContent {
 function buildTouch(
   touch: number,
   opts: {
-    firstName: string | null;
     area: string;
     newsletterName: string;
     link: string;
   }
 ): TouchContent {
-  const greeting = opts.firstName ? `Hey ${escapeHtml(opts.firstName)}` : "Hey";
+  const greeting = "Hey there!";
   const wrap = (inner: string) => `
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 560px; margin: 0 auto; padding: 32px 24px;">
       ${inner}
@@ -93,7 +92,7 @@ function buildTouch(
     return {
       subject: "Quick reminder: The Gist Deals",
       html: wrap(`
-        ${p(`${greeting},`)}
+        ${p(greeting)}
         ${p(`You joined <strong style="color: #111827;">${escapeHtml(opts.newsletterName)}</strong> a couple hours ago. Did you see the offer on the thank-you page?`)}
         ${p(`I built <strong style="color: #111827;">The Gist Deals</strong>: a digital book of real discounts from local ${escapeHtml(opts.area)} businesses, right on your phone. Weekly grocery deals, local coupons with QR codes, and the 10 best deals hand-picked every Monday.`)}
         ${p(`It&apos;s <strong style="color: #111827;">$15 once, yours for life</strong>. One grocery run usually covers it.`)}
@@ -107,7 +106,7 @@ function buildTouch(
     return {
       subject: "Is the Deals book worth $15?",
       html: wrap(`
-        ${p(`${greeting},`)}
+        ${p(greeting)}
         ${p(`Fair question. Here&apos;s how I think about it:`)}
         ${p(`The book has <strong style="color: #111827;">weekly grocery deals</strong> from stores like Aldi, Kroger, and Dollar General, <strong style="color: #111827;">real coupons from local ${escapeHtml(opts.area)} businesses</strong> you flash at checkout, and <strong style="color: #111827;">the 10 best deals</strong> hand-picked every Monday.`)}
         ${p(`Use <strong style="color: #111827;">one</strong> grocery deal in a typical week and you&apos;ve covered the $15. Everything after that is money back in your pocket.`)}
@@ -121,7 +120,7 @@ function buildTouch(
     return {
       subject: "Last email about the Deals book",
       html: wrap(`
-        ${p(`${greeting},`)}
+        ${p(greeting)}
         ${p(`This is the last email I&apos;ll send you about the Deals book. I don&apos;t want to be that guy.`)}
         ${p(`If you want it, it&apos;s <strong style="color: #111827;">$15 once, yours for life</strong>, and the One-Deal Promise still applies: save $15 in 60 days or email me for a full refund.`)}
         ${ctaHtml(opts.link, "Get the Book, $15 once")}
@@ -134,7 +133,7 @@ function buildTouch(
   return {
     subject: "quick question",
     html: wrap(`
-      ${p(`${greeting},`)}
+      ${p(greeting)}
       <p style="color: #4b5563; font-size: 14px; line-height: 1.7;">It&apos;s Chad.</p>
       <p style="color: #4b5563; font-size: 14px; line-height: 1.7;">
         I noticed you didn&apos;t grab the Deals book, and that&apos;s totally fine. The newsletter is free forever either way.
@@ -150,7 +149,7 @@ function buildTouch(
 }
 
 async function sendNurtureTouch(
-  subscriber: { id: string; email: string; firstName: string | null },
+  subscriber: { id: string; email: string },
   touch: number
 ): Promise<boolean> {
   const workspace = await getWorkspace();
@@ -180,7 +179,6 @@ async function sendNurtureTouch(
   const unsubUrl = `${appUrl}/unsubscribe?r=${recipient.id}&email=${encodeURIComponent(subscriber.email)}`;
 
   const content = buildTouch(touch, {
-    firstName: subscriber.firstName,
     area: workspace.area,
     newsletterName: workspace.name,
     link: dealsLink(appUrl, touch, subscriber.email),
@@ -236,7 +234,7 @@ export async function runDealsNurture(now = new Date()): Promise<NurtureRunResul
     },
     orderBy: { subscribedAt: "asc" },
     take: 200,
-    select: { id: true, email: true, firstName: true, subscribedAt: true },
+    select: { id: true, email: true, subscribedAt: true },
   });
 
   for (const sub of subscribers) {
