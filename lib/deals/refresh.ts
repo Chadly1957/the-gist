@@ -1,6 +1,11 @@
-// Runs retailer fetchers and stores results as draft DealWeeks for review.
-// Called from the admin "Refresh week" action (one click). Chad reviews,
-// picks Top 10, then publishes.
+// Runs retailer fetchers and stores results as LIVE (published) DealWeeks.
+// Full automation (Chad's call, 2026-10-12): as long as a fetch returns
+// deals for the retailer's configured market, they go straight into the
+// book — no draft review step. Location matching is inherent: every
+// retailer is seeded with a storeConfig (zip / storeId / locationId) tied
+// to its workspace's market, and refreshers never touch another workspace.
+// Safety valve: a week with zero fetched deals stays a draft so an empty or
+// glitched fetch can never blank out a retailer's live section.
 
 import { basePrisma } from "@/lib/db-base";
 import { fetchRetailerDeals } from "./fetchers";
@@ -12,6 +17,7 @@ export interface RefreshOutcome {
   ok: boolean;
   dealCount?: number;
   weekStart?: string;
+  note?: string;
   error?: string;
 }
 
@@ -40,6 +46,7 @@ export async function refreshRetailer(
   };
   try {
     const result = await fetchRetailerDeals(pipeline, parseConfig(retailer.storeConfig));
+    const hasDeals = result.deals.length > 0;
     // Upsert the week's row; never clobber a published week's status.
     const existing = await basePrisma.dealWeek.findUnique({
       where: {
@@ -60,9 +67,23 @@ export async function refreshRetailer(
           weekStart: result.weekStart,
           weekEnd: result.weekEnd,
           sourceUrl: result.sourceUrl,
-          status: "draft",
+          // Auto-publish on creation when the fetch returned real deals;
+          // zero-deal weeks stay drafts (safety valve, see header).
+          ...(hasDeals
+            ? { status: "published", publishedAt: new Date() }
+            : { status: "draft" }),
         },
       }));
+
+    // Auto-publish: a refreshed week with deals goes live immediately.
+    // Existing published weeks keep their status; zero-deal weeks stay
+    // drafts so a glitched fetch can never blank the book.
+    if (hasDeals && week.status !== "published") {
+      await basePrisma.dealWeek.update({
+        where: { id: week.id },
+        data: { status: "published", publishedAt: new Date() },
+      });
+    }
 
     // Replace the week's deals with the fresh fetch.
     await basePrisma.deal.deleteMany({ where: { workspaceId, dealWeekId: week.id } });
@@ -88,6 +109,7 @@ export async function refreshRetailer(
     outcome.ok = true;
     outcome.dealCount = result.deals.length;
     outcome.weekStart = result.weekStart;
+    if (!hasDeals) outcome.note = "0 deals fetched — week left as draft, not published.";
   } catch (err) {
     outcome.error = err instanceof Error ? err.message : String(err);
   }

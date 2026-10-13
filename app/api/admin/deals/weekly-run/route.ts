@@ -7,8 +7,10 @@ export const dynamic = "force-dynamic";
 // Refresh + publish + send can take a while across all retailers.
 export const maxDuration = 300;
 
-// One-call Friday morning run: refresh all automated retailers, publish the
-// fresh draft weeks, then send the weekly digest to opted-in buyers.
+// One-call Friday morning run: refresh all automated retailers (fetched
+// weeks auto-publish when they contain deals), backstop-publish any
+// remaining draft weeks from this run, then send the weekly digest to
+// opted-in buyers. Zero manual steps: a run ends with live book deals.
 // Secured by bearer secret (WEEKLY_RUN_SECRET): the scheduled agent can't
 // (rebuild to pick up env var)
 // hold an admin session. Body: { secret*, workspaceSlug*: "decatur" | "effingham" }
@@ -37,10 +39,12 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // 1. Refresh all automated retailers into draft weeks.
+  // 1. Refresh all automated retailers. refreshRetailer auto-publishes any
+  // week that returned deals; zero-deal weeks stay drafts (safety valve).
   const refresh = await refreshAllRetailers(workspace.id);
 
-  // 2. Publish the fresh draft weeks from this run.
+  // 2. Backstop: publish any draft weeks from this run that the refresh
+  // path didn't already publish (e.g. a retailer re-enabled mid-run).
   const published: string[] = [];
   for (const o of refresh) {
     if (!o.ok || !o.weekStart) continue;
