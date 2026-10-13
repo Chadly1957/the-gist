@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getAdminSession } from "@/lib/auth";
 import { getEmailClient, htmlToText } from "@/lib/email";
-import { renderTemplate, Block, SpotlightItem, PresentingSponsorItem, InArticleAdItem, EventItem } from "@/lib/template-renderer";
+import { renderTemplate, Block, SpotlightItem, PresentingSponsorItem, InArticleAdItem, EventItem, getDealsBlockCopy, DEALS_BUYER_COPY, resolveDealsPlaceholders } from "@/lib/template-renderer";
 import { fetchWeatherSnapshot, WeatherSnapshot } from "@/lib/weather";
 import { blurbToHtml } from "@/lib/url";
 
@@ -112,6 +112,19 @@ export async function POST(req: NextRequest) {
   const themeWs = await getWorkspace();
   const theme = { primary: themeWs.primaryColor, secondary: themeWs.secondaryColor };
 
+  // Dual-purpose Deals block: show the buyer variant when the test address
+  // belongs to a Deals buyer.
+  const dealsCopy = getDealsBlockCopy(blocks);
+  let testBuyerToken: string | null = null;
+  if (blocks.some((b) => b.type === "deals_signup")) {
+    const purchases = await prisma.couponBookPurchase.findMany({
+      where: { active: true },
+      select: { email: true, magicToken: true },
+    });
+    testBuyerToken =
+      purchases.find((p) => p.email.toLowerCase() === testEmail.toLowerCase())?.magicToken ?? null;
+  }
+
   // Fetch the weather snapshot at send time (if the template has a weather block).
   // Wrapped in try/catch so a weather API hiccup never blocks the test send.
   const weatherBlock = blocks.find((b) => b.type === "weather");
@@ -132,21 +145,25 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const htmlBody = renderTemplate(
-    blocks,
-    articles.map((a) => ({ ...a, publishedAt: a.publishedAt })),
-    { spotlights, presentingSponsor, inArticleAds },
-    undefined,
-    events,
-    undefined,
-    undefined,
-    weatherData,
-    theme
-  )
-    .replace(/\{\{UNSUBSCRIBE_URL\}\}/g, `${appUrl}/unsubscribe`)
-    .replace(/\{\{PROFILE_URL\}\}/g, `${appUrl}/profile?r=preview`)
-    .replace(/\{\{APP_URL\}\}/g, appUrl)
-    .replace(/REFCODEPLACEHOLDER/g, "preview");
+  const htmlBody = resolveDealsPlaceholders(
+    renderTemplate(
+      blocks,
+      articles.map((a) => ({ ...a, publishedAt: a.publishedAt })),
+      { spotlights, presentingSponsor, inArticleAds },
+      undefined,
+      events,
+      undefined,
+      undefined,
+      weatherData,
+      theme
+    )
+      .replace(/\{\{UNSUBSCRIBE_URL\}\}/g, `${appUrl}/unsubscribe`)
+      .replace(/\{\{PROFILE_URL\}\}/g, `${appUrl}/profile?r=preview`)
+      .replace(/\{\{APP_URL\}\}/g, appUrl)
+      .replace(/REFCODEPLACEHOLDER/g, "preview"),
+    testBuyerToken ? DEALS_BUYER_COPY : dealsCopy,
+    testBuyerToken ? `${appUrl}/deals?token=${testBuyerToken}` : `${appUrl}/deals?source=newsletter`
+  );
 
   const emailClient = await getEmailClient(allSettings);
   if (!emailClient) {

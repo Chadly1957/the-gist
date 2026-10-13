@@ -3,7 +3,7 @@ import { workspaceFetch, workspaceStorage } from "@/lib/workspace-client";
 
 import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
 import { useEffect, useRef, useState } from "react";
-import { renderTemplate } from "@/lib/template-renderer";
+import { renderTemplate, getDealsBlockCopy, resolveDealsPlaceholders } from "@/lib/template-renderer";
 import { sampleWeatherSnapshot } from "@/lib/weather";
 import { blurbToHtml } from "@/lib/url";
 
@@ -338,19 +338,24 @@ export default function ComposePage() {
       );
     }
 
-    return renderTemplate(
-      blocks,
-      selectedArticles.map((a) => ({
-        ...a,
-        publishedAt: new Date(a.publishedAt),
-      })),
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      sampleWeatherSnapshot(),
-      { primary: workspace.primaryColor, secondary: workspace.secondaryColor }
+    return resolveDealsPlaceholders(
+      renderTemplate(
+        blocks,
+        selectedArticles.map((a) => ({
+          ...a,
+          publishedAt: new Date(a.publishedAt),
+        })),
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        sampleWeatherSnapshot(),
+        { primary: workspace.primaryColor, secondary: workspace.secondaryColor }
+      ),
+      // Preview shows the non-buyer pitch; the buyer variant is per-recipient at send time.
+      getDealsBlockCopy(blocks),
+      "{{APP_URL}}/deals?source=newsletter"
     );
   }
 
