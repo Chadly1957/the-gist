@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getAdminSession } from "@/lib/auth";
 import { getEmailClient, htmlToText } from "@/lib/email";
+import { getDealsBlockCopy, DEALS_BUYER_COPY, resolveDealsPlaceholders } from "@/lib/template-renderer";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = prisma as any;
@@ -93,13 +94,30 @@ export async function POST(
     }
   }
 
+  // Dual-purpose Deals block: resolve {{DEALS_*}} placeholders per recipient.
+  // No-op for sends stored before the block became dual-purpose.
+  const dealsFallbackCopy = getDealsBlockCopy([]);
+  const buyerTokens = new Map<string, string>();
+  if (existingSend.htmlBody.includes("{{DEALS_URL}}")) {
+    const purchases = await prisma.couponBookPurchase.findMany({
+      where: { active: true },
+      select: { email: true, magicToken: true },
+    });
+    for (const p of purchases) buyerTokens.set(p.email.toLowerCase(), p.magicToken);
+  }
+
   const personalized = recipients.map((r) => {
     const sub = activeSubscribers.find((s) => s.email === r.email);
     const refCode = (sub && refCodeMap.get(sub.id)) || "nocode";
-    const personalizedHtml = existingSend.htmlBody
-      .replaceAll("RIDPLACEHOLDER", r.id)
-      .replaceAll("EMAILPLACEHOLDER", encodeURIComponent(r.email))
-      .replaceAll("REFCODEPLACEHOLDER", refCode);
+    const buyerToken = buyerTokens.get(r.email.toLowerCase());
+    const personalizedHtml = resolveDealsPlaceholders(
+      existingSend.htmlBody
+        .replaceAll("RIDPLACEHOLDER", r.id)
+        .replaceAll("EMAILPLACEHOLDER", encodeURIComponent(r.email))
+        .replaceAll("REFCODEPLACEHOLDER", refCode),
+      buyerToken ? DEALS_BUYER_COPY : dealsFallbackCopy,
+      buyerToken ? `${appUrl}/deals?token=${buyerToken}` : `${appUrl}/deals?source=newsletter`
+    );
     const unsubUrl = `${appUrl}/unsubscribe?r=${r.id}&email=${encodeURIComponent(r.email)}`;
     return {
       to: r.email,

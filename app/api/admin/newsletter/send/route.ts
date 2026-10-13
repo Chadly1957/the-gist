@@ -4,7 +4,7 @@ import { workspaceUnique } from "@/lib/workspace";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getAdminSession } from "@/lib/auth";
-import { renderTemplate, Block, SpotlightItem, PresentingSponsorItem, InArticleAdItem, EventItem, PollData, WordyData } from "@/lib/template-renderer";
+import { renderTemplate, Block, SpotlightItem, PresentingSponsorItem, InArticleAdItem, EventItem, PollData, WordyData, getDealsBlockCopy, DEALS_BUYER_COPY, resolveDealsPlaceholders } from "@/lib/template-renderer";
 import { fetchWeatherSnapshot, WeatherSnapshot } from "@/lib/weather";
 import { getEmailClient, htmlToText } from "@/lib/email";
 import { signTrackingUrl } from "@/lib/tracking";
@@ -59,6 +59,18 @@ export async function POST(req: NextRequest) {
 
   // Fetch sponsor data for this newsletter date
   const date = newsletterDate || new Date().toISOString().split("T")[0];
+
+  // Dual-purpose Deals block: buyers see an "Open Your Deals Book" portal
+  // button, everyone else sees the buy-now pitch. Resolved per recipient below.
+  const dealsCopy = getDealsBlockCopy(blocks);
+  const buyerTokens = new Map<string, string>();
+  if (blocks.some((b) => b.type === "deals_signup")) {
+    const purchases = await prisma.couponBookPurchase.findMany({
+      where: { active: true },
+      select: { email: true, magicToken: true },
+    });
+    for (const p of purchases) buyerTokens.set(p.email.toLowerCase(), p.magicToken);
+  }
 
   // Load settings first so we can use configured limits
   const allSettings = Object.fromEntries(
@@ -245,21 +257,26 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Clean snapshot for public archive: no tracking tokens, no personalization
-  const htmlSnapshot = renderTemplate(
-    blocks,
-    articles.map((a) => ({ ...a, publishedAt: a.publishedAt })),
-    { spotlights, presentingSponsor, inArticleAds },
-    undefined,
-    events,
-    pollsMap,
-    wordyData,
-    weatherData,
-    theme
-  )
-    .replace(/\{\{UNSUBSCRIBE_URL\}\}/g, `${appUrl}/unsubscribe`)
-    .replace(/\{\{PROFILE_URL\}\}/g, `${appUrl}/profile`)
-    .replace(/\{\{APP_URL\}\}/g, appUrl);
+  // Clean snapshot for public archive: no tracking tokens, no personalization.
+  // The Deals block shows the non-buyer pitch here (no per-recipient buyer data).
+  const htmlSnapshot = resolveDealsPlaceholders(
+    renderTemplate(
+      blocks,
+      articles.map((a) => ({ ...a, publishedAt: a.publishedAt })),
+      { spotlights, presentingSponsor, inArticleAds },
+      undefined,
+      events,
+      pollsMap,
+      wordyData,
+      weatherData,
+      theme
+    )
+      .replace(/\{\{UNSUBSCRIBE_URL\}\}/g, `${appUrl}/unsubscribe`)
+      .replace(/\{\{PROFILE_URL\}\}/g, `${appUrl}/profile`)
+      .replace(/\{\{APP_URL\}\}/g, appUrl),
+    dealsCopy,
+    `${appUrl}/deals?source=newsletter`
+  );
 
   let recipientCount = 0;
   const status = emailClient ? "sent" : "draft";
@@ -295,10 +312,15 @@ export async function POST(req: NextRequest) {
     const personalized = recipients.map((r) => {
       const sub = activeSubscribers.find((s) => s.email === r.email);
       const refCode = (sub && refCodeMap.get(sub.id)) || "nocode";
-      const personalizedHtml = htmlBody
-        .replaceAll("RIDPLACEHOLDER", r.id)
-        .replaceAll("EMAILPLACEHOLDER", encodeURIComponent(r.email))
-        .replaceAll("REFCODEPLACEHOLDER", refCode);
+      const buyerToken = buyerTokens.get(r.email.toLowerCase());
+      const personalizedHtml = resolveDealsPlaceholders(
+        htmlBody
+          .replaceAll("RIDPLACEHOLDER", r.id)
+          .replaceAll("EMAILPLACEHOLDER", encodeURIComponent(r.email))
+          .replaceAll("REFCODEPLACEHOLDER", refCode),
+        buyerToken ? DEALS_BUYER_COPY : dealsCopy,
+        buyerToken ? `${appUrl}/deals?token=${buyerToken}` : `${appUrl}/deals?source=newsletter`
+      );
       const unsubUrl = `${appUrl}/unsubscribe?r=${r.id}&email=${encodeURIComponent(r.email)}`;
       return {
         to: r.email,

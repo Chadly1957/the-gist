@@ -3,7 +3,7 @@ import { workspaceFetch } from "@/lib/workspace-client";
 
 import { useEffect, useState } from "react";
 import BlockEditor, { Block } from "@/components/admin/BlockEditor";
-import { renderTemplate } from "@/lib/template-renderer";
+import { renderTemplate, getDealsBlockCopy, resolveDealsPlaceholders } from "@/lib/template-renderer";
 import { sampleWeatherSnapshot } from "@/lib/weather";
 import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
 
@@ -105,32 +105,36 @@ export default function TemplatesPage() {
   }
 
   const previewHtml = selected
-    ? renderTemplate(selected.blocks, [
-        {
-          title: "Example: City Council Approves New Park",
-          description: "The Decatur City Council voted 7-0 Tuesday to approve a new community park on the east side, a project that has been in planning for two years…",
-          imageUrl: null,
-          articleUrl: "#",
-          sourceName: "Decatur Daily",
-          publishedAt: new Date(),
-        },
-        {
-          title: "Local Restaurant Week Returns This Friday",
-          description: "More than 30 Decatur restaurants will participate in this year's Restaurant Week, offering special menus and discounts for five days starting Friday…",
-          imageUrl: null,
-          articleUrl: "#",
-          sourceName: "AL.com",
-          publishedAt: new Date(),
-        },
-      ],
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      sampleWeatherSnapshot(),
-      { primary: workspace.primaryColor, secondary: workspace.secondaryColor }
-    )
+    ? resolveDealsPlaceholders(
+        renderTemplate(selected.blocks, [
+          {
+            title: "Example: City Council Approves New Park",
+            description: "The Decatur City Council voted 7-0 Tuesday to approve a new community park on the east side, a project that has been in planning for two years…",
+            imageUrl: null,
+            articleUrl: "#",
+            sourceName: "Decatur Daily",
+            publishedAt: new Date(),
+          },
+          {
+            title: "Local Restaurant Week Returns This Friday",
+            description: "More than 30 Decatur restaurants will participate in this year's Restaurant Week, offering special menus and discounts for five days starting Friday…",
+            imageUrl: null,
+            articleUrl: "#",
+            sourceName: "AL.com",
+            publishedAt: new Date(),
+          },
+        ],
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        sampleWeatherSnapshot(),
+        { primary: workspace.primaryColor, secondary: workspace.secondaryColor }
+        ),
+        getDealsBlockCopy(selected.blocks),
+        "{{APP_URL}}/deals?source=newsletter"
+      )
     : "";
 
   if (loading) {

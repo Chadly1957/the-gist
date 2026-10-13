@@ -489,27 +489,66 @@ function renderTipJar(content: Record<string, unknown>): string {
     </div>`;
 }
 
-function renderDealsSignup(content: Record<string, unknown>): string {
-  const headline = String(content.headline || "Introducing The Gist Deals");
-  const body = String(content.body || "Hundreds of deals from local businesses and your favorite stores. $15 once, yours for life.");
-  const buttonLabel = String(content.buttonLabel || "Get the Book");
-  const dealsUrl = "{{APP_URL}}/deals?source=newsletter";
-
+// The deals_signup block is dual-purpose: it renders with {{DEALS_*}}
+// placeholders so each send route can swap in the buyer variant ("Open Your
+// Deals Book" with a personalized portal link) or the non-buyer buy-now pitch
+// per recipient. See resolveDealsPlaceholders below.
+function renderDealsSignup(): string {
   return `
     <div style="padding:20px 40px;">
       <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:24px;text-align:center;">
         <div style="font-size:28px;margin-bottom:8px;">&#x1F39F;&#xFE0F;</div>
         <div style="font-size:17px;font-weight:700;color:#14532d;font-family:Georgia,serif;line-height:1.4;margin-bottom:6px;">
-          ${headline}
+          {{DEALS_HEADLINE}}
         </div>
         <div style="font-size:13px;color:#166534;font-family:sans-serif;margin-bottom:18px;">
-          ${body}
+          {{DEALS_BODY}}
         </div>
-        <a href="${dealsUrl}" style="display:inline-block;background:#15803d;color:#ffffff;padding:12px 28px;border-radius:6px;text-decoration:none;font-size:14px;font-family:sans-serif;font-weight:700;">
-          ${buttonLabel}
+        <a href="{{DEALS_URL}}" style="display:inline-block;background:#15803d;color:#ffffff;padding:12px 28px;border-radius:6px;text-decoration:none;font-size:14px;font-family:sans-serif;font-weight:700;">
+          {{DEALS_BUTTON}}
         </a>
       </div>
     </div>`;
+}
+
+export interface DealsCopy {
+  headline: string;
+  body: string;
+  buttonLabel: string;
+}
+
+const DEALS_DEFAULT_COPY: DealsCopy = {
+  headline: "Introducing The Gist Deals",
+  body: "Hundreds of deals from local businesses and your favorite stores. $15 once, yours for life.",
+  buttonLabel: "Get the Book",
+};
+
+export const DEALS_BUYER_COPY: DealsCopy = {
+  headline: "Your Deals Book Is Ready",
+  body: "Your lifetime book is stocked with this week's local deals. Open it anytime to browse and save.",
+  buttonLabel: "Open Your Deals Book",
+};
+
+// Non-buyer pitch copy comes from the template's deals_signup block when set,
+// otherwise the defaults above.
+export function getDealsBlockCopy(blocks: Block[]): DealsCopy {
+  const block = blocks.find((b) => b.type === "deals_signup");
+  const content = (block?.content || {}) as Record<string, unknown>;
+  return {
+    headline: String(content.headline || DEALS_DEFAULT_COPY.headline),
+    body: String(content.body || DEALS_DEFAULT_COPY.body),
+    buttonLabel: String(content.buttonLabel || DEALS_DEFAULT_COPY.buttonLabel),
+  };
+}
+
+// Swap the {{DEALS_*}} placeholders for one variant of the block. Replacer
+// functions are used so copy containing "$" (e.g. "$15") is inserted literally.
+export function resolveDealsPlaceholders(html: string, copy: DealsCopy, url: string): string {
+  return html
+    .replaceAll("{{DEALS_HEADLINE}}", () => copy.headline)
+    .replaceAll("{{DEALS_BODY}}", () => copy.body)
+    .replaceAll("{{DEALS_BUTTON}}", () => copy.buttonLabel)
+    .replaceAll("{{DEALS_URL}}", () => url);
 }
 
 function renderDivider(): string {
@@ -645,7 +684,7 @@ export function renderTemplate(
         case "tip_jar":
           return renderTipJar(block.content);
         case "deals_signup":
-          return renderDealsSignup(block.content);
+          return renderDealsSignup();
         case "weather":
           return renderWeather(block.content, weatherData);
         default:
