@@ -24,6 +24,13 @@ interface JoinData {
   } | null;
 }
 
+function getJoinVariant(): string {
+  if (typeof document === "undefined") return "a";
+  const match = document.cookie.match(/(?:^|; )gist_join_variant=([^;]*)/);
+  const v = match ? decodeURIComponent(match[1]) : "a";
+  return v === "b" ? "b" : "a";
+}
+
 function JoinForm({ compact = false }: { compact?: boolean }) {
   const { workspace } = useWorkspace();
   const [email, setEmail] = useState("");
@@ -39,7 +46,7 @@ function JoinForm({ compact = false }: { compact?: boolean }) {
       const res = await workspaceFetch("/api/subscribe", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email, variant: getJoinVariant() }),
       });
       const data = await res.json();
       if (res.ok) {
@@ -92,7 +99,7 @@ function JoinForm({ compact = false }: { compact?: boolean }) {
           disabled={status === "loading"}
           className="bg-green-700 hover:bg-green-800 text-white font-semibold px-6 py-3.5 rounded-xl text-sm transition-colors disabled:opacity-60 whitespace-nowrap"
         >
-          {status === "loading" ? "…" : "Subscribe"}
+          {status === "loading" ? "…" : "Get it free"}
         </button>
       </div>
       {status === "error" && <p className="text-red-500 text-sm mt-2">{message}</p>}
@@ -124,12 +131,21 @@ function gamesLine(games: string[]): string {
 export default function JoinPage() {
   const { workspace } = useWorkspace();
   const [data, setData] = useState<JoinData | null>(null);
+  const [variant, setVariant] = useState<string>("a");
 
   useEffect(() => {
     workspaceFetch("/api/join-data")
       .then((r) => r.json())
       .then((d) => setData(d))
       .catch(() => null);
+    // A/B test: read sticky variant, log a view event for conversion tracking.
+    const v = getJoinVariant();
+    setVariant(v);
+    workspaceFetch("/api/join-test-event", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ variant: v, event: "view" }),
+    }).catch(() => null);
   }, []);
 
   const rounded = data?.rounded ?? null;
@@ -149,7 +165,7 @@ export default function JoinPage() {
   const faqs = [
     {
       q: "Is it really free?",
-      a: "Yes. Free forever. The newsletter will never cost you anything. (There's a separate optional Deals book for $15, but the daily email is free.)",
+      a: "Yes. Free forever. The newsletter will never cost you anything.",
     },
     {
       q: "Will you sell my email or spam me?",
@@ -203,6 +219,11 @@ export default function JoinPage() {
             </p>
 
             <JoinForm />
+            {variant === "b" && (
+              <p className="text-sm text-green-700 font-semibold mt-4">
+                Tomorrow&apos;s issue drops at 6 AM. Join tonight to wake up caught up.
+              </p>
+            )}
           </div>
 
           {/* Fanned issue cards from the latest real send, or the hero image */}
@@ -300,9 +321,9 @@ export default function JoinPage() {
                 <p className="text-[11px] font-bold tracking-[0.12em] text-green-700 mb-4">THE 2-MINUTE TRADE</p>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="bg-red-50 rounded-xl p-4">
-                    <p className="text-[13px] font-bold text-red-800 mb-1.5">20 min on Facebook</p>
+                    <p className="text-[13px] font-bold text-red-800 mb-1.5">20 min scrolling</p>
                     <p className="text-[13px] text-gray-500 leading-relaxed">
-                      Ads. Outrage. Your cousin&apos;s politics. Zero idea what&apos;s actually happening in {workspace.area}.
+                      Endless feed. Maybe some local news. Probably your cousin&apos;s politics. Zero idea what&apos;s actually happening in {workspace.area}.
                     </p>
                   </div>
                   <div className="bg-green-50 rounded-xl p-4">
@@ -353,6 +374,19 @@ export default function JoinPage() {
         </section>
 
         {/* ── FAQ ── */}
+        {variant === "b" && (
+          <section className="py-12 sm:py-14">
+            <div className="max-w-xl mx-auto px-6 text-center">
+              <h2 className="text-2xl font-extrabold text-gray-900 tracking-tight mb-3">
+                Ready to wake up caught up?
+              </h2>
+              <p className="text-gray-500 mb-6 text-sm">Join free. Unsubscribe anytime.</p>
+              <div className="flex justify-center">
+                <JoinForm compact />
+              </div>
+            </div>
+          </section>
+        )}
         <section className="bg-white border-y border-[#ece7dd] py-14 sm:py-16">
           <div className="max-w-2xl mx-auto px-6">
             <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight mb-8 text-center">

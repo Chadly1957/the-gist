@@ -48,6 +48,7 @@ model Workspace {
   wordyBookingRows            WordyBooking[]
   wordyPlayRows               WordyPlay[]
   matchScoreRows              MatchScore[]
+  joinTestEventRows           JoinTestEvent[]
   pollRows                    Poll[]
   pollOptionRows              PollOption[]
   pollVoteRows                PollVote[]
@@ -133,6 +134,19 @@ model Subscriber {
   @@unique([workspaceId, email])
   @@unique([id, workspaceId])
   @@index([workspaceId])
+}
+
+// A/B test events for the /join landing page (view + signup per variant).
+model JoinTestEvent {
+  workspaceId String    @default("decatur")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  id          String    @id @default(cuid())
+  variant     String
+  event       String
+  createdAt   DateTime  @default(now())
+
+  @@index([workspaceId, variant, event])
+  @@index([createdAt])
 }
 
 model Setting {
