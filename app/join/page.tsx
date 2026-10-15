@@ -160,7 +160,7 @@ export default function JoinPage() {
     .toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })
     .toUpperCase();
   const heroImage =
-    workspace.heroImageUrl ?? (workspace.slug === "effingham" ? "/hero-effingham.png" : "/hero-decatur.jpg");
+    workspace.heroImageUrl ?? (workspace.slug === "effingham" ? "/join-hero.png" : "/join-hero-decatur.png");
 
   const faqs = [
     {
@@ -200,8 +200,15 @@ export default function JoinPage() {
       </header>
 
       <main className="flex-1">
-        {/* ── HERO ── */}
-        <section className="max-w-5xl mx-auto px-6 pt-10 pb-14 sm:pt-16 sm:pb-20 grid gap-10 lg:grid-cols-[1.05fr_0.95fr] lg:items-center">
+        {/* ── HERO with aerial background ── */}
+        <section className="relative overflow-hidden">
+          <img
+            src={heroImage}
+            alt=""
+            aria-hidden="true"
+            className="absolute inset-0 w-full h-full object-cover object-right"
+          />
+          <div className="relative max-w-5xl mx-auto px-6 pt-10 pb-14 sm:pt-16 sm:pb-20 grid gap-10 lg:grid-cols-[1.05fr_0.95fr] lg:items-center">
           <div>
             {showProof && (
               <div className="inline-flex items-center gap-2 bg-green-50 text-green-700 text-xs font-bold px-3 py-1.5 rounded-full mb-6 border border-green-100">
@@ -251,14 +258,9 @@ export default function JoinPage() {
                 </div>
               </>
             ) : (
-              <div>
-                <img
-                  src={heroImage}
-                  alt={`${workspace.area}, Illinois`}
-                  className="w-full rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.10)]"
-                />
-              </div>
+              <div aria-hidden="true" />
             )}
+          </div>
           </div>
         </section>
 
