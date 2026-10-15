@@ -6,7 +6,7 @@ import { sendWelcomeEmail } from "@/lib/welcome-email";
 
 export async function POST(req: NextRequest) {
   try {
-    const { email, firstName } = await req.json();
+    const { email, firstName, variant } = await req.json();
 
     if (!email || !email.includes("@")) {
       return NextResponse.json({ error: "Valid email required." }, { status: 400 });
@@ -30,6 +30,17 @@ export async function POST(req: NextRequest) {
         });
 
     const appUrl = await getWorkspaceUrl();
+    // Log A/B test signup event if a valid variant was passed.
+    if (["a", "b"].includes(variant)) {
+      try {
+        const ws = await getWorkspace();
+        await prisma.joinTestEvent.create({
+          data: { workspaceId: ws.id, variant, event: "signup" },
+        });
+      } catch {
+        // Event logging must not break the subscription itself
+      }
+    }
     try {
       await sendWelcomeEmail({ id: subscriber.id, email: subscriber.email }, appUrl);
     } catch {

@@ -10,6 +10,18 @@ export async function middleware(req: NextRequest) {
   // Never trust a caller-supplied scope. It comes only from the URL.
   requestHeaders.delete("x-gist-workspace");
   if (scoped) requestHeaders.set("x-gist-workspace", scoped.slug);
+  // A/B test variant assignment for /join. Random on first visit, sticky via
+  // 30-day cookie so returning visitors always see the same version.
+  // Variants: "a" = control, "b" = urgency + friction fixes.
+  let joinVariant: string | null = null;
+  if (pathname === "/join") {
+    const valid = ["a", "b"];
+    joinVariant = req.cookies.get("gist_join_variant")?.value || null;
+    if (!joinVariant || !valid.includes(joinVariant)) {
+      joinVariant = valid[Math.floor(Math.random() * valid.length)];
+    }
+    requestHeaders.set("x-join-variant", joinVariant);
+  }
   const isAdmin = pathname === "/admin" || pathname.startsWith("/admin/") || pathname.startsWith("/api/admin/");
   const isLogin = pathname === "/admin/login" || pathname === "/api/admin/login";
   if (isAdmin && !isLogin) {
@@ -38,8 +50,24 @@ export async function middleware(req: NextRequest) {
   if (scoped) {
     const url = req.nextUrl.clone();
     url.pathname = pathname;
-    return NextResponse.rewrite(url, { request: { headers: requestHeaders } });
+    const res = NextResponse.rewrite(url, { request: { headers: requestHeaders } });
+    if (joinVariant) {
+      res.cookies.set("gist_join_variant", joinVariant, {
+        maxAge: 60 * 60 * 24 * 30,
+        path: "/",
+        sameSite: "lax",
+      });
+    }
+    return res;
   }
-  return NextResponse.next({ request: { headers: requestHeaders } });
+  const res = NextResponse.next({ request: { headers: requestHeaders } });
+  if (joinVariant) {
+    res.cookies.set("gist_join_variant", joinVariant, {
+      maxAge: 60 * 60 * 24 * 30,
+      path: "/",
+      sameSite: "lax",
+    });
+  }
+  return res;
 }
 export const config = { matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"] };
