@@ -757,6 +757,12 @@ function DealsPageInner() {
           <button onClick={resendLink} className="w-full py-2 text-sm text-gray-600 underline">
             Already bought one? Email me my link
           </button>
+          <p className="text-center text-sm text-gray-500 mt-2">
+            Buying for someone else?{" "}
+            <a href="/deals/gift" className="text-green-700 font-semibold underline">
+              Gift the book 🎁
+            </a>
+          </p>
         </div>
       </section>
 

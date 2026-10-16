@@ -8,3 +8,7 @@ export function couponBookPriceCents(): number {
 // Stripe metadata kind used to route checkout.session.completed events to the
 // coupon book fulfillment path.
 export const COUPON_BOOK_STRIPE_KIND = "coupon_book";
+
+// Stripe metadata kind for gifted coupon books. Fulfillment creates the
+// purchase row for the RECIPIENT's email and sends the gift email.
+export const COUPON_BOOK_GIFT_STRIPE_KIND = "coupon_book_gift";

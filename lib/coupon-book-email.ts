@@ -65,6 +65,69 @@ export async function sendCouponBookMagicLinkEmail(opts: {
   }
 }
 
+// Gift email: tells the recipient who sent the book, shows their message,
+// and gives them their magic link. The buyer (gifter) gets Stripe's own
+// receipt; no separate buyer email is sent.
+export async function sendCouponBookGiftEmail(opts: {
+  workspaceId: string;
+  to: string;
+  magicToken: string;
+  gifterName: string;
+  gifterEmail: string;
+  giftMessage: string;
+}): Promise<void> {
+  try {
+    await withWorkspaceById(opts.workspaceId, async () => {
+      const workspaceUrl = await getWorkspaceUrl();
+      const bookUrl = `${workspaceUrl}/deals?token=${opts.magicToken}`;
+      const rows = await prisma.setting.findMany();
+      const settings = Object.fromEntries(rows.map((r) => [r.key, r.value]));
+      const client = await getEmailClient(settings);
+      if (!client) throw new Error("No email provider configured for this workspace");
+      const ws = await getWorkspace();
+      const logoHtml = ws.dealsLogoUrl
+        ? `<img src="${escapeHtml(ws.dealsLogoUrl)}" alt="The Gist Deals" style="height: 96px; width: auto; display: block; margin: 0 0 16px;" />`
+        : "";
+      const fromLabel = opts.gifterName || opts.gifterEmail;
+      await client.sendEmail({
+        to: opts.to,
+        subject: `${fromLabel} sent you a Gist Deals Book`,
+        htmlBody: `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 480px; margin: 0 auto; padding: 32px 24px;">
+      ${logoHtml}
+      <h2 style="color: #111827; margin: 0 0 12px;">You got a gift!</h2>
+      <p style="color: #4b5563; font-size: 14px; line-height: 1.5;">
+        <strong>${escapeHtml(fromLabel)}</strong> bought you the Gist Deals Book, every deal worth
+        knowing about, in one little book on your phone. One-time gift, yours for life, no subscription.
+      </p>
+      ${opts.giftMessage ? `<div style="background: #f9fafb; border-left: 3px solid #24726f; padding: 12px 16px; margin: 16px 0;"><p style="color: #4b5563; font-size: 14px; font-style: italic; margin: 0;">&ldquo;${escapeHtml(opts.giftMessage)}&rdquo;</p></div>` : ""}
+      <p style="margin: 24px 0;">
+        <a href="${bookUrl}" style="background: #24726f; color: #ffffff; padding: 12px 22px; border-radius: 10px; text-decoration: none; font-weight: 600; font-size: 14px; display: inline-block;">
+          Open My Gist Deals Book
+        </a>
+      </p>
+      <p style="color: #9ca3af; font-size: 12px; word-break: break-all;">Or copy this link: ${bookUrl}</p>
+      <div style="border-top: 1px solid #e5e7eb; margin: 20px 0; padding-top: 16px;">
+        <p style="color: #111827; font-size: 14px; font-weight: bold; margin: 0 0 8px;">Also included with your book</p>
+        <p style="color: #4b5563; font-size: 14px; line-height: 1.5; margin: 0 0 8px;">
+          <strong>The Friday Deal Drop.</strong> Every Friday, the week&apos;s best new deals land in your inbox. You&apos;re on the list.
+        </p>
+        <p style="color: #4b5563; font-size: 14px; line-height: 1.5; margin: 0;">
+          <strong>Deal Savings Tracker.</strong> Log every deal you use and watch the book pay for itself:
+          <a href="${workspaceUrl}/deals/tracker" style="color: #24726f; font-weight: 600;">open your printable tracker</a>
+        </p>
+      </div>
+      <p style="color: #9ca3af; font-size: 12px;">This link is unique to you. If you weren&apos;t expecting a Gist Deals Book, you can ignore this email.</p>
+    </div>
+  `,
+      });
+    });
+  } catch (err) {
+    console.error("Failed to send coupon book gift email:", err);
+    throw err instanceof Error ? err : new Error(String(err));
+  }
+}
+
 // Notify the business owner each time one of their coupons is redeemed.
 export async function sendCouponRedemptionEmail(opts: {
   workspaceId: string;

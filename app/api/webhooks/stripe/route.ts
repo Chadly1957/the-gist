@@ -62,6 +62,31 @@ async function fulfillCouponBookPurchase(workspaceId: string, session: Stripe.Ch
   await sendCouponBookMagicLinkEmail({ workspaceId, to: email, magicToken: purchase.magicToken });
 }
 
+async function fulfillCouponBookGift(workspaceId: string, session: Stripe.Checkout.Session) {
+  // The recipient's email is in metadata (set by gift-checkout). The buyer
+  // paid on their own email, which Stripe receipts automatically.
+  const email = (session.metadata?.email || "").trim().toLowerCase();
+  if (!email || !email.includes("@")) {
+    console.error(`Coupon book gift payment captured but no recipient email for session ${session.id}`);
+    return;
+  }
+  // Idempotent: the same session completing twice reuses the purchase row.
+  const purchase = await basePrisma.couponBookPurchase.upsert({
+    where: { stripeSessionId: session.id },
+    update: { active: true, email },
+    create: { workspaceId, email, stripeSessionId: session.id, active: true },
+  });
+  const { sendCouponBookGiftEmail } = await import("@/lib/coupon-book-email");
+  await sendCouponBookGiftEmail({
+    workspaceId,
+    to: email,
+    magicToken: purchase.magicToken,
+    gifterName: (session.metadata?.gifterName || "").trim(),
+    gifterEmail: (session.metadata?.gifterEmail || "").trim(),
+    giftMessage: (session.metadata?.giftMessage || "").trim(),
+  });
+}
+
 export async function POST(req: NextRequest) {
   if (!process.env.STRIPE_SECRET_KEY || !process.env.STRIPE_WEBHOOK_SECRET) {
     return NextResponse.json({ error: "Stripe not configured." }, { status: 503 });
@@ -97,6 +122,8 @@ export async function POST(req: NextRequest) {
       await fulfillWeekBooking(workspaceId, session);
     } else if (session.metadata?.kind === "coupon_book") {
       await fulfillCouponBookPurchase(workspaceId, session);
+    } else if (session.metadata?.kind === "coupon_book_gift") {
+      await fulfillCouponBookGift(workspaceId, session);
     } else {
       await basePrisma.adBooking.updateMany({
         where: { workspaceId, stripeSessionId: sessionId, status: "pending_payment" },
