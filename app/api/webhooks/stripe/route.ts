@@ -87,6 +87,62 @@ async function fulfillCouponBookGift(workspaceId: string, session: Stripe.Checko
   });
 }
 
+// Presenting Partnership lifecycle: invoice.paid activates, invoice.payment_failed
+// flags past_due, subscription deleted/cancelled marks cancelled. Returns true
+// when the event belonged to a partnership (handled), false to fall through.
+async function handlePartnershipEvent(event: Stripe.Event): Promise<boolean> {
+  const obj = event.data.object as
+    | Stripe.Invoice
+    | Stripe.Subscription;
+  const subscriptionId =
+    "subscription" in obj && typeof obj.subscription === "string"
+      ? obj.subscription
+      : "id" in obj && event.type.startsWith("customer.subscription")
+        ? (obj as Stripe.Subscription).id
+        : null;
+  if (!subscriptionId) return false;
+
+  const partnership = await basePrisma.presentingPartnership.findUnique({
+    where: { stripeSubscriptionId: subscriptionId },
+  });
+  if (!partnership) return false;
+
+  if (event.type === "invoice.paid") {
+    await basePrisma.presentingPartnership.update({
+      where: { id: partnership.id },
+      data: { status: "active" },
+    });
+  } else if (event.type === "invoice.payment_failed") {
+    await basePrisma.presentingPartnership.update({
+      where: { id: partnership.id },
+      data: { status: "past_due" },
+    });
+    console.error(
+      `Presenting Partnership payment failed: ${partnership.businessName} (${partnership.email}), subscription ${subscriptionId}`
+    );
+  } else if (event.type === "customer.subscription.deleted") {
+    await basePrisma.presentingPartnership.update({
+      where: { id: partnership.id },
+      data: { status: "cancelled", cancelledAt: new Date() },
+    });
+  } else if (event.type === "customer.subscription.updated") {
+    const sub = obj as Stripe.Subscription;
+    const status =
+      sub.status === "active" || sub.status === "trialing"
+        ? "active"
+        : sub.status === "past_due"
+          ? "past_due"
+          : sub.status === "canceled"
+            ? "cancelled"
+            : partnership.status;
+    await basePrisma.presentingPartnership.update({
+      where: { id: partnership.id },
+      data: { status },
+    });
+  }
+  return true;
+}
+
 export async function POST(req: NextRequest) {
   if (!process.env.STRIPE_SECRET_KEY || !process.env.STRIPE_WEBHOOK_SECRET) {
     return NextResponse.json({ error: "Stripe not configured." }, { status: 503 });
@@ -105,6 +161,21 @@ export async function POST(req: NextRequest) {
 
   const session = event.data.object as Stripe.Checkout.Session;
   const sessionId = session.id;
+
+  // Presenting Partnership subscription/invoice events are workspace-agnostic
+  // (one partnership can span both cities), so handle them before the
+  // workspaceId fail-closed check below.
+  if (
+    event.type === "invoice.paid" ||
+    event.type === "invoice.payment_failed" ||
+    event.type === "customer.subscription.updated" ||
+    event.type === "customer.subscription.deleted"
+  ) {
+    const handled = await handlePartnershipEvent(event);
+    if (handled) return NextResponse.json({ received: true, partnership: true });
+    // Not a partnership event: fall through to normal handling.
+  }
+
   const workspaceId = session.metadata?.workspaceId;
   if (!workspaceId) {
     // Fail closed: never silently attribute a purchase (and its magic-link
