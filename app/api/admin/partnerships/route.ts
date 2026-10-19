@@ -52,6 +52,14 @@ export async function POST(req: NextRequest) {
     tier?: string;
     workspaceIds?: string[];
     notes?: string;
+    // Ad creative profile (optional at setup, goes live when paid)
+    logoUrl?: string;
+    website?: string;
+    headline?: string;
+    adBody?: string;
+    ctaLabel?: string;
+    ctaUrl?: string;
+    imageUrl?: string;
   };
 
   const businessName = body.businessName?.trim();
@@ -118,7 +126,40 @@ export async function POST(req: NextRequest) {
     },
   });
 
-  // 3. Local record, pending until the first invoice is paid.
+  // 3. Sponsor profile: find-or-create so the business exists in the system
+  // with their logo and website. Ad creative rides on the partnership row.
+  const logoUrl = body.logoUrl?.trim() || null;
+  const website = body.website?.trim() || null;
+  let sponsorProfileId: string | null = null;
+  // SponsorProfile is workspace-scoped; create in the first workspace.
+  const primaryWorkspace = workspaceIds[0];
+  if (primaryWorkspace) {
+    const existingProfile = await basePrisma.sponsorProfile.findFirst({
+      where: { workspaceId: primaryWorkspace, email, businessName },
+      select: { id: true },
+    });
+    if (existingProfile) {
+      sponsorProfileId = existingProfile.id;
+      await basePrisma.sponsorProfile.update({
+        where: { id: existingProfile.id },
+        data: { logoUrl, website },
+      });
+    } else {
+      const profile = await basePrisma.sponsorProfile.create({
+        data: {
+          workspaceId: primaryWorkspace,
+          businessName,
+          contactName,
+          email,
+          website,
+          logoUrl,
+        },
+      });
+      sponsorProfileId = profile.id;
+    }
+  }
+
+  // 4. Local partnership record, pending until the first invoice is paid.
   const partnership = await basePrisma.presentingPartnership.create({
     data: {
       businessName,
@@ -131,6 +172,14 @@ export async function POST(req: NextRequest) {
       stripeCustomerId: customer.id,
       stripeSubscriptionId: subscription.id,
       status: "pending_payment",
+      sponsorProfileId,
+      logoUrl,
+      website,
+      headline: body.headline?.trim() || null,
+      body: body.adBody?.trim() || null,
+      ctaLabel: body.ctaLabel?.trim() || null,
+      ctaUrl: body.ctaUrl?.trim() || null,
+      imageUrl: body.imageUrl?.trim() || null,
       notes: body.notes?.trim() || null,
     },
   });

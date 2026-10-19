@@ -49,6 +49,14 @@ export default function PartnershipsPage() {
     tier: "one_city",
     workspaceIds: ["decatur"] as string[],
     notes: "",
+    // Ad creative profile
+    logoUrl: "",
+    website: "",
+    headline: "",
+    adBody: "",
+    ctaLabel: "",
+    ctaUrl: "",
+    imageUrl: "",
   });
 
   const load = async () => {
@@ -91,7 +99,7 @@ export default function PartnershipsPage() {
       if (!res.ok) throw new Error(data.error || "Failed to create partnership.");
       setSuccess(`Invoice sent to ${data.invoiceSentTo}. They just click and pay.`);
       setShowForm(false);
-      setForm({ businessName: "", contactName: "", email: "", category: "dining", tier: "one_city", workspaceIds: ["decatur"], notes: "" });
+      setForm({ businessName: "", contactName: "", email: "", category: "dining", tier: "one_city", workspaceIds: ["decatur"], notes: "", logoUrl: "", website: "", headline: "", adBody: "", ctaLabel: "", ctaUrl: "", imageUrl: "" });
       load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create partnership.");
@@ -216,6 +224,76 @@ export default function PartnershipsPage() {
               rows={2}
             />
           </label>
+
+          <div className="pt-2 border-t">
+            <h3 className="text-sm font-semibold mb-3">Ad Creative Profile <span className="font-normal text-gray-500">(goes live when paid)</span></h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <label className="block">
+                <span className="text-sm font-medium">Logo URL</span>
+                <input
+                  value={form.logoUrl}
+                  onChange={(e) => setForm({ ...form, logoUrl: e.target.value })}
+                  className="mt-1 w-full border rounded-lg px-3 py-2"
+                  placeholder="https://..."
+                />
+              </label>
+              <label className="block">
+                <span className="text-sm font-medium">Website</span>
+                <input
+                  value={form.website}
+                  onChange={(e) => setForm({ ...form, website: e.target.value })}
+                  className="mt-1 w-full border rounded-lg px-3 py-2"
+                  placeholder="https://..."
+                />
+              </label>
+              <label className="block md:col-span-2">
+                <span className="text-sm font-medium">Headline</span>
+                <input
+                  value={form.headline}
+                  onChange={(e) => setForm({ ...form, headline: e.target.value })}
+                  className="mt-1 w-full border rounded-lg px-3 py-2"
+                  placeholder="Your headline here"
+                />
+              </label>
+              <label className="block md:col-span-2">
+                <span className="text-sm font-medium">Body</span>
+                <textarea
+                  value={form.adBody}
+                  onChange={(e) => setForm({ ...form, adBody: e.target.value })}
+                  className="mt-1 w-full border rounded-lg px-3 py-2"
+                  rows={3}
+                  placeholder="Ad body copy..."
+                />
+              </label>
+              <label className="block">
+                <span className="text-sm font-medium">CTA Label</span>
+                <input
+                  value={form.ctaLabel}
+                  onChange={(e) => setForm({ ...form, ctaLabel: e.target.value })}
+                  className="mt-1 w-full border rounded-lg px-3 py-2"
+                  placeholder="Learn More"
+                />
+              </label>
+              <label className="block">
+                <span className="text-sm font-medium">CTA URL</span>
+                <input
+                  value={form.ctaUrl}
+                  onChange={(e) => setForm({ ...form, ctaUrl: e.target.value })}
+                  className="mt-1 w-full border rounded-lg px-3 py-2"
+                  placeholder="https://..."
+                />
+              </label>
+              <label className="block md:col-span-2">
+                <span className="text-sm font-medium">Feature Image URL (for rotating spotlight)</span>
+                <input
+                  value={form.imageUrl}
+                  onChange={(e) => setForm({ ...form, imageUrl: e.target.value })}
+                  className="mt-1 w-full border rounded-lg px-3 py-2"
+                  placeholder="https://..."
+                />
+              </label>
+            </div>
+          </div>
           <button
             type="submit"
             disabled={sending}

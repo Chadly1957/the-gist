@@ -2,7 +2,7 @@
 
 export interface Block {
   id: string;
-  type: "header" | "text" | "image" | "articles" | "divider" | "footer" | "button" | "spotlight" | "presenting_sponsor" | "events" | "referral" | "poll" | "wordy" | "match" | "games" | "tip_jar" | "deals_signup" | "weather";
+  type: "header" | "text" | "image" | "articles" | "divider" | "footer" | "button" | "spotlight" | "presenting_sponsor" | "presenting_logo_bar" | "presenting_spotlight" | "events" | "referral" | "poll" | "wordy" | "match" | "games" | "tip_jar" | "deals_signup" | "weather";
   content: Record<string, unknown>;
 }
 
@@ -51,6 +51,18 @@ export interface PresentingSponsorItem {
   ctaLabel: string;
   imageUrl?: string | null;
   presentingBlurb?: string | null;
+}
+
+// A presenting partner for the logo bar / rotating spotlight (from PresentingPartnership rows).
+export interface PresentingPartnerItem {
+  businessName: string;
+  logoUrl?: string | null;
+  website?: string | null;
+  headline?: string | null;
+  body?: string | null;
+  ctaUrl?: string | null;
+  ctaLabel?: string | null;
+  imageUrl?: string | null;
 }
 
 export interface InArticleAdItem {
@@ -263,6 +275,52 @@ function renderPresentingSponsor(item: PresentingSponsorItem, tracking?: Trackin
       <div style="font-size:14px;color:#4b5563;line-height:1.6;margin:0 0 ${ctaHtml ? "14px" : "0"};font-family:sans-serif;">${item.body}</div>
       ${ctaHtml}
     </div>`;
+}
+
+// Compact logo strip: every active presenting partner, every issue.
+function renderPresentingLogoBar(partners: PresentingPartnerItem[], tracking?: TrackingConfig): string {
+  if (partners.length === 0) return "";
+  const logos = partners
+    .map((p) => {
+      const url = p.website || p.ctaUrl || "#";
+      const tracked = trackedUrl(tracking, url, "presenting_logo_bar", p.businessName);
+      const img = p.logoUrl
+        ? `<img src="${p.logoUrl}" alt="${p.businessName}" style="max-height:36px;max-width:120px;width:auto;height:auto;display:block;" />`
+        : `<span style="font-family:sans-serif;font-size:13px;font-weight:600;color:#374151;">${p.businessName}</span>`;
+      return `<a href="${tracked}" style="display:inline-block;padding:6px 14px;text-decoration:none;">${img}</a>`;
+    })
+    .join("");
+  return `
+    <div style="padding:14px 40px;background:#f9fafb;border-top:1px solid #e5e7eb;border-bottom:1px solid #e5e7eb;">
+      <div style="font-family:sans-serif;font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#9ca3af;margin-bottom:8px;text-align:center;">Presented by</div>
+      <div style="text-align:center;">${logos}</div>
+    </div>`;
+}
+
+// Rotating premium spotlight: 1-2 partners per issue, picked by rotation at send time.
+function renderPresentingSpotlight(partners: PresentingPartnerItem[], tracking?: TrackingConfig): string {
+  if (partners.length === 0) return "";
+  const cards = partners
+    .map((p) => {
+      const ctaUrl = p.ctaUrl ? trackedUrl(tracking, p.ctaUrl, "presenting_spotlight", p.businessName) : "";
+      const ctaHtml = ctaUrl && p.ctaLabel
+        ? `<a href="${ctaUrl}" style="display:inline-block;background:#166534;color:#ffffff;padding:10px 20px;border-radius:4px;text-decoration:none;font-size:13px;font-family:sans-serif;font-weight:600;">${p.ctaLabel}</a>`
+        : "";
+      const logoHtml = p.logoUrl
+        ? `<img src="${p.logoUrl}" alt="${p.businessName}" style="max-height:48px;max-width:180px;width:auto;height:auto;display:block;margin-bottom:12px;" />`
+        : "";
+      return `
+      <div style="background:#fefce8;border:1px solid #fde047;border-radius:8px;padding:18px;margin-bottom:16px;">
+        <div style="font-family:sans-serif;font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#854d0e;margin-bottom:10px;">Presenting Partner</div>
+        ${logoHtml}
+        ${p.imageUrl ? `<img src="${p.imageUrl}" alt="" style="max-width:100%;height:auto;display:block;border-radius:6px;margin-bottom:12px;" />` : ""}
+        ${p.headline ? `<div style="font-size:18px;font-weight:700;color:#111827;margin:0 0 8px;font-family:Georgia,serif;line-height:1.3;">${p.headline}</div>` : ""}
+        ${p.body ? `<div style="font-size:14px;color:#4b5563;line-height:1.6;margin:0 0 ${ctaHtml ? "14px" : "0"};font-family:sans-serif;">${p.body}</div>` : ""}
+        ${ctaHtml}
+      </div>`;
+    })
+    .join("");
+  return `<div style="padding:20px 40px;">${cards}</div>`;
 }
 
 function renderInArticleAd(ad: InArticleAdItem, tracking?: TrackingConfig): string {
@@ -637,6 +695,8 @@ export function renderTemplate(
   sponsors: {
     spotlights?: SpotlightItem[];
     presentingSponsor?: PresentingSponsorItem | null;
+    presentingPartners?: PresentingPartnerItem[];
+    presentingSpotlight?: PresentingPartnerItem[];
     inArticleAds?: InArticleAdItem[];
   } = {},
   tracking?: TrackingConfig,
@@ -646,7 +706,7 @@ export function renderTemplate(
   weatherData?: WeatherSnapshot,
   theme: ThemeColors = DEFAULT_THEME
 ): string {
-  const { spotlights = [], presentingSponsor = null, inArticleAds = [] } = sponsors;
+  const { spotlights = [], presentingSponsor = null, presentingPartners = [], presentingSpotlight = [], inArticleAds = [] } = sponsors;
 
   const bodyContent = blocks
     .map((block) => {
@@ -669,6 +729,10 @@ export function renderTemplate(
           return renderSpotlight(spotlights, tracking);
         case "presenting_sponsor":
           return presentingSponsor ? renderPresentingSponsor(presentingSponsor, tracking) : "";
+        case "presenting_logo_bar":
+          return renderPresentingLogoBar(presentingPartners, tracking);
+        case "presenting_spotlight":
+          return renderPresentingSpotlight(presentingSpotlight, tracking);
         case "events":
           return renderEvents(events);
         case "referral":
