@@ -4,7 +4,7 @@ import { workspaceUnique } from "@/lib/workspace";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getAdminSession } from "@/lib/auth";
-import { renderTemplate, Block, SpotlightItem, PresentingSponsorItem, InArticleAdItem, EventItem, PollData, WordyData, getDealsBlockCopy, DEALS_BUYER_COPY, resolveDealsPlaceholders } from "@/lib/template-renderer";
+import { renderTemplate, Block, SpotlightItem, PresentingSponsorItem, PresentingPartnerItem, InArticleAdItem, EventItem, PollData, WordyData, getDealsBlockCopy, DEALS_BUYER_COPY, resolveDealsPlaceholders } from "@/lib/template-renderer";
 import { fetchWeatherSnapshot, WeatherSnapshot } from "@/lib/weather";
 import { getEmailClient, htmlToText } from "@/lib/email";
 import { signTrackingUrl } from "@/lib/tracking";
@@ -140,6 +140,38 @@ export async function POST(req: NextRequest) {
       imageUrl: b.imageUrl,
     }));
 
+  // Presenting Partnerships: active partners for this city. Logo bar gets all
+  // of them; the spotlight rotates 2 per issue by day-of-year (fair round-robin).
+  let presentingPartners: PresentingPartnerItem[] = [];
+  let presentingSpotlight: PresentingPartnerItem[] = [];
+  try {
+    const ws = await getWorkspace();
+    const active = await (prisma as any).presentingPartnership.findMany({
+      where: { status: "active", workspaceIds: { has: ws.id } },
+      orderBy: { createdAt: "asc" },
+    });
+    presentingPartners = active.map((p: any) => ({
+      businessName: p.businessName,
+      logoUrl: p.logoUrl,
+      website: p.website,
+      headline: p.headline,
+      body: p.body,
+      ctaUrl: p.ctaUrl,
+      ctaLabel: p.ctaLabel,
+      imageUrl: p.imageUrl,
+    }));
+    if (active.length > 0) {
+      const dayOfYear = Math.floor((Date.parse(date + "T12:00:00Z") - Date.parse(new Date(date + "T12:00:00Z").getFullYear() + "-01-01T12:00:00Z")) / 86400000);
+      const start = dayOfYear % active.length;
+      const count = Math.min(2, active.length);
+      for (let i = 0; i < count; i++) {
+        presentingSpotlight.push(presentingPartners[(start + i) % active.length]);
+      }
+    }
+  } catch {
+    // PresentingPartnership table may not exist pre-migration; blocks render empty.
+  }
+
   const emailClient = await getEmailClient(allSettings);
   const activeSubscribers = emailClient
     ? await prisma.subscriber.findMany({ where: { active: true }, select: { id: true, email: true } })
@@ -214,7 +246,7 @@ export async function POST(req: NextRequest) {
   const htmlBody = renderTemplate(
     blocks,
     articles.map((a) => ({ ...a, publishedAt: a.publishedAt })),
-    { spotlights, presentingSponsor, inArticleAds },
+    { spotlights, presentingSponsor, presentingPartners, presentingSpotlight, inArticleAds },
     willSend ? { baseUrl: appUrl, sign: signTrackingUrl } : undefined,
     events,
     pollsMap,

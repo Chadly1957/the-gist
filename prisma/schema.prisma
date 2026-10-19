@@ -241,6 +241,7 @@ model SponsorProfile {
   email         String
   phone         String?
   website       String?
+  logoUrl       String?
   magicToken    String               @unique @default(cuid())
   active        Boolean              @default(true)
   notes         String?
@@ -628,6 +629,40 @@ model Tip {
   @@index([stripeSessionId])
   @@index([status])
   @@index([workspaceId])
+}
+
+// Presenting Partnerships: annual sponsorships billed monthly via Stripe.
+// Workspace-agnostic by design: one partnership can cover one city or both.
+model PresentingPartnership {
+  id                   String    @id @default(cuid())
+  businessName         String
+  contactName          String
+  email                String
+  category             String    // dining | banking | auto | healthcare | home_services | retail
+  tier                 String    // "one_city" | "both_cities"
+  workspaceIds         String[]  @default([]) // city workspaces this covers, e.g. ["decatur"]
+  monthlyAmountCents   Int       // 33333 = $333.33/mo (one city), 58333 = $583.33/mo (both)
+  stripeCustomerId     String?
+  stripeSubscriptionId String?   @unique
+  status               String    @default("pending_payment") // pending_payment | active | past_due | cancelled
+  startDate            DateTime  @default(now())
+  cancelledAt          DateTime?
+  // Ad creative profile: filled in at setup, goes live when paid.
+  sponsorProfileId     String?
+  logoUrl              String?
+  website              String?
+  headline             String?
+  body                 String?
+  ctaLabel             String?
+  ctaUrl               String?
+  imageUrl             String?   // feature image for the rotating spotlight
+  notes                String?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  @@index([status])
+  @@index([email])
+  @@index([stripeCustomerId])
 }
 
 model CouponBookPurchase {

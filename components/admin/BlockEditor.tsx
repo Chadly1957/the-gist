@@ -8,7 +8,7 @@ import UrlInput from "@/components/UrlInput";
 
 export interface Block {
   id: string;
-  type: "header" | "text" | "image" | "articles" | "divider" | "button" | "footer" | "spotlight" | "presenting_sponsor" | "events" | "referral" | "poll" | "wordy" | "match" | "games" | "tip_jar" | "deals_signup" | "weather";
+  type: "header" | "text" | "image" | "articles" | "divider" | "button" | "footer" | "spotlight" | "presenting_sponsor" | "presenting_logo_bar" | "presenting_spotlight" | "events" | "referral" | "poll" | "wordy" | "match" | "games" | "tip_jar" | "deals_signup" | "weather";
   content: Record<string, string>;
 }
 
@@ -29,6 +29,8 @@ const BLOCK_TYPES: { type: Block["type"]; label: string; icon: string }[] = [
   { type: "events", label: "Upcoming Events", icon: "📅" },
   { type: "spotlight", label: "Community Partners", icon: "★" },
   { type: "presenting_sponsor", label: "Presenting Sponsor", icon: "✦" },
+  { type: "presenting_logo_bar", label: "Presenting Logo Bar", icon: "▬" },
+  { type: "presenting_spotlight", label: "Presenting Spotlight", icon: "✧" },
   { type: "referral", label: "Refer a Friend", icon: "🔗" },
   { type: "poll", label: "Poll", icon: "📊" },
   { type: "wordy", label: "Wordy", icon: "🟩" },
@@ -58,6 +60,8 @@ export default function BlockEditor({ blocks, onChange }: BlockEditorProps) {
       },
       spotlight: {},
       presenting_sponsor: {},
+      presenting_logo_bar: {},
+      presenting_spotlight: {},
       events: {},
       referral: {
         title: "Refer a Friend, Earn Rewards",
@@ -664,6 +668,10 @@ function BlockFields({
       return <p className="text-xs text-gray-400">No configuration needed. This block auto-populates with the most-eligible approved community partner listings at send time.</p>;
     case "presenting_sponsor":
       return <p className="text-xs text-gray-400">No configuration needed. This block auto-populates with the approved presenting sponsor for the selected newsletter date. Hidden if no sponsor is booked.</p>;
+    case "presenting_logo_bar":
+      return <p className="text-xs text-gray-400">No configuration needed. Shows a compact logo strip of all active Presenting Partners for this city, every issue. Hidden if none are active.</p>;
+    case "presenting_spotlight":
+      return <p className="text-xs text-gray-400">No configuration needed. Features 1-2 Presenting Partners in rotation (fair round-robin by date). Hidden if none are active.</p>;
     case "referral":
       return (
         <div className="space-y-3">
