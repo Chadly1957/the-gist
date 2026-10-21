@@ -61,6 +61,8 @@ model Workspace {
   dealRows                    Deal[]
   dealDigestSendRows          DealDigestSend[]
   dealsNurtureTouchRows       DealsNurtureTouch[]
+  productRows                 Product[]
+  productOrderRows            ProductOrder[]
 }
 
 model AdminUser {
@@ -629,6 +631,50 @@ model Tip {
   @@index([stripeSessionId])
   @@index([status])
   @@index([workspaceId])
+}
+
+// Products: things a workspace sells (Decatur-opoly, future merch, etc.).
+// Created in admin; each active product gets a public marketing page at
+// /products/<slug> and a Stripe Checkout flow fulfilled by the webhook.
+model Product {
+  workspaceId     String         @default("decatur")
+  workspace       Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  id              String         @id @default(cuid())
+  name            String
+  slug            String
+  tagline         String?
+  description     String?        // marketing copy, plain text paragraphs
+  priceCents      Int
+  compareAtCents  Int?           // strikethrough "was" price, optional
+  imageUrl        String?        // hero image
+  galleryUrls     String[]       @default([])
+  fulfillmentNote String?        // e.g. "Pre-order: ships when the run prints"
+  status          String         @default("draft") // draft | active | archived
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  orders          ProductOrder[]
+
+  @@unique([workspaceId, slug])
+  @@unique([id, workspaceId])
+  @@index([workspaceId, status])
+}
+
+model ProductOrder {
+  workspaceId     String    @default("decatur")
+  workspace       Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  id              String    @id @default(cuid())
+  productId       String
+  product         Product   @relation(fields: [productId, workspaceId], references: [id, workspaceId], onDelete: Restrict)
+  email           String
+  amountCents     Int
+  stripeSessionId String?   @unique
+  status          String    @default("pending_payment") // pending_payment | paid
+  createdAt       DateTime  @default(now())
+  paidAt          DateTime?
+
+  @@unique([id, workspaceId])
+  @@index([productId])
+  @@index([workspaceId, status])
 }
 
 // Presenting Partnerships: annual sponsorships billed monthly via Stripe.
