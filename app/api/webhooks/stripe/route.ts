@@ -3,6 +3,7 @@ import { basePrisma } from "@/lib/db-base";
 import { withWorkspace } from "@/lib/workspace";
 import Stripe from "stripe";
 import { alertBookingFailureOnce } from "@/lib/sponsor-booking-alerts";
+import { recordPaidProductOrder } from "@/lib/products";
 
 export const dynamic = "force-dynamic";
 
@@ -181,6 +182,38 @@ async function fulfillProductOrder(workspaceId: string, session: Stripe.Checkout
   });
 }
 
+// Legacy Payment Link sales: sessions bought through a standalone Stripe
+// Payment Link carry no workspace/product metadata, but the session names
+// its link (session.payment_link). When a product has claimed that link ID
+// (Product.stripePaymentLinkId), the sale files under that product in that
+// product's workspace. Returns true when the link is claimed (handled),
+// false when no product claims it (caller falls through to normal handling).
+async function fulfillPaymentLinkOrder(session: Stripe.Checkout.Session): Promise<boolean> {
+  const linkId =
+    typeof session.payment_link === "string" ? session.payment_link : session.payment_link?.id;
+  if (!linkId) return false;
+  const product = await basePrisma.product.findFirst({
+    where: { stripePaymentLinkId: linkId },
+    select: { id: true, workspaceId: true },
+  });
+  if (!product) return false;
+  if (session.payment_status !== "paid") return true; // claimed, but nothing paid yet
+  const email = (session.customer_details?.email || session.metadata?.email || "").trim().toLowerCase();
+  if (!email) {
+    console.error(`Payment Link product payment captured but no email for session ${session.id}`);
+    return true;
+  }
+  await recordPaidProductOrder(basePrisma, {
+    workspaceId: product.workspaceId,
+    productId: product.id,
+    email,
+    amountCents: session.amount_total ?? 0,
+    sessionId: session.id,
+    paidAt: new Date(),
+  });
+  return true;
+}
+
 export async function POST(req: NextRequest) {
   if (!process.env.STRIPE_SECRET_KEY || !process.env.STRIPE_WEBHOOK_SECRET) {
     return NextResponse.json({ error: "Stripe not configured." }, { status: 503 });
@@ -212,6 +245,13 @@ export async function POST(req: NextRequest) {
     const handled = await handlePartnershipEvent(event);
     if (handled) return NextResponse.json({ received: true, partnership: true });
     // Not a partnership event: fall through to normal handling.
+  }
+
+  // Legacy Payment Link sales carry no metadata; route them by link ID to
+  // the product that claimed the link before the fail-closed check below.
+  if (event.type === "checkout.session.completed" && !session.metadata?.workspaceId && session.payment_link) {
+    const handled = await fulfillPaymentLinkOrder(session);
+    if (handled) return NextResponse.json({ received: true, paymentLinkProduct: true });
   }
 
   const workspaceId = session.metadata?.workspaceId;
