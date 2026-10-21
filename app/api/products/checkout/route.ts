@@ -5,8 +5,6 @@ import Stripe from "stripe";
 
 export const dynamic = "force-dynamic";
 
-export const PRODUCT_STRIPE_KIND = "product";
-
 // POST /api/products/checkout { productId, email }
 // Creates a pending ProductOrder, then a Stripe Checkout session. The
 // webhook marks the order paid on checkout.session.completed.
@@ -69,7 +67,7 @@ export async function POST(req: NextRequest) {
       cancel_url: `${appUrl}/products/${product.slug}?cancelled=1`,
       metadata: {
         workspaceId: workspace.id,
-        kind: PRODUCT_STRIPE_KIND,
+        kind: "product",
         productId: product.id,
         orderId: order.id,
         email: normalizedEmail,
