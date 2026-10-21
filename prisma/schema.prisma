@@ -650,6 +650,7 @@ model Product {
   galleryUrls     String[]       @default([])
   fulfillmentNote String?        // e.g. "Pre-order: ships when the run prints"
   quantity        Int?           // total available; null = unlimited. Sold out when paid orders reach it
+  stripePaymentLinkId String?    // legacy Stripe Payment Link (plink_...) whose sales file under this product
   status          String         @default("draft") // draft | active | archived
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
@@ -658,6 +659,7 @@ model Product {
   @@unique([workspaceId, slug])
   @@unique([id, workspaceId])
   @@index([workspaceId, status])
+  @@index([stripePaymentLinkId])
 }
 
 model ProductOrder {

@@ -50,6 +50,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       data.quantity = q;
     }
   }
+  if (body.stripePaymentLinkId !== undefined) {
+    data.stripePaymentLinkId = typeof body.stripePaymentLinkId === "string" && body.stripePaymentLinkId.trim() ? body.stripePaymentLinkId.trim() : null;
+  }
   if (typeof body.status === "string") {
     if (!VALID_STATUS.includes(body.status)) return NextResponse.json({ error: "Invalid status." }, { status: 400 });
     data.status = body.status;

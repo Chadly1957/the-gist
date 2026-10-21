@@ -15,6 +15,7 @@ interface Product {
   galleryUrls: string[];
   fulfillmentNote: string | null;
   quantity: number | null;
+  stripePaymentLinkId: string | null;
   status: string;
   paidCount?: number;
   orderCount?: number;
@@ -30,6 +31,7 @@ const EMPTY_FORM = {
   galleryUrls: [] as string[],
   fulfillmentNote: "",
   quantity: "",
+  stripePaymentLinkId: "",
   status: "draft",
 };
 
@@ -46,6 +48,7 @@ export default function ProductsPage() {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
+  const [syncing, setSyncing] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -129,6 +132,7 @@ export default function ProductsPage() {
       galleryUrls: p.galleryUrls || [],
       fulfillmentNote: p.fulfillmentNote || "",
       quantity: p.quantity === null || p.quantity === undefined ? "" : String(p.quantity),
+      stripePaymentLinkId: p.stripePaymentLinkId || "",
       status: p.status,
     });
     setShowForm(true);
@@ -151,6 +155,7 @@ export default function ProductsPage() {
       galleryUrls: form.galleryUrls,
       fulfillmentNote: form.fulfillmentNote,
       quantity: form.quantity === "" ? null : Math.floor(Number(form.quantity)),
+      stripePaymentLinkId: form.stripePaymentLinkId.trim() || null,
       status: form.status,
     };
     try {
@@ -169,6 +174,23 @@ export default function ProductsPage() {
       setError(err instanceof Error ? err.message : "Save failed.");
     }
     setSaving(false);
+  };
+
+  const syncLinkOrders = async () => {
+    if (!editingId) return;
+    setSyncing(true);
+    setError("");
+    setSuccess("");
+    try {
+      const res = await workspaceFetch(`/api/admin/products/${editingId}/sync-payment-link`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Sync failed.");
+      setSuccess(`Payment Link sync done: ${data.imported} new order(s) imported, ${data.paidTotal} paid total on this product.`);
+      load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Sync failed.");
+    }
+    setSyncing(false);
   };
 
   const setStatus = async (p: Product, status: string) => {
@@ -235,6 +257,11 @@ export default function ProductsPage() {
               <input type="number" step="1" min="0" value={form.quantity} onChange={(e) => setForm({ ...form, quantity: e.target.value })} className="mt-1 w-full border rounded-lg px-3 py-2" placeholder="Unlimited" />
               <span className="text-xs text-gray-400">When paid orders reach this number, the pages show SOLD OUT and checkout closes. Use 0 to force sold out.</span>
             </label>
+            <label className="block md:col-span-2">
+              <span className="text-sm font-medium">Legacy Stripe Payment Link ID (optional)</span>
+              <input value={form.stripePaymentLinkId} onChange={(e) => setForm({ ...form, stripePaymentLinkId: e.target.value })} className="mt-1 w-full border rounded-lg px-3 py-2" placeholder="plink_..." />
+              <span className="text-xs text-gray-400">If this product was already selling through a Stripe Payment Link, paste its ID (in the link's Stripe dashboard URL) and every sale from that link files under this product automatically.</span>
+            </label>
             <label className="block">
               <span className="text-sm font-medium">Status</span>
               <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })} className="mt-1 w-full border rounded-lg px-3 py-2">
@@ -275,10 +302,15 @@ export default function ProductsPage() {
             </div>
           </div>
 
-          <div className="flex gap-3">
+          <div className="flex gap-3 flex-wrap">
             <button type="submit" disabled={saving} className="px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium disabled:opacity-50">
               {saving ? "Saving..." : editingId ? "Save changes" : "Create product"}
             </button>
+            {editingId && form.stripePaymentLinkId.trim() && (
+              <button type="button" onClick={syncLinkOrders} disabled={syncing} className="px-4 py-2.5 border border-blue-300 text-blue-700 rounded-lg hover:bg-blue-50 disabled:opacity-50">
+                {syncing ? "Syncing..." : "Sync Payment Link orders"}
+              </button>
+            )}
             <button type="button" onClick={() => setShowForm(false)} className="px-4 py-2.5 border rounded-lg">Cancel</button>
           </div>
         </form>
