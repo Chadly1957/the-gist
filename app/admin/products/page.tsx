@@ -14,6 +14,7 @@ interface Product {
   imageUrl: string | null;
   galleryUrls: string[];
   fulfillmentNote: string | null;
+  quantity: number | null;
   status: string;
   paidCount?: number;
   orderCount?: number;
@@ -28,6 +29,7 @@ const EMPTY_FORM = {
   imageUrl: "",
   galleryUrls: [] as string[],
   fulfillmentNote: "",
+  quantity: "",
   status: "draft",
 };
 
@@ -126,6 +128,7 @@ export default function ProductsPage() {
       imageUrl: p.imageUrl || "",
       galleryUrls: p.galleryUrls || [],
       fulfillmentNote: p.fulfillmentNote || "",
+      quantity: p.quantity === null || p.quantity === undefined ? "" : String(p.quantity),
       status: p.status,
     });
     setShowForm(true);
@@ -147,6 +150,7 @@ export default function ProductsPage() {
       imageUrl: form.imageUrl || null,
       galleryUrls: form.galleryUrls,
       fulfillmentNote: form.fulfillmentNote,
+      quantity: form.quantity === "" ? null : Math.floor(Number(form.quantity)),
       status: form.status,
     };
     try {
@@ -227,6 +231,11 @@ export default function ProductsPage() {
               <input value={form.fulfillmentNote} onChange={(e) => setForm({ ...form, fulfillmentNote: e.target.value })} className="mt-1 w-full border rounded-lg px-3 py-2" placeholder="Pre-order: printed once 10 orders land, full refunds if we don't get there" />
             </label>
             <label className="block">
+              <span className="text-sm font-medium">Quantity available (blank = unlimited)</span>
+              <input type="number" step="1" min="0" value={form.quantity} onChange={(e) => setForm({ ...form, quantity: e.target.value })} className="mt-1 w-full border rounded-lg px-3 py-2" placeholder="Unlimited" />
+              <span className="text-xs text-gray-400">When paid orders reach this number, the pages show SOLD OUT and checkout closes. Use 0 to force sold out.</span>
+            </label>
+            <label className="block">
               <span className="text-sm font-medium">Status</span>
               <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })} className="mt-1 w-full border rounded-lg px-3 py-2">
                 <option value="draft">Draft (hidden)</option>
@@ -286,7 +295,12 @@ export default function ProductsPage() {
               {p.imageUrl ? <img src={p.imageUrl} alt="" className="w-14 h-14 object-cover rounded-lg border" /> : <div className="w-14 h-14 rounded-lg border bg-gray-50" />}
               <div className="flex-1">
                 <div className="font-semibold">{p.name}</div>
-                <div className="text-sm text-gray-500">{money(p.priceCents)} · /products/{p.slug} · {p.paidCount ?? 0} paid orders</div>
+                <div className="text-sm text-gray-500">
+                  {money(p.priceCents)} · /products/{p.slug} · {p.paidCount ?? 0} paid orders
+                  {p.quantity !== null && p.quantity !== undefined && (
+                    <> · {(p.paidCount ?? 0) >= p.quantity ? <span className="text-red-600 font-semibold">SOLD OUT</span> : `${p.quantity - (p.paidCount ?? 0)} left of ${p.quantity}`}</>
+                  )}
+                </div>
               </div>
               <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${STATUS_COLORS[p.status] || "bg-gray-100"}`}>{p.status}</span>
               {p.status !== "active" && <button onClick={() => setStatus(p, "active")} className="text-sm text-green-700 hover:underline">Go live</button>}

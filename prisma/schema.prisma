@@ -649,6 +649,7 @@ model Product {
   imageUrl        String?        // hero image
   galleryUrls     String[]       @default([])
   fulfillmentNote String?        // e.g. "Pre-order: ships when the run prints"
+  quantity        Int?           // total available; null = unlimited. Sold out when paid orders reach it
   status          String         @default("draft") // draft | active | archived
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt

@@ -41,6 +41,15 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (body.imageUrl !== undefined) data.imageUrl = typeof body.imageUrl === "string" && body.imageUrl.trim() ? body.imageUrl.trim() : null;
   if (Array.isArray(body.galleryUrls)) data.galleryUrls = body.galleryUrls.filter((u) => typeof u === "string" && u).slice(0, 6);
   if (typeof body.fulfillmentNote === "string") data.fulfillmentNote = body.fulfillmentNote.trim() || null;
+  if (body.quantity !== undefined) {
+    if (body.quantity === null) {
+      data.quantity = null;
+    } else {
+      const q = Math.floor(Number(body.quantity));
+      if (!Number.isFinite(q) || q < 0) return NextResponse.json({ error: "Quantity must be zero or more (leave blank for unlimited)." }, { status: 400 });
+      data.quantity = q;
+    }
+  }
   if (typeof body.status === "string") {
     if (!VALID_STATUS.includes(body.status)) return NextResponse.json({ error: "Invalid status." }, { status: 400 });
     data.status = body.status;

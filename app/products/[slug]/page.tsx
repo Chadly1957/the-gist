@@ -17,6 +17,8 @@ interface Product {
   imageUrl: string | null;
   galleryUrls: string[];
   fulfillmentNote: string | null;
+  soldOut: boolean;
+  remaining: number | null;
 }
 
 const money = (cents: number) => `$${(cents / 100).toFixed(2)}`;
@@ -124,17 +126,27 @@ export default function ProductPage() {
               <p className="mt-3 text-sm bg-green-50 text-green-800 border border-green-200 rounded-lg px-3 py-2">{product.fulfillmentNote}</p>
             )}
 
-            <form onSubmit={buy} className="mt-6 space-y-3">
-              <label className="block">
-                <span className="text-sm font-medium text-gray-700">Email for your receipt</span>
-                <input required type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="mt-1 w-full border rounded-lg px-3 py-2.5" placeholder="you@example.com" />
-              </label>
-              {error && <p className="text-sm text-red-600">{error}</p>}
-              <button type="submit" disabled={buying} className="w-full py-3 bg-green-700 text-white rounded-lg font-semibold hover:bg-green-800 disabled:opacity-50">
-                {buying ? "Taking you to checkout..." : `Buy now — ${money(product.priceCents)}`}
-              </button>
-              <p className="text-xs text-gray-400 text-center">Secure checkout by Stripe. The Gist never sees your card.</p>
-            </form>
+            {product.soldOut ? (
+              <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-lg text-center">
+                <div className="text-xl font-bold text-red-700 tracking-wide">SOLD OUT</div>
+                <p className="text-sm text-red-600 mt-1">This one is gone. If more get made, newsletter readers hear about it first.</p>
+              </div>
+            ) : (
+              <form onSubmit={buy} className="mt-6 space-y-3">
+                <label className="block">
+                  <span className="text-sm font-medium text-gray-700">Email for your receipt</span>
+                  <input required type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="mt-1 w-full border rounded-lg px-3 py-2.5" placeholder="you@example.com" />
+                </label>
+                {error && <p className="text-sm text-red-600">{error}</p>}
+                <button type="submit" disabled={buying} className="w-full py-3 bg-green-700 text-white rounded-lg font-semibold hover:bg-green-800 disabled:opacity-50">
+                  {buying ? "Taking you to checkout..." : `Buy now — ${money(product.priceCents)}`}
+                </button>
+                {product.remaining !== null && product.remaining <= 5 && (
+                  <p className="text-sm font-semibold text-red-600 text-center">Only {product.remaining} left</p>
+                )}
+                <p className="text-xs text-gray-400 text-center">Secure checkout by Stripe. The Gist never sees your card.</p>
+              </form>
+            )}
           </div>
         </div>
 

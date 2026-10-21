@@ -22,6 +22,7 @@ interface ProductBody {
   imageUrl?: string | null;
   galleryUrls?: string[];
   fulfillmentNote?: string;
+  quantity?: number | null;
   status?: string;
 }
 
@@ -65,6 +66,13 @@ export async function POST(req: NextRequest) {
   const priceCents = Math.round(Number(body.priceCents) || 0);
   if (priceCents <= 0) return NextResponse.json({ error: "Price must be greater than zero." }, { status: 400 });
   const status = body.status && VALID_STATUS.includes(body.status) ? body.status : "draft";
+  let quantity: number | null = null;
+  if (body.quantity !== undefined && body.quantity !== null) {
+    quantity = Math.floor(Number(body.quantity));
+    if (!Number.isFinite(quantity) || quantity < 0) {
+      return NextResponse.json({ error: "Quantity must be zero or more (leave blank for unlimited)." }, { status: 400 });
+    }
+  }
 
   let slug = slugify(body.slug?.trim() || name);
   if (!slug) return NextResponse.json({ error: "Could not generate a URL slug from that name." }, { status: 400 });
@@ -86,6 +94,7 @@ export async function POST(req: NextRequest) {
       imageUrl: body.imageUrl?.trim() || null,
       galleryUrls: Array.isArray(body.galleryUrls) ? body.galleryUrls.filter(Boolean).slice(0, 6) : [],
       fulfillmentNote: body.fulfillmentNote?.trim() || null,
+      quantity,
       status,
     },
   });

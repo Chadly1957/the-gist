@@ -14,6 +14,8 @@ interface ProductCard {
   priceCents: number;
   compareAtCents: number | null;
   imageUrl: string | null;
+  soldOut: boolean;
+  remaining: number | null;
 }
 
 const money = (cents: number) => `$${(cents / 100).toFixed(2)}`;
@@ -50,11 +52,16 @@ export default function ProductsPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-10">
             {products.map((p) => (
               <Link key={p.id} href={`/products/${p.slug}`} className="border rounded-2xl overflow-hidden hover:shadow-lg transition-shadow block">
-                {p.imageUrl ? (
-                  <img src={p.imageUrl} alt={p.name} className="w-full h-48 object-cover" />
-                ) : (
-                  <div className="w-full h-48 bg-gray-100" />
-                )}
+                <div className="relative">
+                  {p.imageUrl ? (
+                    <img src={p.imageUrl} alt={p.name} className={`w-full h-48 object-cover ${p.soldOut ? "opacity-60 grayscale" : ""}`} />
+                  ) : (
+                    <div className="w-full h-48 bg-gray-100" />
+                  )}
+                  {p.soldOut && (
+                    <span className="absolute top-3 left-3 bg-red-600 text-white text-xs font-bold tracking-wide px-2.5 py-1 rounded-full">SOLD OUT</span>
+                  )}
+                </div>
                 <div className="p-4">
                   <div className="font-bold text-lg text-gray-900">{p.name}</div>
                   {p.tagline && <div className="text-sm text-gray-500 mt-1">{p.tagline}</div>}
@@ -62,6 +69,9 @@ export default function ProductsPage() {
                     {money(p.priceCents)}
                     {p.compareAtCents && p.compareAtCents > p.priceCents && (
                       <span className="ml-2 text-sm text-gray-400 line-through">{money(p.compareAtCents)}</span>
+                    )}
+                    {!p.soldOut && p.remaining !== null && p.remaining <= 5 && (
+                      <span className="ml-2 text-sm font-semibold text-red-600">Only {p.remaining} left</span>
                     )}
                   </div>
                 </div>

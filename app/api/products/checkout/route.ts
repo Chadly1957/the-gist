@@ -22,9 +22,20 @@ export async function POST(req: NextRequest) {
 
   const product = await prisma.product.findFirst({
     where: { id: productId, status: "active" },
-    select: { id: true, name: true, slug: true, priceCents: true, imageUrl: true },
+    select: { id: true, name: true, slug: true, priceCents: true, imageUrl: true, quantity: true },
   });
   if (!product) return NextResponse.json({ error: "Product not found." }, { status: 404 });
+
+  // Inventory guard: a capped product stops selling the moment paid orders
+  // reach its quantity, so nobody can buy past the cap.
+  if (product.quantity !== null) {
+    const paid = await prisma.productOrder.count({
+      where: { productId: product.id, status: "paid" },
+    });
+    if (paid >= product.quantity) {
+      return NextResponse.json({ error: "This product is sold out." }, { status: 400 });
+    }
+  }
 
   const workspace = await getWorkspace();
   const appUrl = await getWorkspaceUrl();
