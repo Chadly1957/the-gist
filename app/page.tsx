@@ -9,6 +9,7 @@ import Logo from "@/components/Logo";
 import DealsOto from "@/components/DealsOto";
 import SponsorsMarquee from "@/components/SponsorsMarquee";
 import RecentIssues from "@/components/RecentIssues";
+import ProductsSection, { type ShopProduct } from "@/components/ProductsSection";
 
 function CityLandingPage() {
   const { workspace } = useWorkspace();
@@ -23,6 +24,7 @@ function CityLandingPage() {
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [message, setMessage] = useState("");
   const [subCount, setSubCount] = useState<number | null>(null);
+  const [products, setProducts] = useState<ShopProduct[]>([]);
   const [showSponsorLogin, setShowSponsorLogin] = useState(false);
   const [sponsorLoginEmail, setSponsorLoginEmail] = useState("");
   const [sponsorLoginStatus, setSponsorLoginStatus] = useState<"idle" | "loading" | "sent">("idle");
@@ -32,6 +34,15 @@ function CityLandingPage() {
       .then((r) => r.json())
       .then((d) => setSubCount(d.rounded ?? null))
       .catch(() => null);
+  }, []);
+
+  // Shop: drives the nav link, footer link, and the homepage shop section.
+  // All three render only when this workspace has at least one active product.
+  useEffect(() => {
+    workspaceFetch("/api/products")
+      .then((r) => r.json())
+      .then((d) => setProducts(Array.isArray(d.products) ? d.products : []))
+      .catch(() => setProducts([]));
   }, []);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -130,6 +141,11 @@ function CityLandingPage() {
             <Link href="/games" className="text-sm font-semibold text-gray-700 hover:text-gray-900 transition-colors">
               Games
             </Link>
+            {products.length > 0 && (
+              <Link href="/products" className="text-sm font-semibold text-gray-700 hover:text-gray-900 transition-colors">
+                Shop
+              </Link>
+            )}
             <Link href="/sponsor" className="text-sm font-semibold text-green-700 hover:text-green-800 transition-colors">
               Advertise
             </Link>
@@ -295,6 +311,8 @@ function CityLandingPage() {
 
         <RecentIssues />
 
+        <ProductsSection products={products} area={workspace.area} />
+
         {/* ── SPONSORSHIP CTA ── */}
         <section className="bg-green-900 py-14 sm:py-20">
           <div className="max-w-6xl mx-auto px-6">
@@ -404,6 +422,9 @@ function CityLandingPage() {
           </div>
           <div className="flex items-center gap-6 text-xs text-gray-400">
             <Link href="/games" className="hover:text-gray-600 transition-colors">Games</Link>
+            {products.length > 0 && (
+              <Link href="/products" className="hover:text-gray-600 transition-colors">Shop</Link>
+            )}
             <Link href="/sponsor" className="hover:text-gray-600 transition-colors">Advertise</Link>
             <Link href="/unsubscribe" className="hover:text-gray-600 transition-colors">Unsubscribe</Link>
             <span>&copy; {new Date().getFullYear()} {workspace.name}</span>
