@@ -143,6 +143,44 @@ async function handlePartnershipEvent(event: Stripe.Event): Promise<boolean> {
   return true;
 }
 
+// Product orders: the checkout route creates the ProductOrder row as
+// pending_payment; fulfillment just flips it to paid. Idempotent: re-delivered
+// events no-op. If the pending row is missing (edge case), create it from
+// session metadata so a captured payment never goes unrecorded.
+async function fulfillProductOrder(workspaceId: string, session: Stripe.Checkout.Session) {
+  const paidAt = new Date();
+  const existing = await basePrisma.productOrder.findUnique({
+    where: { stripeSessionId: session.id },
+    select: { id: true, status: true },
+  });
+  if (existing) {
+    if (existing.status !== "paid") {
+      await basePrisma.productOrder.update({
+        where: { id: existing.id },
+        data: { status: "paid", paidAt },
+      });
+    }
+    return;
+  }
+  const productId = session.metadata?.productId;
+  const email = (session.customer_details?.email || session.metadata?.email || "").trim().toLowerCase();
+  if (!productId || !email) {
+    console.error(`Product payment captured but order row missing and metadata incomplete for session ${session.id}`);
+    return;
+  }
+  await basePrisma.productOrder.create({
+    data: {
+      workspaceId,
+      productId,
+      email,
+      amountCents: session.amount_total ?? 0,
+      stripeSessionId: session.id,
+      status: "paid",
+      paidAt,
+    },
+  });
+}
+
 export async function POST(req: NextRequest) {
   if (!process.env.STRIPE_SECRET_KEY || !process.env.STRIPE_WEBHOOK_SECRET) {
     return NextResponse.json({ error: "Stripe not configured." }, { status: 503 });
@@ -195,6 +233,8 @@ export async function POST(req: NextRequest) {
       await fulfillCouponBookPurchase(workspaceId, session);
     } else if (session.metadata?.kind === "coupon_book_gift") {
       await fulfillCouponBookGift(workspaceId, session);
+    } else if (session.metadata?.kind === "product") {
+      await fulfillProductOrder(workspaceId, session);
     } else {
       await basePrisma.adBooking.updateMany({
         where: { workspaceId, stripeSessionId: sessionId, status: "pending_payment" },
