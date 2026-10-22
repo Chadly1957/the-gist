@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { workspaceFetch } from "@/lib/workspace-client";
 import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
 import Link from "@/components/workspace/WorkspaceLink";
-import Logo from "@/components/Logo";
+import SiteHeader from "@/components/SiteHeader";
 
 interface ProductCard {
   id: string;
@@ -34,11 +34,10 @@ export default function ProductsPage() {
   }, []);
 
   return (
-    <main className="min-h-screen bg-white">
+    <div className="min-h-screen bg-white flex flex-col">
+      <SiteHeader />
+      <main className="flex-1">
       <div className="max-w-5xl mx-auto px-4 py-10">
-        <div className="flex justify-center mb-6">
-          <Logo />
-        </div>
         <h1 className="text-3xl font-bold text-center text-gray-900">The Gist Shop</h1>
         <p className="text-center text-gray-500 mt-2">
           Things we make for {workspace.area} readers. Every purchase supports the newsletter directly.
@@ -80,6 +79,7 @@ export default function ProductsPage() {
           </div>
         )}
       </div>
-    </main>
+      </main>
+    </div>
   );
 }

@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { workspaceFetch } from "@/lib/workspace-client";
 import Link from "@/components/workspace/WorkspaceLink";
-import Logo from "@/components/Logo";
+import SiteHeader from "@/components/SiteHeader";
+import AboutGist from "@/components/AboutGist";
 
 interface Product {
   id: string;
@@ -68,19 +69,25 @@ export default function ProductPage() {
 
   if (notFound) {
     return (
-      <main className="min-h-screen bg-white flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-gray-500">That product is not available.</p>
-          <Link href="/products" className="text-green-700 font-semibold hover:underline">See all products</Link>
-        </div>
-      </main>
+      <div className="min-h-screen bg-white flex flex-col">
+        <SiteHeader />
+        <main className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <p className="text-gray-500">That product is not available.</p>
+            <Link href="/products" className="text-green-700 font-semibold hover:underline">See all products</Link>
+          </div>
+        </main>
+      </div>
     );
   }
   if (!product) {
     return (
-      <main className="min-h-screen bg-white flex items-center justify-center">
-        <p className="text-gray-400">Loading...</p>
-      </main>
+      <div className="min-h-screen bg-white flex flex-col">
+        <SiteHeader />
+        <main className="flex-1 flex items-center justify-center">
+          <p className="text-gray-400">Loading...</p>
+        </main>
+      </div>
     );
   }
 
@@ -88,10 +95,11 @@ export default function ProductPage() {
   const paragraphs = (product.description || "").split(/\n\s*\n/).filter(Boolean);
 
   return (
-    <main className="min-h-screen bg-white">
+    <div className="min-h-screen bg-white flex flex-col">
+      <SiteHeader />
+      <main className="flex-1">
       <div className="max-w-5xl mx-auto px-4 py-8">
-        <div className="flex items-center justify-between mb-8">
-          <Logo />
+        <div className="flex items-center justify-end mb-8">
           <Link href="/products" className="text-sm text-gray-500 hover:text-gray-800">← All products</Link>
         </div>
 
@@ -158,6 +166,8 @@ export default function ProductPage() {
           </div>
         )}
       </div>
-    </main>
+      <AboutGist />
+      </main>
+    </div>
   );
 }
