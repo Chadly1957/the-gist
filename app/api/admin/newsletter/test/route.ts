@@ -179,7 +179,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const unsubUrl = `${appUrl}/unsubscribe`;
+  const unsubUrl = `${appUrl}/api/unsubscribe`;
   const result = await emailClient.sendEmail({
     to: testEmail,
     subject: `[TEST] ${subject}`,
