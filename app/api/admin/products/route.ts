@@ -23,6 +23,7 @@ interface ProductBody {
   galleryUrls?: string[];
   fulfillmentNote?: string;
   quantity?: number | null;
+  requiresShipping?: boolean;
   stripePaymentLinkId?: string | null;
   status?: string;
 }
@@ -96,6 +97,7 @@ export async function POST(req: NextRequest) {
       galleryUrls: Array.isArray(body.galleryUrls) ? body.galleryUrls.filter(Boolean).slice(0, 6) : [],
       fulfillmentNote: body.fulfillmentNote?.trim() || null,
       quantity,
+      requiresShipping: body.requiresShipping !== false,
       stripePaymentLinkId: body.stripePaymentLinkId?.trim() || null,
       status,
     },

@@ -650,6 +650,7 @@ model Product {
   galleryUrls     String[]       @default([])
   fulfillmentNote String?        // e.g. "Pre-order: ships when the run prints"
   quantity        Int?           // total available; null = unlimited. Sold out when paid orders reach it
+  requiresShipping Boolean       @default(true) // physical products collect a shipping address at checkout; digital ones do not
   stripePaymentLinkId String?    // legacy Stripe Payment Link (plink_...) whose sales file under this product
   status          String         @default("draft") // draft | active | archived
   createdAt       DateTime       @default(now())
@@ -674,6 +675,16 @@ model ProductOrder {
   status          String    @default("pending_payment") // pending_payment | paid
   createdAt       DateTime  @default(now())
   paidAt          DateTime?
+  // Shipping address captured from the Stripe Checkout session at payment
+  // time, stored for fulfillment. Null when the product does not require
+  // shipping or the session collected no address (e.g. older orders).
+  shippingName       String?
+  shippingLine1      String?
+  shippingLine2      String?
+  shippingCity       String?
+  shippingState      String?
+  shippingPostalCode String?
+  shippingCountry    String?
 
   @@unique([id, workspaceId])
   @@index([productId])

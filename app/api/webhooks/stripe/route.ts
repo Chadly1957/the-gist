@@ -3,7 +3,7 @@ import { basePrisma } from "@/lib/db-base";
 import { withWorkspace } from "@/lib/workspace";
 import Stripe from "stripe";
 import { alertBookingFailureOnce } from "@/lib/sponsor-booking-alerts";
-import { recordPaidProductOrder } from "@/lib/products";
+import { recordPaidProductOrder, shippingFromSession } from "@/lib/products";
 
 export const dynamic = "force-dynamic";
 
@@ -150,6 +150,9 @@ async function handlePartnershipEvent(event: Stripe.Event): Promise<boolean> {
 // session metadata so a captured payment never goes unrecorded.
 async function fulfillProductOrder(workspaceId: string, session: Stripe.Checkout.Session) {
   const paidAt = new Date();
+  // Shipping address collected at checkout (physical products); null for
+  // digital products or sessions that collected none.
+  const shipping = shippingFromSession(session);
   const existing = await basePrisma.productOrder.findUnique({
     where: { stripeSessionId: session.id },
     select: { id: true, status: true },
@@ -158,7 +161,13 @@ async function fulfillProductOrder(workspaceId: string, session: Stripe.Checkout
     if (existing.status !== "paid") {
       await basePrisma.productOrder.update({
         where: { id: existing.id },
-        data: { status: "paid", paidAt },
+        data: { status: "paid", paidAt, ...(shipping ?? {}) },
+      });
+    } else if (shipping) {
+      // Redelivery after the flip: backfill the address if it is missing.
+      await basePrisma.productOrder.update({
+        where: { id: existing.id },
+        data: { ...shipping },
       });
     }
     return;
@@ -178,6 +187,7 @@ async function fulfillProductOrder(workspaceId: string, session: Stripe.Checkout
       stripeSessionId: session.id,
       status: "paid",
       paidAt,
+      ...(shipping ?? {}),
     },
   });
 }
@@ -210,6 +220,9 @@ async function fulfillPaymentLinkOrder(session: Stripe.Checkout.Session): Promis
     amountCents: session.amount_total ?? 0,
     sessionId: session.id,
     paidAt: new Date(),
+    // The legacy Decatur-opoly link required a shipping address at
+    // checkout, so these sessions carry one; store it for fulfillment.
+    shipping: shippingFromSession(session),
   });
   return true;
 }

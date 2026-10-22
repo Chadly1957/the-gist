@@ -50,6 +50,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       data.quantity = q;
     }
   }
+  if (typeof body.requiresShipping === "boolean") data.requiresShipping = body.requiresShipping;
   if (body.stripePaymentLinkId !== undefined) {
     data.stripePaymentLinkId = typeof body.stripePaymentLinkId === "string" && body.stripePaymentLinkId.trim() ? body.stripePaymentLinkId.trim() : null;
   }

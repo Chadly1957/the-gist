@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminSession } from "@/lib/auth";
 import { basePrisma } from "@/lib/db-base";
-import { recordPaidProductOrder } from "@/lib/products";
+import { recordPaidProductOrder, shippingFromSession } from "@/lib/products";
 import Stripe from "stripe";
 
 export const dynamic = "force-dynamic";
@@ -50,6 +50,9 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
         amountCents: s.amount_total ?? 0,
         sessionId: s.id,
         paidAt: new Date(s.created * 1000),
+        // The link collected shipping addresses; store them on new orders
+        // and backfill them onto orders recorded before addresses were kept.
+        shipping: shippingFromSession(s),
       });
       if (created) imported++;
     }
