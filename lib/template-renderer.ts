@@ -2,7 +2,7 @@
 
 export interface Block {
   id: string;
-  type: "header" | "text" | "image" | "articles" | "divider" | "footer" | "button" | "spotlight" | "presenting_sponsor" | "presenting_logo_bar" | "presenting_spotlight" | "events" | "referral" | "poll" | "wordy" | "match" | "games" | "tip_jar" | "deals_signup" | "weather";
+  type: "header" | "text" | "image" | "articles" | "divider" | "footer" | "button" | "spotlight" | "presenting_sponsor" | "presenting_logo_bar" | "presenting_spotlight" | "events" | "referral" | "poll" | "wordy" | "match" | "games" | "tip_jar" | "deals_signup" | "weather" | "product_spotlight";
   content: Record<string, unknown>;
 }
 
@@ -63,6 +63,20 @@ export interface PresentingPartnerItem {
   ctaUrl?: string | null;
   ctaLabel?: string | null;
   imageUrl?: string | null;
+}
+
+// A single product chosen in the template editor for a product_spotlight
+// block. Resolved server-side at send time (see resolveProductSpotlightItems
+// in lib/products.ts); url is the product's public page on the workspace site.
+export interface ProductSpotlightItem {
+  name: string;
+  tagline?: string | null;
+  description?: string | null;
+  priceCents: number;
+  compareAtCents?: number | null;
+  imageUrl?: string | null;
+  url: string;
+  soldOut: boolean;
 }
 
 export interface InArticleAdItem {
@@ -321,6 +335,39 @@ function renderPresentingSpotlight(partners: PresentingPartnerItem[], tracking?:
     })
     .join("");
   return `<div style="padding:20px 40px;">${cards}</div>`;
+}
+
+// Manually selected product card. Missing/inactive products never reach
+// here (the resolver omits them and the block renders empty); a sold-out
+// product still renders, with the buy button swapped for a SOLD OUT note,
+// matching the public product page.
+function renderProductSpotlight(
+  content: Record<string, unknown>,
+  item: ProductSpotlightItem,
+  tracking?: TrackingConfig
+): string {
+  const money = (cents: number) => `$${(cents / 100).toFixed(2)}`;
+  const blurb = item.tagline?.trim() || item.description?.trim().split("\n")[0] || "";
+  const shortBlurb = blurb.length > 220 ? `${blurb.slice(0, 217).trimEnd()}…` : blurb;
+  const ctaLabel = String(content.buttonLabel || "Shop Now");
+  const ctaUrl = trackedUrl(tracking, item.url, "product_spotlight", item.name);
+  const ctaHtml = item.soldOut
+    ? `<span style="display:inline-block;background:#f3f4f6;color:#b91c1c;padding:10px 20px;border-radius:4px;font-size:13px;font-family:sans-serif;font-weight:700;letter-spacing:0.5px;">SOLD OUT</span>`
+    : `<a href="${ctaUrl}" style="display:inline-block;background:#166534;color:#ffffff;padding:10px 20px;border-radius:4px;text-decoration:none;font-size:13px;font-family:sans-serif;font-weight:600;">${ctaLabel}</a>`;
+  return `
+    <div style="padding:20px 40px;">
+      <div style="border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;">
+        ${item.imageUrl ? `<img src="${item.imageUrl}" alt="${item.name}" style="width:100%;height:200px;object-fit:cover;display:block;" />` : ""}
+        <div style="padding:16px;">
+          <div style="font-size:18px;font-weight:700;color:#111827;margin:0 0 6px;font-family:Georgia,serif;line-height:1.3;">${item.name}</div>
+          ${shortBlurb ? `<div style="font-size:14px;color:#4b5563;line-height:1.6;margin:0 0 10px;font-family:sans-serif;">${shortBlurb}</div>` : ""}
+          <div style="font-size:16px;font-weight:700;color:#111827;font-family:sans-serif;margin:0 0 14px;">
+            ${money(item.priceCents)}${item.compareAtCents && item.compareAtCents > item.priceCents ? ` <span style="color:#9ca3af;text-decoration:line-through;font-weight:400;">${money(item.compareAtCents)}</span>` : ""}
+          </div>
+          ${ctaHtml}
+        </div>
+      </div>
+    </div>`;
 }
 
 function renderInArticleAd(ad: InArticleAdItem, tracking?: TrackingConfig): string {
@@ -704,7 +751,8 @@ export function renderTemplate(
   polls?: Map<string, PollData>,
   wordyData?: WordyData,
   weatherData?: WeatherSnapshot,
-  theme: ThemeColors = DEFAULT_THEME
+  theme: ThemeColors = DEFAULT_THEME,
+  productSpotlights?: Map<string, ProductSpotlightItem>
 ): string {
   const { spotlights = [], presentingSponsor = null, presentingPartners = [], presentingSpotlight = [], inArticleAds = [] } = sponsors;
 
@@ -751,6 +799,10 @@ export function renderTemplate(
           return renderDealsSignup();
         case "weather":
           return renderWeather(block.content, weatherData);
+        case "product_spotlight": {
+          const item = productSpotlights?.get(String(block.content.productId || ""));
+          return item ? renderProductSpotlight(block.content, item, tracking) : "";
+        }
         default:
           return "";
       }

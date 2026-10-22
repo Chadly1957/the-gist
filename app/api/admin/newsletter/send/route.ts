@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getAdminSession } from "@/lib/auth";
 import { renderTemplate, Block, SpotlightItem, PresentingSponsorItem, PresentingPartnerItem, InArticleAdItem, EventItem, PollData, WordyData, getDealsBlockCopy, DEALS_BUYER_COPY, resolveDealsPlaceholders } from "@/lib/template-renderer";
+import { resolveProductSpotlightItems } from "@/lib/products";
 import { fetchWeatherSnapshot, WeatherSnapshot } from "@/lib/weather";
 import { getEmailClient, htmlToText } from "@/lib/email";
 import { signTrackingUrl } from "@/lib/tracking";
@@ -240,6 +241,10 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // Resolve any manually selected product_spotlight products for this
+  // workspace. Missing/inactive selections render empty; never blocks a send.
+  const productSpotlights = await resolveProductSpotlightItems(blocks, appUrl);
+
   // Render HTML once. Open/click tracking links embed a recipient-id
   // placeholder that gets swapped in per-recipient below, so the template
   // only needs to be rendered a single time regardless of list size.
@@ -252,7 +257,8 @@ export async function POST(req: NextRequest) {
     pollsMap,
     wordyData,
     weatherData,
-    theme
+    theme,
+    productSpotlights
   )
     .replace(
       /\{\{UNSUBSCRIBE_URL\}\}/g,
@@ -301,7 +307,8 @@ export async function POST(req: NextRequest) {
       pollsMap,
       wordyData,
       weatherData,
-      theme
+      theme,
+      productSpotlights
     )
       .replace(/\{\{UNSUBSCRIBE_URL\}\}/g, `${appUrl}/unsubscribe`)
       .replace(/\{\{PROFILE_URL\}\}/g, `${appUrl}/profile`)
