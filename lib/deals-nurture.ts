@@ -177,6 +177,10 @@ async function sendNurtureTouch(
     },
   });
   const unsubUrl = `${appUrl}/unsubscribe?r=${recipient.id}&email=${encodeURIComponent(subscriber.email)}`;
+  // One-click (RFC 8058) header target: the API endpoint, which accepts the
+  // form-encoded POST mail clients send. The footer link above stays on the
+  // human page.
+  const unsubHeaderUrl = `${appUrl}/api/unsubscribe?r=${recipient.id}&email=${encodeURIComponent(subscriber.email)}`;
 
   const content = buildTouch(touch, {
     area: workspace.area,
@@ -200,7 +204,7 @@ async function sendNurtureTouch(
     htmlBody,
     textBody: htmlToText(htmlBody),
     headers: {
-      "List-Unsubscribe": `<${unsubUrl}>`,
+      "List-Unsubscribe": `<${unsubHeaderUrl}>`,
       "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
     },
   });

@@ -83,7 +83,7 @@ export async function sendWelcomeEmail(
   });
 
   const refCode = await getOrCreateRefCode(subscriber.id);
-  const unsubUrl = `${appUrl}/unsubscribe?r=${recipient.id}&email=${encodeURIComponent(subscriber.email)}`;
+  const unsubUrl = `${appUrl}/api/unsubscribe?r=${recipient.id}&email=${encodeURIComponent(subscriber.email)}`;
 
   // Day-0 upsell: a short Deals P.S. injected before the footer. The welcome
   // email is not a distinct template (it re-sends the latest newsletter

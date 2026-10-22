@@ -143,7 +143,7 @@ export async function POST(
       buyerToken ? DEALS_BUYER_COPY : dealsFallbackCopy,
       buyerToken ? `${appUrl}/deals?token=${buyerToken}` : `${appUrl}/deals?source=newsletter`
     );
-    const unsubUrl = `${appUrl}/unsubscribe?r=${r.id}&email=${encodeURIComponent(r.email)}`;
+    const unsubUrl = `${appUrl}/api/unsubscribe?r=${r.id}&email=${encodeURIComponent(r.email)}`;
     return {
       to: r.email,
       subject: originalSend.subject,
