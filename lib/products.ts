@@ -4,8 +4,45 @@
 // unique Stripe checkout session ID, so webhook redeliveries and repeated
 // syncs never double-count a sale.
 import type { PrismaClient } from "@prisma/client";
+import type Stripe from "stripe";
 import { prisma } from "./db";
 import type { Block, ProductSpotlightItem } from "./template-renderer";
+
+// Shipping address as stored on a ProductOrder (column names match the
+// schema). Extracted from the Stripe Checkout session at payment time.
+export interface ProductShipping {
+  shippingName: string | null;
+  shippingLine1: string | null;
+  shippingLine2: string | null;
+  shippingCity: string | null;
+  shippingState: string | null;
+  shippingPostalCode: string | null;
+  shippingCountry: string | null;
+}
+
+// Pull the buyer's shipping name + address off a completed Checkout
+// session. The current Stripe API returns it at
+// collected_information.shipping_details; older API versions put it at the
+// top-level shipping_details, so check both. Returns null when the session
+// collected no address (digital product, or a link with collection off).
+export function shippingFromSession(session: Stripe.Checkout.Session): ProductShipping | null {
+  const s = session as unknown as {
+    collected_information?: { shipping_details?: Stripe.Checkout.Session.CollectedInformation.ShippingDetails | null } | null;
+    shipping_details?: { name?: string | null; address?: Stripe.Address | null } | null;
+  };
+  const details = s.collected_information?.shipping_details ?? s.shipping_details;
+  const address = details?.address;
+  if (!details || !address) return null;
+  return {
+    shippingName: details.name || null,
+    shippingLine1: address.line1 || null,
+    shippingLine2: address.line2 || null,
+    shippingCity: address.city || null,
+    shippingState: address.state || null,
+    shippingPostalCode: address.postal_code || null,
+    shippingCountry: address.country || null,
+  };
+}
 
 // Resolve the products selected in a template's product_spotlight blocks
 // into render-ready items, keyed by product ID. Only ACTIVE products in the
@@ -70,6 +107,7 @@ export async function recordPaidProductOrder(
     amountCents: number;
     sessionId: string;
     paidAt?: Date;
+    shipping?: ProductShipping | null;
   }
 ): Promise<{ created: boolean }> {
   const existing = await db.productOrder.findUnique({
@@ -80,7 +118,15 @@ export async function recordPaidProductOrder(
     if (existing.status !== "paid") {
       await db.productOrder.update({
         where: { id: existing.id },
-        data: { status: "paid", paidAt: args.paidAt ?? new Date() },
+        data: { status: "paid", paidAt: args.paidAt ?? new Date(), ...(args.shipping ?? {}) },
+      });
+    } else if (args.shipping) {
+      // Already recorded as paid: still fill in the shipping address when
+      // the caller has it (e.g. a Payment Link sync backfilling orders that
+      // were created before addresses were stored).
+      await db.productOrder.update({
+        where: { id: existing.id },
+        data: { ...args.shipping },
       });
     }
     return { created: false };
@@ -94,6 +140,7 @@ export async function recordPaidProductOrder(
       stripeSessionId: args.sessionId,
       status: "paid",
       paidAt: args.paidAt ?? new Date(),
+      ...(args.shipping ?? {}),
     },
   });
   return { created: true };

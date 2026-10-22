@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
 
   const product = await prisma.product.findFirst({
     where: { id: productId, status: "active" },
-    select: { id: true, name: true, slug: true, priceCents: true, imageUrl: true, quantity: true },
+    select: { id: true, name: true, slug: true, priceCents: true, imageUrl: true, quantity: true, requiresShipping: true },
   });
   if (!product) return NextResponse.json({ error: "Product not found." }, { status: 404 });
 
@@ -63,6 +63,12 @@ export async function POST(req: NextRequest) {
         },
       ],
       customer_email: normalizedEmail,
+      // Physical products need a mailing address to fulfill: make the hosted
+      // checkout collect (and require) a US shipping name + address. The
+      // webhook copies it onto the order. Digital products skip this.
+      ...(product.requiresShipping
+        ? { shipping_address_collection: { allowed_countries: ["US" as const] } }
+        : {}),
       success_url: `${appUrl}/products/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${appUrl}/products/${product.slug}?cancelled=1`,
       metadata: {

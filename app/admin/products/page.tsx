@@ -15,6 +15,7 @@ interface Product {
   galleryUrls: string[];
   fulfillmentNote: string | null;
   quantity: number | null;
+  requiresShipping: boolean;
   stripePaymentLinkId: string | null;
   status: string;
   paidCount?: number;
@@ -31,9 +32,24 @@ const EMPTY_FORM = {
   galleryUrls: [] as string[],
   fulfillmentNote: "",
   quantity: "",
+  requiresShipping: true,
   stripePaymentLinkId: "",
   status: "draft",
 };
+
+interface ProductOrder {
+  id: string;
+  email: string;
+  amountCents: number;
+  paidAt: string | null;
+  shippingName: string | null;
+  shippingLine1: string | null;
+  shippingLine2: string | null;
+  shippingCity: string | null;
+  shippingState: string | null;
+  shippingPostalCode: string | null;
+  shippingCountry: string | null;
+}
 
 const STATUS_COLORS: Record<string, string> = {
   draft: "bg-yellow-100 text-yellow-800",
@@ -49,6 +65,9 @@ export default function ProductsPage() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [ordersFor, setOrdersFor] = useState<string | null>(null);
+  const [orders, setOrders] = useState<ProductOrder[]>([]);
+  const [ordersLoading, setOrdersLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -132,6 +151,7 @@ export default function ProductsPage() {
       galleryUrls: p.galleryUrls || [],
       fulfillmentNote: p.fulfillmentNote || "",
       quantity: p.quantity === null || p.quantity === undefined ? "" : String(p.quantity),
+      requiresShipping: p.requiresShipping !== false,
       stripePaymentLinkId: p.stripePaymentLinkId || "",
       status: p.status,
     });
@@ -155,6 +175,7 @@ export default function ProductsPage() {
       galleryUrls: form.galleryUrls,
       fulfillmentNote: form.fulfillmentNote,
       quantity: form.quantity === "" ? null : Math.floor(Number(form.quantity)),
+      requiresShipping: form.requiresShipping,
       stripePaymentLinkId: form.stripePaymentLinkId.trim() || null,
       status: form.status,
     };
@@ -191,6 +212,25 @@ export default function ProductsPage() {
       setError(err instanceof Error ? err.message : "Sync failed.");
     }
     setSyncing(false);
+  };
+
+  const toggleOrders = async (p: Product) => {
+    if (ordersFor === p.id) {
+      setOrdersFor(null);
+      return;
+    }
+    setOrdersFor(p.id);
+    setOrders([]);
+    setOrdersLoading(true);
+    try {
+      const res = await workspaceFetch(`/api/admin/products/${p.id}/orders`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to load orders.");
+      setOrders(data.orders || []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load orders.");
+    }
+    setOrdersLoading(false);
   };
 
   const setStatus = async (p: Product, status: string) => {
@@ -256,6 +296,13 @@ export default function ProductsPage() {
               <span className="text-sm font-medium">Quantity available (blank = unlimited)</span>
               <input type="number" step="1" min="0" value={form.quantity} onChange={(e) => setForm({ ...form, quantity: e.target.value })} className="mt-1 w-full border rounded-lg px-3 py-2" placeholder="Unlimited" />
               <span className="text-xs text-gray-400">When paid orders reach this number, the pages show SOLD OUT and checkout closes. Use 0 to force sold out.</span>
+            </label>
+            <label className="flex items-start gap-2 md:col-span-2">
+              <input type="checkbox" checked={form.requiresShipping} onChange={(e) => setForm({ ...form, requiresShipping: e.target.checked })} className="mt-1" />
+              <span>
+                <span className="text-sm font-medium">Requires a shipping address</span>
+                <span className="block text-xs text-gray-400">On for physical products: checkout requires the buyer's shipping name and address, and it is saved on the order for fulfillment. Turn off for digital products.</span>
+              </span>
             </label>
             <label className="block md:col-span-2">
               <span className="text-sm font-medium">Legacy Stripe Payment Link ID (optional)</span>
@@ -323,7 +370,8 @@ export default function ProductsPage() {
       ) : (
         <div className="space-y-3">
           {list.map((p) => (
-            <div key={p.id} className="p-4 border rounded-xl flex items-center gap-4">
+            <div key={p.id} className="border rounded-xl">
+            <div className="p-4 flex items-center gap-4">
               {p.imageUrl ? <img src={p.imageUrl} alt="" className="w-14 h-14 object-cover rounded-lg border" /> : <div className="w-14 h-14 rounded-lg border bg-gray-50" />}
               <div className="flex-1">
                 <div className="font-semibold">{p.name}</div>
@@ -338,6 +386,46 @@ export default function ProductsPage() {
               {p.status !== "active" && <button onClick={() => setStatus(p, "active")} className="text-sm text-green-700 hover:underline">Go live</button>}
               {p.status === "active" && <button onClick={() => setStatus(p, "draft")} className="text-sm text-gray-500 hover:underline">Unpublish</button>}
               <button onClick={() => openEdit(p)} className="text-sm text-blue-600 hover:underline">Edit</button>
+              <button onClick={() => toggleOrders(p)} className="text-sm text-blue-600 hover:underline">{ordersFor === p.id ? "Hide orders" : "Orders"}</button>
+            </div>
+            {ordersFor === p.id && (
+              <div className="px-4 pb-4">
+                {ordersLoading ? (
+                  <p className="text-sm text-gray-500">Loading orders...</p>
+                ) : orders.length === 0 ? (
+                  <p className="text-sm text-gray-500">No paid orders yet.</p>
+                ) : (
+                  <div className="border-t pt-3 space-y-3">
+                    {orders.map((o) => (
+                      <div key={o.id} className="text-sm flex flex-wrap gap-x-8 gap-y-1">
+                        <div>
+                          <div className="font-medium">{o.email}</div>
+                          <div className="text-gray-500">
+                            {money(o.amountCents)}
+                            {o.paidAt && <> · {new Date(o.paidAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</>}
+                          </div>
+                        </div>
+                        <div className="text-gray-600">
+                          {o.shippingLine1 ? (
+                            <>
+                              <div>{o.shippingName || ""}</div>
+                              <div>{o.shippingLine1}</div>
+                              {o.shippingLine2 && <div>{o.shippingLine2}</div>}
+                              <div>
+                                {[o.shippingCity, o.shippingState].filter(Boolean).join(", ")} {o.shippingPostalCode || ""}
+                                {o.shippingCountry && o.shippingCountry !== "US" ? ` · ${o.shippingCountry}` : ""}
+                              </div>
+                            </>
+                          ) : (
+                            <span className="text-gray-400">No shipping address collected</span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
             </div>
           ))}
         </div>
