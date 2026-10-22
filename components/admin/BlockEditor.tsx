@@ -3,13 +3,20 @@ import WorkspaceText from "@/components/workspace/WorkspaceText";
 
 import { workspaceFetch } from "@/lib/workspace-client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import UrlInput from "@/components/UrlInput";
 
 export interface Block {
   id: string;
-  type: "header" | "text" | "image" | "articles" | "divider" | "button" | "footer" | "spotlight" | "presenting_sponsor" | "presenting_logo_bar" | "presenting_spotlight" | "events" | "referral" | "poll" | "wordy" | "match" | "games" | "tip_jar" | "deals_signup" | "weather";
+  type: "header" | "text" | "image" | "articles" | "divider" | "button" | "footer" | "spotlight" | "presenting_sponsor" | "presenting_logo_bar" | "presenting_spotlight" | "events" | "referral" | "poll" | "wordy" | "match" | "games" | "tip_jar" | "deals_signup" | "weather" | "product_spotlight";
   content: Record<string, string>;
+}
+
+export interface AdminProductOption {
+  id: string;
+  name: string;
+  priceCents: number;
+  status: string;
 }
 
 interface BlockEditorProps {
@@ -39,12 +46,31 @@ const BLOCK_TYPES: { type: Block["type"]; label: string; icon: string }[] = [
   { type: "tip_jar", label: "Tip Jar", icon: "☕" },
   { type: "deals_signup", label: "Gist Deals Signup", icon: "🎟️" },
   { type: "weather", label: "Weather Snapshot", icon: "🌤️" },
+  { type: "product_spotlight", label: "Product Spotlight", icon: "🛍️" },
 ];
 
 export default function BlockEditor({ blocks, onChange }: BlockEditorProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [dropIndex, setDropIndex] = useState<number | null>(null);
+
+  // Products for the product_spotlight picker, loaded lazily only when a
+  // template actually uses the block.
+  const [products, setProducts] = useState<AdminProductOption[]>([]);
+  const hasProductBlock = blocks.some((b) => b.type === "product_spotlight");
+  useEffect(() => {
+    if (!hasProductBlock) return;
+    let cancelled = false;
+    workspaceFetch("/api/admin/products")
+      .then((r) => r.json())
+      .then((data) => {
+        if (!cancelled) setProducts(data.products ?? []);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [hasProductBlock]);
 
   function addBlock(type: Block["type"]) {
     const defaults: Record<Block["type"], Record<string, string>> = {
@@ -94,6 +120,7 @@ export default function BlockEditor({ blocks, onChange }: BlockEditorProps) {
         latitude: "",
         longitude: "",
       },
+      product_spotlight: { productId: "", buttonLabel: "Shop Now" },
     };
     const newBlock: Block = { id: generateId(), type, content: { ...defaults[type], blockId: "" } };
     if (type === "poll") newBlock.content.blockId = newBlock.id;
@@ -213,7 +240,7 @@ export default function BlockEditor({ blocks, onChange }: BlockEditorProps) {
 
           {/* Block preview */}
           <div className="px-4 py-3">
-            <BlockPreview block={block} />
+            <BlockPreview block={block} products={products} />
           </div>
 
           {/* Inline editor */}
@@ -221,6 +248,7 @@ export default function BlockEditor({ blocks, onChange }: BlockEditorProps) {
             <div className="border-t border-gray-100 px-4 py-4 bg-gray-50 rounded-b-xl">
               <BlockFields
                 block={block}
+                products={products}
                 onChange={(content) => updateBlock(block.id, content)}
               />
             </div>
@@ -252,7 +280,7 @@ export default function BlockEditor({ blocks, onChange }: BlockEditorProps) {
   );
 }
 
-function BlockPreview({ block }: { block: Block }) {
+function BlockPreview({ block, products = [] }: { block: Block; products?: AdminProductOption[] }) {
   switch (block.type) {
     case "header":
       return (
@@ -465,6 +493,24 @@ function BlockPreview({ block }: { block: Block }) {
           </div>
         </div>
       );
+    case "product_spotlight": {
+      const selected = products.find((p) => p.id === block.content.productId);
+      return (
+        <div className="flex items-center gap-3 py-2">
+          <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center">
+            <span className="text-sm">🛍️</span>
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-gray-800">{selected ? selected.name : "Product Spotlight"}</p>
+            <p className="text-xs text-gray-400">
+              {selected
+                ? "Featured in the email with image, price, and a button to its product page"
+                : "Pick a product to feature. Hidden in the email if no active product is selected."}
+            </p>
+          </div>
+        </div>
+      );
+    }
     default:
       return null;
   }
@@ -593,9 +639,11 @@ function ImageBlockFields({
 
 function BlockFields({
   block,
+  products = [],
   onChange,
 }: {
   block: Block;
+  products?: AdminProductOption[];
   onChange: (content: Record<string, string>) => void;
 }) {
   const c = block.content;
@@ -766,6 +814,38 @@ function BlockFields({
           <p className="text-xs text-gray-400">The snapshot is fetched when the newsletter is sent — current conditions plus the next ~6 hours. Leave the location fields blank to use this workspace's location (set on the Workspaces page). No API key needed.</p>
         </div>
       );
+    case "product_spotlight": {
+      const activeProducts = products.filter((p) => p.status === "active");
+      const selectedId = c.productId || "";
+      const selectedIsActive = activeProducts.some((p) => p.id === selectedId);
+      return (
+        <div className="space-y-3">
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">Product</label>
+            <select
+              value={selectedId}
+              onChange={(e) => onChange({ ...c, productId: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
+            >
+              <option value="">Select a product…</option>
+              {selectedId && !selectedIsActive && (
+                <option value={selectedId}>Selected product (not active)</option>
+              )}
+              {activeProducts.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name} — ${(p.priceCents / 100).toFixed(2)}
+                </option>
+              ))}
+            </select>
+            {activeProducts.length === 0 && (
+              <p className="text-xs text-gray-400 mt-1">No active products in this workspace yet. Create one on the Products page and set it active.</p>
+            )}
+          </div>
+          {field("buttonLabel", "Button Label", { placeholder: "Shop Now" })}
+          <p className="text-xs text-gray-400">The email shows the product&apos;s image, name, tagline, and price with a button to its product page. If the product sells out, the button becomes a SOLD OUT note. If it is archived or deleted, the block is hidden.</p>
+        </div>
+      );
+    }
     default:
       return null;
   }
