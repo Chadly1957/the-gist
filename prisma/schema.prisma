@@ -63,6 +63,7 @@ model Workspace {
   dealsNurtureTouchRows       DealsNurtureTouch[]
   productRows                 Product[]
   productOrderRows            ProductOrder[]
+  storyRows                   Story[]
 }
 
 model AdminUser {
@@ -689,6 +690,32 @@ model ProductOrder {
   @@unique([id, workspaceId])
   @@index([productId])
   @@index([workspaceId, status])
+}
+
+// Original articles written in the admin (the CMS behind /articles), e.g.
+// the community-seeded briefs. NOT the scraped Article pool above: those
+// rows are external links curated into issues; a Story is first-party
+// content published on the Gist's own site, with its own RSS feed so the
+// Source tab can pull it into the pool like any other source.
+model Story {
+  workspaceId    String    @default("decatur")
+  workspace      Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  id             String    @id @default(cuid())
+  headline       String
+  slug           String
+  author         String    @default("Chad Williams")
+  headerImageUrl String?
+  body           String // rich text HTML from the admin editor, sanitized on save
+  excerpt        String? // summary; auto-derived from the body when left blank
+  status         String    @default("draft") // draft | published
+  publishedAt    DateTime? // stamped when the story first goes published
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@unique([workspaceId, slug])
+  @@unique([id, workspaceId])
+  @@index([workspaceId, status])
+  @@index([workspaceId, publishedAt])
 }
 
 // Presenting Partnerships: annual sponsorships billed monthly via Stripe.
