@@ -93,6 +93,9 @@ export default function SiteHeader() {
           </Link>
           {/* Desktop links */}
           <nav className="hidden md:flex items-center gap-6">
+            <Link href="/articles" className="text-sm font-semibold text-gray-700 hover:text-gray-900 transition-colors">
+              News
+            </Link>
             <Link href="/games" className="text-sm font-semibold text-gray-700 hover:text-gray-900 transition-colors">
               Games
             </Link>
@@ -132,6 +135,9 @@ export default function SiteHeader() {
         {/* Mobile menu panel */}
         {showMenu && (
           <nav className="md:hidden border-t border-gray-100 bg-white px-4 py-2">
+            <Link href="/articles" onClick={() => setShowMenu(false)} className="block py-3 text-sm font-semibold text-gray-700 border-b border-gray-50">
+              News
+            </Link>
             <Link href="/games" onClick={() => setShowMenu(false)} className="block py-3 text-sm font-semibold text-gray-700 border-b border-gray-50">
               Games
             </Link>
