@@ -77,6 +77,9 @@ export interface ProductSpotlightItem {
   imageUrl?: string | null;
   url: string;
   soldOut: boolean;
+  // Units left for capped products (cap minus paid orders, resolved at
+  // send time); null when the product has no quantity cap.
+  remaining?: number | null;
 }
 
 export interface InArticleAdItem {
@@ -354,6 +357,12 @@ function renderProductSpotlight(
   const ctaHtml = item.soldOut
     ? `<span style="display:inline-block;background:#f3f4f6;color:#b91c1c;padding:10px 20px;border-radius:4px;font-size:13px;font-family:sans-serif;font-weight:700;letter-spacing:0.5px;">SOLD OUT</span>`
     : `<a href="${ctaUrl}" style="display:inline-block;background:#166534;color:#ffffff;padding:10px 20px;border-radius:4px;text-decoration:none;font-size:13px;font-family:sans-serif;font-weight:600;">${ctaLabel}</a>`;
+  // Urgency line for capped products, computed from paid orders at send
+  // time so the number is always current; never shown once sold out.
+  const remainingHtml =
+    !item.soldOut && item.remaining !== null && item.remaining !== undefined
+      ? `<div style="font-size:13px;font-weight:700;color:#b91c1c;font-family:sans-serif;margin:0 0 14px;">Only ${item.remaining} left</div>`
+      : "";
   return `
     <div style="padding:20px 40px;">
       <div style="border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;">
@@ -364,6 +373,7 @@ function renderProductSpotlight(
           <div style="font-size:16px;font-weight:700;color:#111827;font-family:sans-serif;margin:0 0 14px;">
             ${money(item.priceCents)}${item.compareAtCents && item.compareAtCents > item.priceCents ? ` <span style="color:#9ca3af;text-decoration:line-through;font-weight:400;">${money(item.compareAtCents)}</span>` : ""}
           </div>
+          ${remainingHtml}
           ${ctaHtml}
         </div>
       </div>

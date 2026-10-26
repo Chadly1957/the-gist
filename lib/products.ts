@@ -87,6 +87,7 @@ export async function resolveProductSpotlightItems(
         imageUrl: p.imageUrl,
         url: `${appUrl}/products/${p.slug}`,
         soldOut: p.quantity !== null && paid >= p.quantity,
+        remaining: p.quantity !== null ? Math.max(0, p.quantity - paid) : null,
       });
     }
   } catch {
