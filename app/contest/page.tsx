@@ -8,7 +8,7 @@ import { workspaceFetch } from "@/lib/workspace-client";
 
 import { useState, useEffect, useRef } from "react";
 import Link from "@/components/workspace/WorkspaceLink";
-import Logo from "@/components/Logo";
+import SiteHeader from "@/components/SiteHeader";
 
 interface Sprint {
   id: string;
@@ -94,19 +94,7 @@ export default function ContestPage() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-green-50 to-white">
       {/* Header */}
-      <header className="border-b border-green-100 bg-white/80 backdrop-blur-sm sticky top-0 z-10">
-        <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
-          <Link href="/">
-            <Logo className="h-7 w-auto" />
-          </Link>
-          <Link
-            href="/"
-            className="text-sm text-green-700 font-medium hover:text-green-800 transition-colors"
-          >
-            Read the newsletter →
-          </Link>
-        </div>
-      </header>
+      <SiteHeader />
 
       <main className="max-w-lg mx-auto px-4 py-10">
         {loading ? (

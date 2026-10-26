@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { workspaceFetch } from "@/lib/workspace-client";
 import { useSearchParams } from "next/navigation";
+import SiteHeader from "@/components/SiteHeader";
 
 function OptOutInner() {
   const searchParams = useSearchParams();
@@ -24,7 +25,9 @@ function OptOutInner() {
   }, [token]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+    <div className="min-h-screen flex flex-col bg-gray-50">
+      <SiteHeader />
+      <div className="flex-1 flex items-center justify-center px-4">
       <div className="max-w-md w-full bg-white rounded-2xl shadow p-8 text-center">
         {status === "working" && <p className="text-gray-600">Updating your preferences…</p>}
         {status === "done" && (
@@ -44,6 +47,7 @@ function OptOutInner() {
             </p>
           </>
         )}
+      </div>
       </div>
     </div>
   );

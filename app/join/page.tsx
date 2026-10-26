@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { workspaceFetch } from "@/lib/workspace-client";
 import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
 import Link from "@/components/workspace/WorkspaceLink";
-import Logo from "@/components/Logo";
+import SiteHeader from "@/components/SiteHeader";
 import DealsOto from "@/components/DealsOto";
 
 // Dedicated landing page for paid ad traffic. Single purpose: email signup.
@@ -191,17 +191,13 @@ export default function JoinPage() {
 
   return (
     <div className="min-h-screen bg-[#faf8f4] flex flex-col">
-      {/* Dateline header: logo only, no nav */}
-      <header className="border-b border-[#ece7dd]">
-        <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between gap-4">
-          <Link href="/">
-            <Logo className="h-10 w-auto" />
-          </Link>
-          <p className="text-[11px] sm:text-xs text-[#8a8478] tracking-[0.08em] font-medium text-right">
-            {dateline} &middot; {workspace.area.toUpperCase()}, IL
-          </p>
-        </div>
-      </header>
+      <SiteHeader />
+      {/* Dateline line under the shared nav */}
+      <div className="border-b border-[#ece7dd] bg-[#faf8f4]">
+        <p className="max-w-5xl mx-auto px-4 sm:px-6 py-2 text-[11px] sm:text-xs text-[#8a8478] tracking-[0.08em] font-medium text-center">
+          {dateline} &middot; {workspace.area.toUpperCase()}, IL
+        </p>
+      </div>
 
       <main className="flex-1">
         {/* ── HERO with aerial background ── */}

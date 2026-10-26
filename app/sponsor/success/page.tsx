@@ -3,7 +3,7 @@
 import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "@/components/workspace/WorkspaceLink";
-import Logo from "@/components/Logo";
+import SiteHeader from "@/components/SiteHeader";
 import { workspaceFetch } from "@/lib/workspace-client";
 
 interface Status {
@@ -41,11 +41,10 @@ function SuccessContent() {
   }, [sessionId]);
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gray-50 flex flex-col">
+      <SiteHeader />
+      <div className="flex-1 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 max-w-md w-full text-center">
-        <div className="flex items-center justify-center mb-5">
-          <Logo className="h-12 w-auto" />
-        </div>
         <div className="w-14 h-14 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
           <svg className="w-7 h-7 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
@@ -72,6 +71,7 @@ function SuccessContent() {
         <Link href="/sponsor" className="block w-full bg-green-700 hover:bg-green-800 text-white text-sm font-semibold py-3 rounded-xl transition-colors">
           Back to Sponsorships
         </Link>
+      </div>
       </div>
     </div>
   );

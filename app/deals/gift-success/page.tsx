@@ -3,6 +3,7 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import SiteHeader from "@/components/SiteHeader";
 
 export const dynamic = "force-dynamic";
 
@@ -11,7 +12,9 @@ function GiftSuccessInner() {
   const to = searchParams.get("to");
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
+    <div className="min-h-screen bg-gray-50 flex flex-col">
+      <SiteHeader />
+      <div className="flex-1 flex items-center justify-center p-6">
       <div className="max-w-md w-full bg-white rounded-2xl shadow p-8 text-center">
         <div className="text-5xl mb-4">🎁</div>
         <h1 className="text-2xl font-bold mb-2">Gift sent!</h1>
@@ -28,6 +31,7 @@ function GiftSuccessInner() {
         <Link href="/deals" className="inline-block mt-6 text-sm text-green-700 underline">
           Back to Gist Deals
         </Link>
+      </div>
       </div>
     </div>
   );

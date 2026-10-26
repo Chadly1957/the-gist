@@ -1,6 +1,6 @@
 import WorkspaceText from "@/components/workspace/WorkspaceText";
 import Link from "@/components/workspace/WorkspaceLink";
-import Logo from "@/components/Logo";
+import SiteHeader from "@/components/SiteHeader";
 
 interface Game {
   name: string;
@@ -35,15 +35,7 @@ const games: Game[] = [
 export default function GamesPage() {
   return (
     <div className="min-h-screen bg-white flex flex-col">
-      <header className="border-b border-gray-100 py-3">
-        <div className="max-w-6xl mx-auto px-6 flex items-center justify-between">
-          <Link href="/"><Logo className="h-10 w-auto" /></Link>
-          <div className="text-right">
-            <p className="text-sm font-bold text-gray-900">Games</p>
-            <p className="text-xs text-gray-400">Play something new every day</p>
-          </div>
-        </div>
-      </header>
+      <SiteHeader />
 
       <main className="flex-1 max-w-6xl mx-auto w-full px-6 py-12">
         <p className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-2">

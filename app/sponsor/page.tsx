@@ -2,6 +2,7 @@ import WorkspaceText from "@/components/workspace/WorkspaceText";
 import { WorkspaceAnchor } from "@/components/workspace/WorkspaceLink";
 import Link from "@/components/workspace/WorkspaceLink";
 import Logo from "@/components/Logo";
+import SiteHeader from "@/components/SiteHeader";
 import SponsorsMarquee from "@/components/SponsorsMarquee";
 
 export const dynamic = "force-dynamic";
@@ -57,17 +58,9 @@ export default async function SponsorPage() {
 
   return (
     <div className="min-h-screen bg-white">
+      <SiteHeader />
       {/* Header */}
       <div className="bg-gray-50 px-6 py-10 sm:py-16 text-center relative">
-        <Link
-          href="/"
-          className="absolute top-4 left-4 sm:top-6 sm:left-6 inline-flex items-center gap-1.5 text-sm font-medium text-gray-500 hover:text-gray-800 transition-colors"
-        >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-          </svg>
-          <span className="hidden sm:inline">Back to Home</span>
-        </Link>
         <Link href="/" className="flex items-center justify-center mb-5 sm:mb-6">
           <Logo className="h-12 sm:h-16 w-auto" />
         </Link>

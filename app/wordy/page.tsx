@@ -7,7 +7,7 @@ import { workspaceFetch, workspaceStorage } from "@/lib/workspace-client";
 import { useState, useEffect, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "@/components/workspace/WorkspaceLink";
-import Logo from "@/components/Logo";
+import SiteHeader from "@/components/SiteHeader";
 import GamePresentingSponsor from "@/components/GamePresentingSponsor";
 import TipJarCTA from "@/components/TipJarCTA";
 
@@ -303,16 +303,12 @@ function WordyGame() {
 export default function WordyPage() {
   return (
     <div className="min-h-screen bg-white flex flex-col">
-      <header className="border-b border-gray-100 py-3">
-        <div className="max-w-lg mx-auto px-6 flex items-center justify-between">
-          <Link href="/"><Logo className="h-10 w-auto" /></Link>
-          <div className="text-right">
-            <p className="text-sm font-bold text-gray-900"><WorkspaceText>{"Decatur Wordy"}</WorkspaceText></p>
-            <p className="text-xs text-gray-400"><WorkspaceText>{"Daily puzzle · all answers Decatur area"}</WorkspaceText></p>
-          </div>
-        </div>
-      </header>
+      <SiteHeader />
       <main className="flex-1 max-w-lg mx-auto w-full px-4 pt-4">
+        <div className="text-center mb-2">
+          <h1 className="text-lg font-bold text-gray-900"><WorkspaceText>{"Wordy"}</WorkspaceText></h1>
+          <p className="text-xs text-gray-400"><WorkspaceText>{"Daily puzzle · all answers from the local area"}</WorkspaceText></p>
+        </div>
         <GamePresentingSponsor game="wordy" />
         <div className="pt-2">
           <Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-8 w-8 border-2 border-green-600 border-t-transparent" /></div>}>

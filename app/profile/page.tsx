@@ -3,7 +3,7 @@ import { workspaceFetch } from "@/lib/workspace-client";
 
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import Logo from "@/components/Logo";
+import SiteHeader from "@/components/SiteHeader";
 
 function ProfileForm() {
   const searchParams = useSearchParams();
@@ -68,7 +68,6 @@ function ProfileForm() {
   return (
     <>
       <div className="text-center mb-6">
-        <Logo className="h-12 w-auto mx-auto mb-4" />
         <h1 className="text-xl font-bold text-gray-900 mb-1">Update Your Name</h1>
         {maskedEmail && (
           <p className="text-sm text-gray-500">Subscribed as {maskedEmail}</p>
@@ -132,11 +131,14 @@ function ProfileForm() {
 
 export default function ProfilePage() {
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 w-full max-w-sm">
-        <Suspense>
-          <ProfileForm />
-        </Suspense>
+    <div className="min-h-screen bg-gray-50 flex flex-col">
+      <SiteHeader />
+      <div className="flex-1 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 w-full max-w-sm">
+          <Suspense>
+            <ProfileForm />
+          </Suspense>
+        </div>
       </div>
     </div>
   );

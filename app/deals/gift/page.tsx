@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { workspaceFetch } from "@/lib/workspace-client";
 import { COUPON_BOOK_PRICE_CENTS } from "@/lib/coupon-book";
+import SiteHeader from "@/components/SiteHeader";
 
 function cents(n: number) {
   return `$${(n / 100).toFixed(2).replace(/\.00$/, "")}`;
@@ -43,6 +44,7 @@ function GiftFormInner() {
 
   return (
     <div className="min-h-screen bg-[#faf8f4]">
+      <SiteHeader />
       <div className="max-w-md mx-auto px-4 pt-12 pb-12">
         <Link href="/deals" className="text-sm text-green-700 underline">
           &larr; Back to Gist Deals

@@ -6,13 +6,15 @@ import Link from "@/components/workspace/WorkspaceLink";
 import Logo from "@/components/Logo";
 
 // The site's regular sticky nav (logo, Games, Shop, Advertise, Sponsor
-// Login, Admin) plus the sponsor-login modal it opens. Shared by the
-// homepage and the product pages so a visitor landing anywhere gets the
-// same way around the site. Branding and links are workspace-aware via
-// Logo and WorkspaceLink; the Shop link renders only when this workspace
-// has at least one active product.
+// Login, Admin) plus the sponsor-login modal it opens. Shared by every
+// public page so a visitor landing anywhere gets the same way around the
+// site. Branding and links are workspace-aware via Logo and WorkspaceLink;
+// the Shop link renders only when this workspace has at least one active
+// product. On small screens the links collapse into a hamburger menu and
+// the logo always links back to the workspace homepage.
 export default function SiteHeader() {
   const [products, setProducts] = useState<{ id: string }[]>([]);
+  const [showMenu, setShowMenu] = useState(false);
   const [showSponsorLogin, setShowSponsorLogin] = useState(false);
   const [sponsorLoginEmail, setSponsorLoginEmail] = useState("");
   const [sponsorLoginStatus, setSponsorLoginStatus] = useState<"idle" | "loading" | "sent">("idle");
@@ -85,11 +87,12 @@ export default function SiteHeader() {
 
       {/* Nav */}
       <header className="sticky top-0 z-10 bg-white/90 backdrop-blur-sm border-b border-gray-100">
-        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between">
+          <Link href="/" aria-label="Back to homepage" className="flex items-center">
             <Logo className="h-10 sm:h-14 w-auto" />
-          </div>
-          <nav className="flex items-center gap-6">
+          </Link>
+          {/* Desktop links */}
+          <nav className="hidden md:flex items-center gap-6">
             <Link href="/games" className="text-sm font-semibold text-gray-700 hover:text-gray-900 transition-colors">
               Games
             </Link>
@@ -111,7 +114,46 @@ export default function SiteHeader() {
               Admin
             </Link>
           </nav>
+          {/* Mobile hamburger */}
+          <button
+            type="button"
+            aria-label={showMenu ? "Close menu" : "Open menu"}
+            aria-expanded={showMenu}
+            onClick={() => setShowMenu((v) => !v)}
+            className="md:hidden inline-flex items-center justify-center w-10 h-10 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors"
+          >
+            {showMenu ? (
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+            ) : (
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" /></svg>
+            )}
+          </button>
         </div>
+        {/* Mobile menu panel */}
+        {showMenu && (
+          <nav className="md:hidden border-t border-gray-100 bg-white px-4 py-2">
+            <Link href="/games" onClick={() => setShowMenu(false)} className="block py-3 text-sm font-semibold text-gray-700 border-b border-gray-50">
+              Games
+            </Link>
+            {products.length > 0 && (
+              <Link href="/products" onClick={() => setShowMenu(false)} className="block py-3 text-sm font-semibold text-gray-700 border-b border-gray-50">
+                Shop
+              </Link>
+            )}
+            <Link href="/sponsor" onClick={() => setShowMenu(false)} className="block py-3 text-sm font-semibold text-green-700 border-b border-gray-50">
+              Advertise
+            </Link>
+            <button
+              onClick={() => { setShowMenu(false); setShowSponsorLogin(true); setSponsorLoginStatus("idle"); setSponsorLoginEmail(""); }}
+              className="block w-full text-left py-3 text-sm font-semibold text-gray-500 border-b border-gray-50"
+            >
+              Sponsor Login
+            </button>
+            <Link href="/admin/login" onClick={() => setShowMenu(false)} className="block py-3 text-sm text-gray-400">
+              Admin
+            </Link>
+          </nav>
+        )}
       </header>
     </>
   );
