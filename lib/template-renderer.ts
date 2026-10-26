@@ -2,7 +2,7 @@
 
 export interface Block {
   id: string;
-  type: "header" | "text" | "image" | "articles" | "divider" | "footer" | "button" | "spotlight" | "presenting_sponsor" | "presenting_logo_bar" | "presenting_spotlight" | "events" | "referral" | "poll" | "wordy" | "match" | "games" | "tip_jar" | "deals_signup" | "weather" | "product_spotlight";
+  type: "header" | "text" | "image" | "articles" | "divider" | "footer" | "button" | "spotlight" | "presenting_sponsor" | "presenting_logo_bar" | "presenting_spotlight" | "events" | "referral" | "poll" | "wordy" | "match" | "games" | "tip_jar" | "deals_signup" | "weather" | "product_spotlight" | "board";
   content: Record<string, unknown>;
 }
 
@@ -40,6 +40,40 @@ export interface SpotlightItem {
   description: string;
   ctaLabel: string;
   ctaUrl: string;
+}
+
+// A live Gist Board post for the newsletter board section. Fields arrive
+// already validated, but they are untrusted reader input, so renderBoard
+// escapes them before interpolating into email HTML.
+export interface BoardItem {
+  id: string;
+  title: string;
+  description: string;
+  category: string;
+  linkUrl: string | null;
+  contactInfo: string | null;
+  displayName: string | null;
+}
+
+export function boardCategoryLabel(key: string): string {
+  const labels: Record<string, string> = {
+    for_sale: "For Sale",
+    job: "Job",
+    event: "Event",
+    announcement: "Announcement",
+    service: "Service",
+    wanted: "Wanted",
+  };
+  return labels[key] ?? "Announcement";
+}
+
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 export interface PresentingSponsorItem {
@@ -271,6 +305,43 @@ function renderSpotlight(items: SpotlightItem[], tracking?: TrackingConfig): str
         Community Partners
       </div>
       ${cards}
+    </div>`;
+}
+
+// Gist Board: reader-posted classifieds, one compact row per live post.
+// Renders nothing when there are no live posts, so issues without board
+// activity are unchanged. The footer line advertises the board itself.
+function renderBoard(items: BoardItem[], tracking?: TrackingConfig): string {
+  if (items.length === 0) return "";
+  const rows = items.map((p) => {
+    const title = escapeHtml(p.title);
+    const description = escapeHtml(p.description);
+    const category = escapeHtml(boardCategoryLabel(p.category));
+    const byline = p.displayName ? `<div style="font-size:12px;color:#9ca3af;font-family:sans-serif;margin-top:6px;">Posted by ${escapeHtml(p.displayName)}</div>` : "";
+    const contact = p.contactInfo ? `<div style="font-size:12px;color:#6b7280;font-family:sans-serif;margin-top:4px;">Contact: ${escapeHtml(p.contactInfo)}</div>` : "";
+    const link = p.linkUrl
+      ? `<a href="${trackedUrl(tracking, p.linkUrl, "board", p.title)}" style="display:inline-block;margin-top:8px;background:#166534;color:#ffffff;padding:6px 12px;border-radius:4px;text-decoration:none;font-size:12px;font-family:sans-serif;font-weight:600;">View →</a>`
+      : "";
+    return `
+    <div style="border:1px solid #e5e7eb;border-radius:8px;padding:14px;margin-bottom:12px;">
+      <div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#15803d;font-family:sans-serif;margin-bottom:4px;">${category}</div>
+      <div style="font-size:14px;font-weight:700;color:#111827;font-family:sans-serif;">${title}</div>
+      <div style="font-size:13px;color:#4b5563;line-height:1.5;font-family:sans-serif;margin-top:2px;">${description}</div>
+      ${byline}
+      ${contact}
+      ${link}
+    </div>`;
+  }).join("");
+
+  return `
+    <div style="padding:20px 40px;">
+      <div style="font-family:sans-serif;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#6b7280;margin-bottom:14px;padding-bottom:8px;border-bottom:2px solid #e5e7eb;">
+        The Gist Board
+      </div>
+      ${rows}
+      <div style="font-size:12px;color:#6b7280;font-family:sans-serif;margin-top:4px;">
+        Got something to list? <a href="{{APP_URL}}/board/post" style="color:#15803d;font-weight:600;">Post it on the Board</a> — just $5 for 7 days.
+      </div>
     </div>`;
 }
 
@@ -755,6 +826,7 @@ export function renderTemplate(
     presentingPartners?: PresentingPartnerItem[];
     presentingSpotlight?: PresentingPartnerItem[];
     inArticleAds?: InArticleAdItem[];
+    boardItems?: BoardItem[];
   } = {},
   tracking?: TrackingConfig,
   events: EventItem[] = [],
@@ -764,7 +836,7 @@ export function renderTemplate(
   theme: ThemeColors = DEFAULT_THEME,
   productSpotlights?: Map<string, ProductSpotlightItem>
 ): string {
-  const { spotlights = [], presentingSponsor = null, presentingPartners = [], presentingSpotlight = [], inArticleAds = [] } = sponsors;
+  const { spotlights = [], presentingSponsor = null, presentingPartners = [], presentingSpotlight = [], inArticleAds = [], boardItems = [] } = sponsors;
 
   const bodyContent = blocks
     .map((block) => {
@@ -785,6 +857,8 @@ export function renderTemplate(
           return renderFooter(block.content);
         case "spotlight":
           return renderSpotlight(spotlights, tracking);
+        case "board":
+          return renderBoard(boardItems, tracking);
         case "presenting_sponsor":
           return presentingSponsor ? renderPresentingSponsor(presentingSponsor, tracking) : "";
         case "presenting_logo_bar":

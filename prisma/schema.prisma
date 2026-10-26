@@ -64,6 +64,7 @@ model Workspace {
   productRows                 Product[]
   productOrderRows            ProductOrder[]
   storyRows                   Story[]
+  boardPostRows               BoardPost[]
 }
 
 model AdminUser {
@@ -932,4 +933,36 @@ model DealsNurtureTouch {
   @@unique([workspaceId, subscriberId, touch])
   @@unique([id, workspaceId])
   @@index([workspaceId])
+}
+
+// Gist Board: community classifieds anyone can post for a flat $5.
+// Flow: form -> Stripe Checkout ($5) -> webhook marks pending_approval ->
+// admin one-tap approve -> active for 7 days (approvedAt -> expiresAt).
+// Live posts render in the newsletter board section and on /board.
+// Expiry is time-based in queries (no cron): active + expiresAt in future.
+// A rejected paid post is refunded via Stripe at reject time.
+model BoardPost {
+  workspaceId         String    @default("decatur")
+  workspace           Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  id                  String    @id @default(cuid())
+  title               String
+  description         String
+  category            String // for_sale | job | event | announcement | service | wanted
+  linkUrl             String?
+  contactInfo         String?
+  displayName         String?
+  email               String
+  status              String    @default("pending_payment") // pending_payment | pending_approval | active | rejected
+  amountCents         Int       @default(500)
+  stripeSessionId     String?   @unique
+  stripePaymentIntent String?
+  paidAt              DateTime?
+  approvedAt          DateTime?
+  expiresAt           DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  @@unique([id, workspaceId])
+  @@index([workspaceId, status])
+  @@index([workspaceId, approvedAt])
 }

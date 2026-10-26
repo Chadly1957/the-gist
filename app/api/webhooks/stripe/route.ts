@@ -144,6 +144,35 @@ async function handlePartnershipEvent(event: Stripe.Event): Promise<boolean> {
   return true;
 }
 
+// Board posts: the checkout route creates the BoardPost row as
+// pending_payment; fulfillment flips it to pending_approval (the 7-day run
+// starts only when an admin approves). Idempotent: re-delivered events no-op.
+async function fulfillBoardPost(workspaceId: string, session: Stripe.Checkout.Session) {
+  const paidAt = new Date();
+  const postId = session.metadata?.boardPostId;
+  const existing = postId
+    ? await basePrisma.boardPost.findFirst({
+        where: { id: postId, workspaceId },
+        select: { id: true, status: true },
+      })
+    : await basePrisma.boardPost.findFirst({
+        where: { stripeSessionId: session.id },
+        select: { id: true, status: true },
+      });
+  if (existing && existing.status === "pending_payment") {
+    await basePrisma.boardPost.update({
+      where: { id: existing.id },
+      data: {
+        status: "pending_approval",
+        paidAt,
+        stripeSessionId: session.id,
+        stripePaymentIntent:
+          typeof session.payment_intent === "string" ? session.payment_intent : undefined,
+      },
+    });
+  }
+}
+
 // Product orders: the checkout route creates the ProductOrder row as
 // pending_payment; fulfillment just flips it to paid. Idempotent: re-delivered
 // events no-op. If the pending row is missing (edge case), create it from
@@ -288,6 +317,8 @@ export async function POST(req: NextRequest) {
       await fulfillCouponBookGift(workspaceId, session);
     } else if (session.metadata?.kind === "product") {
       await fulfillProductOrder(workspaceId, session);
+    } else if (session.metadata?.kind === "board_post") {
+      await fulfillBoardPost(workspaceId, session);
     } else {
       await basePrisma.adBooking.updateMany({
         where: { workspaceId, stripeSessionId: sessionId, status: "pending_payment" },
