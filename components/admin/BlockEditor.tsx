@@ -504,7 +504,7 @@ function BlockPreview({ block, products = [] }: { block: Block; products?: Admin
             <p className="text-sm font-semibold text-gray-800">{selected ? selected.name : "Product Spotlight"}</p>
             <p className="text-xs text-gray-400">
               {selected
-                ? "Featured in the email with image, price, and a button to its product page"
+                ? "Featured in the email with image, price, a button to its product page, and how many are left when the product has a cap"
                 : "Pick a product to feature. Hidden in the email if no active product is selected."}
             </p>
           </div>
@@ -842,7 +842,7 @@ function BlockFields({
             )}
           </div>
           {field("buttonLabel", "Button Label", { placeholder: "Shop Now" })}
-          <p className="text-xs text-gray-400">The email shows the product&apos;s image, name, tagline, and price with a button to its product page. If the product sells out, the button becomes a SOLD OUT note. If it is archived or deleted, the block is hidden.</p>
+          <p className="text-xs text-gray-400">The email shows the product&apos;s image, name, tagline, and price with a button to its product page. When the product has a quantity cap, the email also shows how many are left, counted from paid orders at send time. If the product sells out, the button becomes a SOLD OUT note. If it is archived or deleted, the block is hidden.</p>
         </div>
       );
     }
