@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { workspaceFetch } from "@/lib/workspace-client";
-import { boardCategoryLabel } from "@/lib/board";
+import { boardCategoryLabel } from "@/lib/board-constants";
 
 interface BoardPostRow {
   id: string;

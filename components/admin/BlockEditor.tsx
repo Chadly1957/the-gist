@@ -8,7 +8,7 @@ import UrlInput from "@/components/UrlInput";
 
 export interface Block {
   id: string;
-  type: "header" | "text" | "image" | "articles" | "divider" | "button" | "footer" | "spotlight" | "presenting_sponsor" | "presenting_logo_bar" | "presenting_spotlight" | "events" | "referral" | "poll" | "wordy" | "match" | "games" | "tip_jar" | "deals_signup" | "weather" | "product_spotlight";
+  type: "header" | "text" | "image" | "articles" | "divider" | "button" | "footer" | "spotlight" | "presenting_sponsor" | "presenting_logo_bar" | "presenting_spotlight" | "events" | "referral" | "poll" | "wordy" | "match" | "games" | "tip_jar" | "deals_signup" | "weather" | "product_spotlight" | "board";
   content: Record<string, string>;
 }
 
@@ -35,6 +35,7 @@ const BLOCK_TYPES: { type: Block["type"]; label: string; icon: string }[] = [
   { type: "divider", label: "Divider", icon: "─" },
   { type: "events", label: "Upcoming Events", icon: "📅" },
   { type: "spotlight", label: "Community Partners", icon: "★" },
+  { type: "board", label: "Gist Board", icon: "📌" },
   { type: "presenting_sponsor", label: "Presenting Sponsor", icon: "✦" },
   { type: "presenting_logo_bar", label: "Presenting Logo Bar", icon: "▬" },
   { type: "presenting_spotlight", label: "Presenting Spotlight", icon: "✧" },
@@ -85,6 +86,7 @@ export default function BlockEditor({ blocks, onChange }: BlockEditorProps) {
         unsubscribeText: "Unsubscribe",
       },
       spotlight: {},
+      board: {},
       presenting_sponsor: {},
       presenting_logo_bar: {},
       presenting_spotlight: {},
@@ -340,6 +342,18 @@ function BlockPreview({ block, products = [] }: { block: Block; products?: Admin
           <div>
             <p className="text-sm font-semibold text-gray-800">Community Partners</p>
             <p className="text-xs text-gray-400">Auto-filled with 5 rotating approved listings</p>
+          </div>
+        </div>
+      );
+    case "board":
+      return (
+        <div className="flex items-center gap-3 py-2">
+          <div className="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center">
+            <span className="text-green-700 text-sm">📌</span>
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-gray-800">Gist Board</p>
+            <p className="text-xs text-gray-400">Auto-filled with live board posts at send time; hidden when the board is empty</p>
           </div>
         </div>
       );
@@ -714,6 +728,8 @@ function BlockFields({
       return <ImageBlockFields block={block} onChange={onChange} />;
     case "spotlight":
       return <p className="text-xs text-gray-400">No configuration needed. This block auto-populates with the most-eligible approved community partner listings at send time.</p>;
+    case "board":
+      return <p className="text-xs text-gray-400">No configuration needed. This block auto-populates with live Gist Board posts at send time and hides itself when the board is empty. Place it where you want the section; if a template has no board block, one is added automatically directly above Community Partners at send time.</p>;
     case "presenting_sponsor":
       return <p className="text-xs text-gray-400">No configuration needed. This block auto-populates with the approved presenting sponsor for the selected newsletter date. Hidden if no sponsor is booked.</p>;
     case "presenting_logo_bar":
