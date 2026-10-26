@@ -54,6 +54,10 @@ function JoinForm({ compact = false }: { compact?: boolean }) {
         setMessage(data.message || "You're in! Welcome to " + workspace.name + ".");
         setSubscribedEmail(email);
         setEmail("");
+        // Meta Pixel signup event, for per-ad attribution in Ads Manager.
+        // Guarded so a blocked pixel can never break the signup itself.
+        const fbq = (window as unknown as { fbq?: (...args: unknown[]) => void }).fbq;
+        if (typeof fbq === "function") fbq("track", "Lead");
       } else {
         setStatus("error");
         setMessage(data.error || "Something went wrong. Please try again.");
