@@ -5,6 +5,7 @@ import { workspaceFetch } from "@/lib/workspace-client";
 
 import { useState, useEffect } from "react";
 import Logo from "@/components/Logo";
+import SiteHeader from "@/components/SiteHeader";
 
 interface SprintData {
   goal: number;
@@ -119,11 +120,13 @@ export default function ReferralPage({ params }: { params: { code: string } }) {
 
   if (!data?.valid) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-gray-50 flex flex-col">
+        <SiteHeader />
+        <div className="flex-1 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 w-full max-w-sm text-center">
-          <Logo className="h-12 w-auto mx-auto mb-4" />
           <h1 className="text-xl font-bold text-gray-900 mb-2">Invalid Referral Link</h1>
           <p className="text-gray-500 text-sm">This referral link is not valid. Check that you have the correct URL.</p>
+        </div>
         </div>
       </div>
     );
@@ -137,7 +140,9 @@ export default function ReferralPage({ params }: { params: { code: string } }) {
 
   if (submitStatus === "success") {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-gray-50 flex flex-col">
+        <SiteHeader />
+        <div className="flex-1 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 w-full max-w-sm text-center">
           <div className="w-14 h-14 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <svg className="w-7 h-7 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -148,24 +153,29 @@ export default function ReferralPage({ params }: { params: { code: string } }) {
           <p className="text-gray-500 text-sm"><WorkspaceText>{" Welcome to The Gist Decatur. "}</WorkspaceText>{data.referrerFirstName ? ` ${data.referrerFirstName} referred you — thanks to you both!` : ""}
           </p>
         </div>
+        </div>
       </div>
     );
   }
 
   if (submitStatus === "already") {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-gray-50 flex flex-col">
+        <SiteHeader />
+        <div className="flex-1 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 w-full max-w-sm text-center">
-          <Logo className="h-12 w-auto mx-auto mb-4" />
           <h2 className="text-xl font-bold text-gray-900 mb-2">Already subscribed!</h2>
           <p className="text-gray-500 text-sm"><WorkspaceText>{"You&apos;re already on The Gist Decatur list — no action needed."}</WorkspaceText></p>
+        </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gray-50 flex flex-col">
+      <SiteHeader />
+      <div className="flex-1 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 w-full max-w-md overflow-hidden">
         {/* Header */}
         <div className="bg-green-800 px-8 py-8 text-center">
@@ -333,6 +343,7 @@ export default function ReferralPage({ params }: { params: { code: string } }) {
             )}
           </div>
         </div>
+      </div>
       </div>
     </div>
   );

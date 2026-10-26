@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import SiteHeader from "@/components/SiteHeader";
 
 // Buyer bonus: printable Deal Savings Tracker.
 // Unlisted page (not linked anywhere public): buyers get the link in their
@@ -28,6 +29,9 @@ export default function SavingsTrackerPage() {
 
   return (
     <div className="min-h-screen bg-[#faf8f4] print:bg-white">
+      <div className="print:hidden">
+        <SiteHeader />
+      </div>
       <div className="max-w-2xl mx-auto px-4 py-10 print:py-4">
         <p className="text-xs font-bold uppercase tracking-widest text-green-700 mb-2 print:hidden">
           The Gist Deals &middot; Buyer bonus

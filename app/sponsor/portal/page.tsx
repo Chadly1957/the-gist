@@ -9,6 +9,7 @@ import Logo from "@/components/Logo";
 import SponsorPreview from "@/components/SponsorPreview";
 import UrlInput from "@/components/UrlInput";
 import WeekBookingFlow, { WeekTier, WeekBookingPrefill } from "@/components/sponsor/WeekBookingFlow";
+import SiteHeader from "@/components/SiteHeader";
 
 interface Spotlight {
   id: string;
@@ -569,6 +570,7 @@ function PortalContent() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <SiteHeader />
       {/* Header */}
       <div className="bg-white border-b border-gray-200 px-4 sm:px-6 py-3 sm:py-4">
         <div className="max-w-3xl mx-auto flex items-center justify-between">

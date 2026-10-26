@@ -3,6 +3,7 @@
 import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import WeekBookingFlow, { WeekTier } from "@/components/sponsor/WeekBookingFlow";
+import SiteHeader from "@/components/SiteHeader";
 
 function ApplyContent() {
   const searchParams = useSearchParams();
@@ -23,8 +24,11 @@ function ApplyContent() {
 
 export default function ApplyPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-gray-50 flex items-center justify-center"><p className="text-sm text-gray-500">Loading…</p></div>}>
-      <ApplyContent />
-    </Suspense>
+    <div className="min-h-screen bg-gray-50">
+      <SiteHeader />
+      <Suspense fallback={<div className="min-h-screen bg-gray-50 flex items-center justify-center"><p className="text-sm text-gray-500">Loading…</p></div>}>
+        <ApplyContent />
+      </Suspense>
+    </div>
   );
 }

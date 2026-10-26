@@ -6,7 +6,7 @@ import { workspaceFetch } from "@/lib/workspace-client";
 import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "@/components/workspace/WorkspaceLink";
-import Logo from "@/components/Logo";
+import SiteHeader from "@/components/SiteHeader";
 
 const PRESETS = [3, 5, 10];
 const VALID_SOURCES = ["web", "newsletter", "wordy", "match"];
@@ -61,19 +61,22 @@ function TipForm() {
 
   if (justPaid) {
     return (
-      <div className="min-h-screen bg-white flex flex-col items-center justify-center px-6 text-center">
-        <Link href="/" className="mb-6"><Logo className="h-12 w-auto" /></Link>
+      <div className="min-h-screen bg-white flex flex-col">
+        <SiteHeader />
+        <div className="flex-1 flex flex-col items-center justify-center px-6 text-center">
         <p className="text-4xl mb-3">☕</p>
         <h1 className="text-xl font-bold text-gray-900 mb-2">Thank you so much!</h1>
         <p className="text-sm text-gray-500 max-w-xs"><WorkspaceText>{" Your tip means a lot and helps keep The Gist Decatur going. We really appreciate you. "}</WorkspaceText></p>
         <Link href="/" className="mt-6 text-sm text-green-700 font-semibold hover:underline"><WorkspaceText>{"← Back to The Gist Decatur"}</WorkspaceText></Link>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-white flex flex-col items-center px-6 py-12">
-      <Link href="/" className="mb-8"><Logo className="h-12 w-auto" /></Link>
+    <div className="min-h-screen bg-white flex flex-col">
+      <SiteHeader />
+      <div className="flex-1 flex flex-col items-center px-6 py-12 w-full">
       <div className="w-full max-w-sm text-center">
         <p className="text-4xl mb-3">☕</p>
         <h1 className="text-xl font-bold text-gray-900 mb-2"><WorkspaceText>{"Support The Gist Decatur"}</WorkspaceText></h1>
@@ -138,6 +141,7 @@ function TipForm() {
         </button>
 
         <Link href="/" className="mt-6 inline-block text-xs text-gray-400 hover:text-gray-600 transition-colors"><WorkspaceText>{" ← Back to The Gist Decatur "}</WorkspaceText></Link>
+      </div>
       </div>
     </div>
   );

@@ -1,7 +1,7 @@
 import WorkspaceText from "@/components/workspace/WorkspaceText";
 import Link from "@/components/workspace/WorkspaceLink";
 import { prisma } from "@/lib/db";
-import Logo from "@/components/Logo";
+import SiteHeader from "@/components/SiteHeader";
 
 export const dynamic = "force-dynamic";
 
@@ -14,10 +14,8 @@ export default async function IssuesPage() {
 
   return (
     <div className="min-h-screen bg-white">
+      <SiteHeader />
       <div className="bg-gray-50 border-b border-gray-100 px-6 py-8 sm:py-12 text-center">
-        <Link href="/" className="flex items-center justify-center mb-6">
-          <Logo className="h-10 sm:h-14 w-auto" />
-        </Link>
         <h1 className="text-3xl font-extrabold text-gray-900 mb-2">Past Issues</h1>
         <p className="text-gray-500"><WorkspaceText>{"Browse every edition of The Gist Decatur."}</WorkspaceText></p>
       </div>

@@ -4,6 +4,7 @@ import { Suspense, createContext, useEffect, useState } from "react";
 import { workspaceFetch } from "@/lib/workspace-client";
 import { useSearchParams } from "next/navigation";
 import { COUPON_BOOK_PRICE_CENTS } from "@/lib/coupon-book";
+import SiteHeader from "@/components/SiteHeader";
 
 interface BookCoupon {
   id: string;
@@ -448,6 +449,7 @@ function DealsPageInner() {
 
     return (
       <OutboundLinkContext.Provider value={setPreview}>
+        <SiteHeader />
         <div className="min-h-screen bg-[#faf8f4] p-4 pb-10">
           <div className="max-w-2xl mx-auto">
             {/* Header */}
@@ -626,6 +628,7 @@ function DealsPageInner() {
   // Landing / buy view.
   return (
     <div className="min-h-screen bg-[#faf8f4]">
+      <SiteHeader />
       {/* Hero */}
       <div className="max-w-2xl mx-auto px-4 pt-12 pb-8 text-center">
         <p className="text-xs font-bold uppercase tracking-widest text-green-700 mb-3">From The Gist</p>

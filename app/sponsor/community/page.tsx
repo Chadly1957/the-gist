@@ -3,6 +3,7 @@
 import { useState, useRef, Suspense } from "react";
 import Link from "@/components/workspace/WorkspaceLink";
 import Logo from "@/components/Logo";
+import SiteHeader from "@/components/SiteHeader";
 import { WorkspaceAnchor } from "@/components/workspace/WorkspaceLink";
 import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
 import { workspaceFetch } from "@/lib/workspace-client";
@@ -76,7 +77,9 @@ function CommunityContent() {
 
   if (done) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-gray-50 flex flex-col">
+        <SiteHeader />
+        <div className="flex-1 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 max-w-md w-full text-center">
           <div className="w-14 h-14 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <svg className="w-7 h-7 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -99,12 +102,15 @@ function CommunityContent() {
             Go to My Sponsor Portal →
           </WorkspaceAnchor>
         </div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-start justify-center p-4 pt-6 sm:pt-12">
+    <div className="min-h-screen bg-gray-50 flex flex-col">
+      <SiteHeader />
+      <div className="flex-1 flex items-start justify-center p-4 pt-6 sm:pt-12">
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 sm:p-8 max-w-md w-full">
         <Link href="/sponsor" className="text-xs text-gray-400 hover:text-gray-600 mb-5 inline-block">
           ← Sponsorship options
@@ -187,6 +193,7 @@ function CommunityContent() {
             {submitting ? "Putting you on the board…" : "Join the Community Board (Free)"}
           </button>
         </form>
+      </div>
       </div>
     </div>
   );

@@ -4,7 +4,7 @@ import { workspaceFetch } from "@/lib/workspace-client";
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "@/components/workspace/WorkspaceLink";
-import Logo from "@/components/Logo";
+import SiteHeader from "@/components/SiteHeader";
 
 export default function IssuePage() {
   const { id } = useParams<{ id: string }>();
@@ -58,10 +58,8 @@ export default function IssuePage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="bg-white border-b border-gray-100 px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between max-w-3xl mx-auto">
-        <Link href="/" className="flex items-center">
-          <Logo className="h-8 sm:h-10 w-auto" />
-        </Link>
+      <SiteHeader />
+      <div className="max-w-3xl mx-auto px-4 sm:px-6 pt-4 flex justify-end">
         <Link
           href="/issues"
           className="text-sm text-gray-500 hover:text-gray-800 transition-colors font-medium"

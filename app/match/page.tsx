@@ -4,8 +4,7 @@ import WorkspaceText from "@/components/workspace/WorkspaceText";
 import { workspaceFetch } from "@/lib/workspace-client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import Link from "@/components/workspace/WorkspaceLink";
-import Logo from "@/components/Logo";
+import SiteHeader from "@/components/SiteHeader";
 import GamePresentingSponsor from "@/components/GamePresentingSponsor";
 import TipJarCTA from "@/components/TipJarCTA";
 import styles from "./match.module.css";
@@ -150,11 +149,7 @@ export default function MatchPage() {
 
   return (
     <div className="min-h-screen bg-white flex flex-col">
-      <header className="border-b border-gray-100 py-3">
-        <div className="max-w-lg mx-auto px-6 flex items-center">
-          <Link href="/"><Logo className="h-10 w-auto" /></Link>
-        </div>
-      </header>
+      <SiteHeader />
 
       <main className="flex-1 max-w-lg mx-auto w-full px-4 pt-4 pb-10">
         <div className="max-w-[460px] mx-auto mb-4">
