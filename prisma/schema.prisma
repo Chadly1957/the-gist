@@ -677,6 +677,9 @@ model ProductOrder {
   status          String    @default("pending_payment") // pending_payment | paid
   createdAt       DateTime  @default(now())
   paidAt          DateTime?
+  // Set from the admin Products page when an order ships, so the admin
+  // notification bell can clear it. Null = paid but not yet fulfilled.
+  fulfilledAt     DateTime?
   // Shipping address captured from the Stripe Checkout session at payment
   // time, stored for fulfillment. Null when the product does not require
   // shipping or the session collected no address (e.g. older orders).

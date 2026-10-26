@@ -42,6 +42,7 @@ interface ProductOrder {
   email: string;
   amountCents: number;
   paidAt: string | null;
+  fulfilledAt: string | null;
   shippingName: string | null;
   shippingLine1: string | null;
   shippingLine2: string | null;
@@ -403,6 +404,45 @@ export default function ProductsPage() {
                           <div className="text-gray-500">
                             {money(o.amountCents)}
                             {o.paidAt && <> · {new Date(o.paidAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</>}
+                          </div>
+                          <div className="mt-1">
+                            {o.fulfilledAt ? (
+                              <span className="text-xs text-green-700">
+                                Fulfilled {new Date(o.fulfilledAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })} ·{" "}
+                                <button
+                                  type="button"
+                                  className="text-blue-600 hover:underline"
+                                  onClick={async () => {
+                                    const res = await workspaceFetch(`/api/admin/products/${p.id}/orders`, {
+                                      method: "PATCH",
+                                      headers: { "Content-Type": "application/json" },
+                                      body: JSON.stringify({ orderId: o.id, fulfilled: false }),
+                                    });
+                                    if (res.ok) setOrders(orders.map((x) => (x.id === o.id ? { ...x, fulfilledAt: null } : x)));
+                                  }}
+                                >
+                                  Undo
+                                </button>
+                              </span>
+                            ) : (
+                              <button
+                                type="button"
+                                className="text-xs px-2 py-1 border border-green-300 text-green-700 rounded hover:bg-green-50"
+                                onClick={async () => {
+                                  const res = await workspaceFetch(`/api/admin/products/${p.id}/orders`, {
+                                    method: "PATCH",
+                                    headers: { "Content-Type": "application/json" },
+                                    body: JSON.stringify({ orderId: o.id, fulfilled: true }),
+                                  });
+                                  if (res.ok) {
+                                    const data = await res.json();
+                                    setOrders(orders.map((x) => (x.id === o.id ? { ...x, fulfilledAt: data.order.fulfilledAt } : x)));
+                                  }
+                                }}
+                              >
+                                Mark fulfilled
+                              </button>
+                            )}
                           </div>
                         </div>
                         <div className="text-gray-600">

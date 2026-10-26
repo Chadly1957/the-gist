@@ -3,7 +3,8 @@ import { workspaceFetch } from "@/lib/workspace-client";
 
 import Link from "@/components/workspace/WorkspaceLink";
 import { usePathname, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
+import AdminNotifications, { AdminNotificationData } from "@/components/admin/AdminNotifications";
 import Logo from "@/components/Logo";
 import WorkspaceSwitcher from "@/components/workspace/WorkspaceSwitcher";
 import { pathWorkspace } from "@/lib/workspace-constants";
@@ -193,6 +194,22 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [loggingOut, setLoggingOut] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
+  // Attention counts for the whole admin shell: refreshed on every admin
+  // navigation (and on demand from the bell), so badges never go stale
+  // while Chad clicks around. A failed fetch just means no badges.
+  const [notes, setNotes] = useState<AdminNotificationData | null>(null);
+  const refreshNotes = useCallback(() => {
+    workspaceFetch("/api/admin/notifications")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data) setNotes(data);
+      })
+      .catch(() => {});
+  }, []);
+  useEffect(() => {
+    refreshNotes();
+  }, [refreshNotes, pathname]);
+
   async function handleLogout() {
     setLoggingOut(true);
     await workspaceFetch("/api/admin/logout", { method: "POST" });
@@ -205,8 +222,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   const sidebarNav = (
     <>
-      <div className="px-5 py-6 border-b border-gray-200">
-        <Logo className="h-14 w-auto" />
+      <div className="px-5 py-6 border-b border-gray-200 relative">
+        <div className="flex items-start justify-between gap-2">
+          <Logo className="h-14 w-auto" />
+          <AdminNotifications notes={notes} onRefresh={refreshNotes} />
+        </div>
         <p className="text-gray-500 text-xs mt-1">{workspace.name} · Admin</p>
         <WorkspaceSwitcher />
       </div>
@@ -217,6 +237,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             item.href === "/admin"
               ? pathname === "/admin"
               : pathname.startsWith(item.href);
+          const badge =
+            item.href === "/admin/board"
+              ? notes?.boardPending ?? 0
+              : item.href === "/admin/sponsors"
+                ? notes?.sponsorPending ?? 0
+                : item.href === "/admin/products"
+                  ? notes?.ordersUnfulfilled ?? 0
+                  : 0;
           return (
             <Link
               key={item.href}
@@ -230,6 +258,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             >
               {item.icon}
               {item.label}
+              {badge > 0 && (
+                <span
+                  className={`ml-auto min-w-5 h-5 px-1 rounded-full text-[11px] font-bold flex items-center justify-center ${
+                    isActive ? "bg-white text-green-800" : "bg-red-500 text-white"
+                  }`}
+                >
+                  {badge > 99 ? "99+" : badge}
+                </span>
+              )}
             </Link>
           );
         })}
