@@ -9,6 +9,7 @@ import Logo from "@/components/Logo";
 import SponsorPreview from "@/components/SponsorPreview";
 import UrlInput from "@/components/UrlInput";
 import WeekBookingFlow, { WeekTier, WeekBookingPrefill } from "@/components/sponsor/WeekBookingFlow";
+import BoardBoostPrompt from "@/components/BoardBoostPrompt";
 import SiteHeader from "@/components/SiteHeader";
 
 interface Spotlight {
@@ -214,6 +215,9 @@ function PortalContent() {
   const [eSubmitting, setESubmitting] = useState(false);
   const [eError, setEError] = useState("");
   const [eSuccess, setESuccess] = useState(false);
+  // Snapshot of the just-submitted event, for the optional Board boost
+  // prompt. Null once declined (plain success box) or after navigating away.
+  const [eBoost, setEBoost] = useState<null | { title: string; description: string; url: string }>(null);
 
   // Coupons (self-serve, live immediately)
   const [coupons, setCoupons] = useState<PortalCoupon[] | null>(null);
@@ -477,7 +481,11 @@ function PortalContent() {
         body: JSON.stringify({ token, ...eForm }),
       });
       const data = await res.json();
-      if (res.ok) { setESuccess(true); setEForm({ title: "", description: "", eventDate: "", startTime: "", endTime: "", location: "", url: "", cost: "" }); }
+      if (res.ok) {
+        setEBoost({ title: eForm.title, description: eForm.description, url: eForm.url });
+        setESuccess(true);
+        setEForm({ title: "", description: "", eventDate: "", startTime: "", endTime: "", location: "", url: "", cost: "" });
+      }
       else setEError(data.error || "Submission failed.");
     } catch (_e) { setEError("Connection error."); }
     setESubmitting(false);
@@ -1420,7 +1428,14 @@ function PortalContent() {
             <h1 className="text-2xl font-bold text-gray-900 mb-1">Submit an Event</h1>
             <p className="text-sm text-gray-500 mb-6">Free for Community Partners. We&apos;ll review and include it in an upcoming newsletter calendar block.</p>
 
-            {eSuccess ? (
+            {eSuccess && eBoost ? (
+              <BoardBoostPrompt
+                title={eBoost.title}
+                description={eBoost.description}
+                linkUrl={eBoost.url}
+                onDecline={() => setEBoost(null)}
+              />
+            ) : eSuccess ? (
               <div className="bg-green-50 border border-green-100 rounded-xl p-6 text-center">
                 <p className="text-green-800 font-semibold mb-1">Event submitted!</p>
                 <p className="text-sm text-green-600">We&apos;ll review it within 1-2 business days.</p>

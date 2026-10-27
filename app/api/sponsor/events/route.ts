@@ -35,6 +35,7 @@ export async function POST(req: NextRequest) {
 
   const event = await db.event.create({
     data: {
+      workspaceId: profile.workspaceId,
       title: title.trim(),
       description: description?.trim() || null,
       eventDate,

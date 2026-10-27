@@ -509,6 +509,9 @@ function renderEvents(events: EventItem[]): string {
         Upcoming Events
       </div>
       ${items}
+      <div style="font-size:12px;color:#6b7280;font-family:sans-serif;margin-top:4px;">
+        Have an event? <a href="{{APP_URL}}/events/submit" style="color:#15803d;font-weight:600;">Submit it for free</a> — and add it to the Gist Board for $5 if you want more eyes on it.
+      </div>
     </div>`;
 }
 

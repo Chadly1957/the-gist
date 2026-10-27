@@ -18,10 +18,12 @@ function BoardPostForm() {
   const preselected = boardIntentForKey(searchParams.get("intent"));
   const [step, setStep] = useState<1 | 2>(preselected ? 2 : 1);
   const [intent, setIntent] = useState<string | null>(preselected?.key ?? null);
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
+  // Prefill from an event submission (?title=&description=&link=), truncated
+  // to the form's own limits. Works with or without ?intent=.
+  const [title, setTitle] = useState((searchParams.get("title") ?? "").slice(0, 80));
+  const [description, setDescription] = useState((searchParams.get("description") ?? "").slice(0, 200));
   const [category, setCategory] = useState<string>(preselected?.category ?? BOARD_CATEGORIES[0].key);
-  const [linkUrl, setLinkUrl] = useState("");
+  const [linkUrl, setLinkUrl] = useState(searchParams.get("link") ?? "");
   const [contactInfo, setContactInfo] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
