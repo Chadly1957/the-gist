@@ -6,11 +6,22 @@ import { sendWelcomeEmail } from "@/lib/welcome-email";
 
 export async function POST(req: NextRequest) {
   try {
-    const { email, firstName, variant } = await req.json();
+    const { email, firstName, variant, utmSource, utmMedium, utmCampaign, referrer } = await req.json();
 
     if (!email || !email.includes("@")) {
       return NextResponse.json({ error: "Valid email required." }, { status: 400 });
     }
+
+    // First-touch acquisition only: a re-subscribe never overwrites a known
+    // source with a later direct visit.
+    const clean = (v: unknown) =>
+      typeof v === "string" && v.trim() ? v.trim().slice(0, 500) : null;
+    const acquisition = {
+      utmSource: clean(utmSource),
+      utmMedium: clean(utmMedium),
+      utmCampaign: clean(utmCampaign),
+      referrer: clean(referrer),
+    };
 
     const existing = await prisma.subscriber.findUnique({ where: await workspaceUnique("email", email) });
     if (existing?.active) {
@@ -23,10 +34,17 @@ export async function POST(req: NextRequest) {
     const subscriber = existing
       ? await prisma.subscriber.update({
           where: await workspaceUnique("email", email),
-          data: { active: true, firstName: firstName || existing.firstName },
+          data: {
+            active: true,
+            firstName: firstName || existing.firstName,
+            utmSource: existing.utmSource ?? acquisition.utmSource,
+            utmMedium: existing.utmMedium ?? acquisition.utmMedium,
+            utmCampaign: existing.utmCampaign ?? acquisition.utmCampaign,
+            referrer: existing.referrer ?? acquisition.referrer,
+          },
         })
       : await prisma.subscriber.create({
-          data: { email, firstName: firstName || null },
+          data: { email, firstName: firstName || null, ...acquisition },
         });
 
     const appUrl = await getWorkspaceUrl();
