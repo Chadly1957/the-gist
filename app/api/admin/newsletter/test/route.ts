@@ -151,12 +151,13 @@ export async function POST(req: NextRequest) {
   // workspace. Missing/inactive selections render empty; never blocks a send.
   const productSpotlights = await resolveProductSpotlightItems(blocks, appUrl);
 
-  // Gist Board, same as the real send: live posts above the spotlight block.
+  // Gist Board, same as the real send: live posts above the spotlight block,
+  // or the invite section when the board is empty.
   let boardItems: Awaited<ReturnType<typeof getActiveBoardPosts>> = [];
   try {
     const ws = await getWorkspace();
     boardItems = await getActiveBoardPosts(ws.id);
-    if (boardItems.length > 0 && !blocks.some((b) => b.type === "board")) {
+    if (!blocks.some((b) => b.type === "board")) {
       const boardBlock: Block = { id: "board-auto", type: "board", content: {} };
       const spotlightIdx = blocks.findIndex((b) => b.type === "spotlight");
       if (spotlightIdx >= 0) blocks.splice(spotlightIdx, 0, boardBlock);

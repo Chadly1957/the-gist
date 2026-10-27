@@ -2,13 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { workspaceFetch } from "@/lib/workspace-client";
-import { boardCategoryLabel } from "@/lib/board-constants";
+import { boardCategoryLabel, boardIntentLabel } from "@/lib/board-constants";
 
 interface BoardPostRow {
   id: string;
   title: string;
   description: string;
   category: string;
+  intent: string | null;
   linkUrl: string | null;
   contactInfo: string | null;
   displayName: string | null;
@@ -117,6 +118,7 @@ export default function BoardAdminPage() {
               </div>
               <p className="text-xs text-gray-500">
                 {boardCategoryLabel(p.category)}
+                {boardIntentLabel(p.intent) ? ` · ${boardIntentLabel(p.intent)}` : ""}
                 {p.displayName ? ` · Posted by ${p.displayName}` : ""}
                 {` · ${p.email}`}
                 {p.linkUrl ? ` · ${p.linkUrl}` : ""}

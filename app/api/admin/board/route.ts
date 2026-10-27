@@ -20,6 +20,7 @@ export async function GET() {
       title: true,
       description: true,
       category: true,
+      intent: true,
       linkUrl: true,
       contactInfo: true,
       displayName: true,

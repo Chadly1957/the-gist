@@ -309,10 +309,22 @@ function renderSpotlight(items: SpotlightItem[], tracking?: TrackingConfig): str
 }
 
 // Gist Board: reader-posted classifieds, one compact row per live post.
-// Renders nothing when there are no live posts, so issues without board
-// activity are unchanged. The footer line advertises the board itself.
+// With no live posts it renders the invite instead of nothing, so every
+// issue carries an easy way onto the board. The footer line advertises
+// the board itself when posts exist.
 function renderBoard(items: BoardItem[], tracking?: TrackingConfig): string {
-  if (items.length === 0) return "";
+  if (items.length === 0) {
+    return `
+    <div style="padding:20px 40px;">
+      <div style="font-family:sans-serif;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#6b7280;margin-bottom:14px;padding-bottom:8px;border-bottom:2px solid #e5e7eb;">
+        The Gist Board
+      </div>
+      <div style="font-size:13px;color:#4b5563;line-height:1.5;font-family:sans-serif;">
+        Nothing on the board this week. Be the first to post.
+      </div>
+      <a href="{{APP_URL}}/board/post" style="display:inline-block;margin-top:12px;background:#166534;color:#ffffff;padding:10px 20px;border-radius:4px;text-decoration:none;font-size:13px;font-family:sans-serif;font-weight:600;">Post something — just $5 for 7 days</a>
+    </div>`;
+  }
   const rows = items.map((p) => {
     const title = escapeHtml(p.title);
     const description = escapeHtml(p.description);

@@ -951,6 +951,7 @@ model BoardPost {
   title               String
   description         String
   category            String // for_sale | job | event | announcement | service | wanted
+  intent              String? // event | deal | job | celebration | classified (what the poster picked)
   linkUrl             String?
   contactInfo         String?
   displayName         String?
