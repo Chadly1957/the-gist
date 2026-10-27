@@ -219,6 +219,14 @@ export default function JoinPage() {
             aria-hidden="true"
             className="absolute inset-0 w-full h-full object-cover object-right"
           />
+          {/* Fading white overlay on the left: the hero photo is bright
+              behind the headline and subtext, and the gray subtext washed
+              out against it. White on the left fading to transparent keeps
+              the photo vivid on the right, behind the story cards. */}
+          <div
+            aria-hidden="true"
+            className="absolute inset-0 bg-gradient-to-r from-white/95 via-white/60 to-transparent"
+          />
           <div className="relative max-w-5xl mx-auto px-6 pt-10 pb-14 sm:pt-16 sm:pb-20 grid gap-10 lg:grid-cols-[1.05fr_0.95fr] lg:items-center">
           <div>
             {showProof && (
