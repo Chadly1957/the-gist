@@ -32,6 +32,7 @@ export async function POST(req: NextRequest) {
       title: input.title,
       description: input.description,
       category: input.category,
+      intent: input.intent || null,
       linkUrl: input.linkUrl || null,
       contactInfo: input.contactInfo || null,
       displayName: input.displayName || null,

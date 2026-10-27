@@ -249,12 +249,13 @@ export async function POST(req: NextRequest) {
   // Gist Board: live approved posts ride along automatically, directly
   // above the Community Partners spotlight block (or at the end when the
   // template has no spotlight block). No editor change needed: the block
-  // is appended at send time, and an empty board renders nothing.
+  // is appended at send time, and an empty board renders the invite
+  // section so every issue carries a way onto the board.
   let boardItems: Awaited<ReturnType<typeof getActiveBoardPosts>> = [];
   try {
     const ws = await getWorkspace();
     boardItems = await getActiveBoardPosts(ws.id);
-    if (boardItems.length > 0 && !blocks.some((b) => b.type === "board")) {
+    if (!blocks.some((b) => b.type === "board")) {
       const boardBlock: Block = { id: "board-auto", type: "board", content: {} };
       const spotlightIdx = blocks.findIndex((b) => b.type === "spotlight");
       if (spotlightIdx >= 0) blocks.splice(spotlightIdx, 0, boardBlock);

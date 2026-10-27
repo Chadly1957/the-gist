@@ -1,13 +1,15 @@
 import { prisma } from "@/lib/db";
-import { BOARD_CATEGORIES } from "./board-constants";
+import { BOARD_CATEGORIES, BOARD_INTENTS } from "./board-constants";
 
 export {
   BOARD_PRICE_CENTS,
   BOARD_RUN_DAYS,
   BOARD_CATEGORIES,
+  BOARD_INTENTS,
   boardCategoryLabel,
+  boardIntentLabel,
 } from "./board-constants";
-export type { BoardCategoryKey } from "./board-constants";
+export type { BoardCategoryKey, BoardIntentKey } from "./board-constants";
 
 // Gist Board: community classifieds, $5 flat for a 7-day run.
 // A post is live while it is approved and inside its approvedAt->expiresAt
@@ -17,6 +19,7 @@ export interface BoardPostInput {
   title: string;
   description: string;
   category: string;
+  intent: string;
   linkUrl: string;
   contactInfo: string;
   displayName: string;
@@ -31,6 +34,7 @@ export function validateBoardPostInput(body: unknown): { input: BoardPostInput }
   const title = str(b.title);
   const description = str(b.description);
   const category = str(b.category);
+  const intent = str(b.intent);
   const linkUrl = str(b.linkUrl);
   const contactInfo = str(b.contactInfo);
   const displayName = str(b.displayName);
@@ -41,6 +45,9 @@ export function validateBoardPostInput(body: unknown): { input: BoardPostInput }
   if (!description) return { error: "A short description is required." };
   if (description.length > 200) return { error: "Keep the description under 200 characters." };
   if (!BOARD_CATEGORIES.some((c) => c.key === category)) return { error: "Pick a category." };
+  if (intent && !BOARD_INTENTS.some((i) => i.key === intent)) {
+    return { error: "Pick what you'd like to share." };
+  }
   if (!linkUrl && !contactInfo) {
     return { error: "Add a link or a way to contact you, so readers can respond." };
   }
@@ -52,7 +59,7 @@ export function validateBoardPostInput(body: unknown): { input: BoardPostInput }
   if (displayName.length > 40) return { error: "Keep the display name under 40 characters." };
   if (!email || !email.includes("@")) return { error: "A valid email is required." };
 
-  return { input: { title, description, category, linkUrl, contactInfo, displayName, email } };
+  return { input: { title, description, category, intent, linkUrl, contactInfo, displayName, email } };
 }
 
 export interface BoardItem {
