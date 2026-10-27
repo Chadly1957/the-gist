@@ -1,20 +1,45 @@
 "use client";
 import { workspaceFetch } from "@/lib/workspace-client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "@/components/workspace/WorkspaceLink";
 import Logo from "@/components/Logo";
 
-// The site's regular sticky nav (logo, Games, Shop, Advertise, Sponsor
-// Login, Admin) plus the sponsor-login modal it opens. Shared by every
-// public page so a visitor landing anywhere gets the same way around the
-// site. Branding and links are workspace-aware via Logo and WorkspaceLink;
-// the Shop link renders only when this workspace has at least one active
-// product. On small screens the links collapse into a hamburger menu and
+// The site's regular sticky nav plus the sponsor-login modal it opens.
+// Shared by every public page so a visitor landing anywhere gets the same
+// way around the site. Branding and links are workspace-aware via Logo and
+// WorkspaceLink; the Shop link renders only when this workspace has at
+// least one active product. On desktop the links are grouped into two
+// click-to-open dropdowns (Explore, For Businesses) plus Shop and Admin;
+// on small screens everything collapses into a flat hamburger menu and
 // the logo always links back to the workspace homepage.
 export default function SiteHeader() {
   const [products, setProducts] = useState<{ id: string }[]>([]);
   const [showMenu, setShowMenu] = useState(false);
+  const [openDropdown, setOpenDropdown] = useState<null | "explore" | "business">(null);
+  const desktopNavRef = useRef<HTMLElement>(null);
+
+  // Close an open dropdown on outside click or Escape. A fixed backdrop
+  // button does NOT work here: the header's backdrop-blur makes the header
+  // the containing block for fixed descendants, so the backdrop would only
+  // cover the header bar itself and clicks on the page below would miss it.
+  useEffect(() => {
+    if (openDropdown === null) return;
+    function onMouseDown(e: MouseEvent) {
+      if (desktopNavRef.current && !desktopNavRef.current.contains(e.target as Node)) {
+        setOpenDropdown(null);
+      }
+    }
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpenDropdown(null);
+    }
+    document.addEventListener("mousedown", onMouseDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onMouseDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [openDropdown]);
   const [showSponsorLogin, setShowSponsorLogin] = useState(false);
   const [sponsorLoginEmail, setSponsorLoginEmail] = useState("");
   const [sponsorLoginStatus, setSponsorLoginStatus] = useState<"idle" | "loading" | "sent">("idle");
@@ -91,31 +116,61 @@ export default function SiteHeader() {
           <Link href="/" aria-label="Back to homepage" className="flex items-center">
             <Logo className="h-10 sm:h-14 w-auto" />
           </Link>
-          {/* Desktop links */}
-          <nav className="hidden md:flex items-center gap-6">
-            <Link href="/articles" className="text-sm font-semibold text-gray-700 hover:text-gray-900 transition-colors">
-              News
-            </Link>
-            <Link href="/games" className="text-sm font-semibold text-gray-700 hover:text-gray-900 transition-colors">
-              Games
-            </Link>
-            <Link href="/board" className="text-sm font-semibold text-gray-700 hover:text-gray-900 transition-colors">
-              Board
-            </Link>
+          {/* Desktop links: grouped into dropdowns, click to open */}
+          <nav ref={desktopNavRef} className="hidden md:flex items-center gap-6">
+            <div className="relative">
+              <button
+                type="button"
+                aria-expanded={openDropdown === "explore"}
+                onClick={() => setOpenDropdown((v) => (v === "explore" ? null : "explore"))}
+                className="flex items-center gap-1 text-sm font-semibold text-gray-700 hover:text-gray-900 transition-colors"
+              >
+                Explore
+                <svg className={`w-3.5 h-3.5 transition-transform ${openDropdown === "explore" ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
+              </button>
+              {openDropdown === "explore" && (
+                  <div className="absolute left-0 top-full mt-2 w-48 bg-white border border-gray-200 rounded-xl shadow-lg z-50 py-2 overflow-hidden">
+                    <Link href="/articles" onClick={() => setOpenDropdown(null)} className="block px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50">
+                      News
+                    </Link>
+                    <Link href="/board" onClick={() => setOpenDropdown(null)} className="block px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50">
+                      Board
+                    </Link>
+                    <Link href="/games" onClick={() => setOpenDropdown(null)} className="block px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50">
+                      Games
+                    </Link>
+                  </div>
+              )}
+            </div>
             {products.length > 0 && (
               <Link href="/products" className="text-sm font-semibold text-gray-700 hover:text-gray-900 transition-colors">
                 Shop
               </Link>
             )}
-            <Link href="/sponsor" className="text-sm font-semibold text-green-700 hover:text-green-800 transition-colors">
-              Advertise
-            </Link>
-            <button
-              onClick={() => { setShowSponsorLogin(true); setSponsorLoginStatus("idle"); setSponsorLoginEmail(""); }}
-              className="text-sm font-semibold text-gray-500 hover:text-gray-700 transition-colors"
-            >
-              Sponsor Login
-            </button>
+            <div className="relative">
+              <button
+                type="button"
+                aria-expanded={openDropdown === "business"}
+                onClick={() => setOpenDropdown((v) => (v === "business" ? null : "business"))}
+                className="flex items-center gap-1 text-sm font-semibold text-gray-700 hover:text-gray-900 transition-colors"
+              >
+                For Businesses
+                <svg className={`w-3.5 h-3.5 transition-transform ${openDropdown === "business" ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
+              </button>
+              {openDropdown === "business" && (
+                  <div className="absolute left-0 top-full mt-2 w-48 bg-white border border-gray-200 rounded-xl shadow-lg z-50 py-2 overflow-hidden">
+                    <Link href="/sponsor" onClick={() => setOpenDropdown(null)} className="block px-4 py-2.5 text-sm font-semibold text-green-700 hover:bg-gray-50">
+                      Advertise
+                    </Link>
+                    <button
+                      onClick={() => { setOpenDropdown(null); setShowSponsorLogin(true); setSponsorLoginStatus("idle"); setSponsorLoginEmail(""); }}
+                      className="block w-full text-left px-4 py-2.5 text-sm font-semibold text-gray-500 hover:bg-gray-50"
+                    >
+                      Sponsor Login
+                    </button>
+                  </div>
+              )}
+            </div>
             <Link href="/admin/login" className="text-sm text-gray-400 hover:text-gray-600 transition-colors">
               Admin
             </Link>
