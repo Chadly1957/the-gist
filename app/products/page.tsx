@@ -5,6 +5,7 @@ import { workspaceFetch } from "@/lib/workspace-client";
 import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
 import Link from "@/components/workspace/WorkspaceLink";
 import SiteHeader from "@/components/SiteHeader";
+import { COUPON_BOOK_PRICE_CENTS } from "@/lib/coupon-book";
 
 interface ProductCard {
   id: string;
@@ -33,6 +34,21 @@ export default function ProductsPage() {
       .finally(() => setLoading(false));
   }, []);
 
+  // The Gist Deals is not a Product row and must not go through the product
+  // checkout. This card links to the existing /deals buy page instead.
+  const dealsCard = (
+    <Link href="/deals" className="border rounded-2xl overflow-hidden hover:shadow-lg transition-shadow block">
+      <div className="relative">
+        <div className="w-full h-48 bg-gray-100" />
+      </div>
+      <div className="p-4">
+        <div className="font-bold text-lg text-gray-900">The Gist Deals</div>
+        <div className="text-sm text-gray-500 mt-1">Local coupons, yours for life.</div>
+        <div className="mt-3 font-semibold text-gray-900">{money(COUPON_BOOK_PRICE_CENTS)}</div>
+      </div>
+    </Link>
+  );
+
   return (
     <div className="min-h-screen bg-white flex flex-col">
       <SiteHeader />
@@ -46,7 +62,9 @@ export default function ProductsPage() {
         {loading ? (
           <p className="text-center text-gray-400 mt-12">Loading...</p>
         ) : products.length === 0 ? (
-          <p className="text-center text-gray-400 mt-12">Nothing here yet. Check back soon.</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-10">
+            {dealsCard}
+          </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-10">
             {products.map((p) => (
@@ -76,6 +94,7 @@ export default function ProductsPage() {
                 </div>
               </Link>
             ))}
+            {dealsCard}
           </div>
         )}
       </div>
