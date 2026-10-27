@@ -6,9 +6,12 @@ import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
 import Link from "@/components/workspace/WorkspaceLink";
 import SiteHeader from "@/components/SiteHeader";
 import DealsOto from "@/components/DealsOto";
+import SponsorsMarquee from "@/components/SponsorsMarquee";
 
 // Dedicated landing page for paid ad traffic. Single purpose: email signup.
-// No nav links, no sponsor section, no distractions: subscribe or leave.
+// No nav links, no distractions: subscribe or leave. The Community Partners
+// marquee sits under the fold, matching the homepage (added Oct 2026 for
+// the /join vs homepage landing-page test).
 // NOTE for the next ad run: the ad's primary text should echo the hero
 // headline below word for word (message match is the #1 CRO lever).
 
@@ -283,6 +286,8 @@ export default function JoinPage() {
           </div>
         </section>
 
+        <SponsorsMarquee />
+
         {/* ── INSIDE THE LATEST ISSUE ── */}
         {stories.length > 0 && (
           <section className="bg-white border-y border-[#ece7dd] py-14 sm:py-16">
@@ -459,3 +464,4 @@ export default function JoinPage() {
     </div>
   );
 }
+

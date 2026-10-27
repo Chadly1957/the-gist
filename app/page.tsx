@@ -48,10 +48,21 @@ function CityLandingPage() {
     setStatus("loading");
     setMessage("");
     try {
+      // Acquisition capture, same as /join: UTM params from the landing
+      // URL (ad traffic) plus the browser referrer. Stored on the
+      // subscriber at signup; nothing here changes the signup itself.
+      const params = new URLSearchParams(window.location.search);
       const res = await workspaceFetch("/api/subscribe", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, firstName }),
+        body: JSON.stringify({
+          email,
+          firstName,
+          utmSource: params.get("utm_source"),
+          utmMedium: params.get("utm_medium"),
+          utmCampaign: params.get("utm_campaign"),
+          referrer: document.referrer || null,
+        }),
       });
       const data = await res.json();
       if (res.ok) {
@@ -60,6 +71,11 @@ function CityLandingPage() {
         setSubscribedEmail(email);
         setEmail("");
         setFirstName("");
+        // Meta Pixel signup event, same as /join, so the pixel counts
+        // homepage signups too. Guarded so a blocked pixel can never
+        // break the signup itself.
+        const fbq = (window as unknown as { fbq?: (...args: unknown[]) => void }).fbq;
+        if (typeof fbq === "function") fbq("track", "Lead");
       } else {
         setStatus("error");
         setMessage(data.error || "Something went wrong. Please try again.");
@@ -350,3 +366,4 @@ function CityLandingPage() {
 export default function LandingPage() {
   return <CityLandingPage />;
 }
+
