@@ -7,6 +7,7 @@ import { getAdminSession } from "@/lib/auth";
 import { getEmailClient, htmlToText } from "@/lib/email";
 import { renderTemplate, Block, SpotlightItem, PresentingSponsorItem, InArticleAdItem, EventItem, getDealsBlockCopy, DEALS_BUYER_COPY, resolveDealsPlaceholders } from "@/lib/template-renderer";
 import { resolveProductSpotlightItems } from "@/lib/products";
+import { getActiveBoardPosts } from "@/lib/board";
 import { fetchWeatherSnapshot, WeatherSnapshot } from "@/lib/weather";
 import { blurbToHtml } from "@/lib/url";
 
@@ -150,11 +151,26 @@ export async function POST(req: NextRequest) {
   // workspace. Missing/inactive selections render empty; never blocks a send.
   const productSpotlights = await resolveProductSpotlightItems(blocks, appUrl);
 
+  // Gist Board, same as the real send: live posts above the spotlight block.
+  let boardItems: Awaited<ReturnType<typeof getActiveBoardPosts>> = [];
+  try {
+    const ws = await getWorkspace();
+    boardItems = await getActiveBoardPosts(ws.id);
+    if (boardItems.length > 0 && !blocks.some((b) => b.type === "board")) {
+      const boardBlock: Block = { id: "board-auto", type: "board", content: {} };
+      const spotlightIdx = blocks.findIndex((b) => b.type === "spotlight");
+      if (spotlightIdx >= 0) blocks.splice(spotlightIdx, 0, boardBlock);
+      else blocks.push(boardBlock);
+    }
+  } catch {
+    // Board lookup never blocks a test send.
+  }
+
   const htmlBody = resolveDealsPlaceholders(
     renderTemplate(
       blocks,
       articles.map((a) => ({ ...a, publishedAt: a.publishedAt })),
-      { spotlights, presentingSponsor, inArticleAds },
+      { spotlights, presentingSponsor, inArticleAds, boardItems },
       undefined,
       events,
       undefined,

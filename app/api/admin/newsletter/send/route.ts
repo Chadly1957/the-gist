@@ -6,6 +6,7 @@ import { prisma } from "@/lib/db";
 import { getAdminSession } from "@/lib/auth";
 import { renderTemplate, Block, SpotlightItem, PresentingSponsorItem, PresentingPartnerItem, InArticleAdItem, EventItem, PollData, WordyData, getDealsBlockCopy, DEALS_BUYER_COPY, resolveDealsPlaceholders } from "@/lib/template-renderer";
 import { resolveProductSpotlightItems } from "@/lib/products";
+import { getActiveBoardPosts } from "@/lib/board";
 import { fetchWeatherSnapshot, WeatherSnapshot } from "@/lib/weather";
 import { getEmailClient, htmlToText } from "@/lib/email";
 import { signTrackingUrl } from "@/lib/tracking";
@@ -245,13 +246,31 @@ export async function POST(req: NextRequest) {
   // workspace. Missing/inactive selections render empty; never blocks a send.
   const productSpotlights = await resolveProductSpotlightItems(blocks, appUrl);
 
+  // Gist Board: live approved posts ride along automatically, directly
+  // above the Community Partners spotlight block (or at the end when the
+  // template has no spotlight block). No editor change needed: the block
+  // is appended at send time, and an empty board renders nothing.
+  let boardItems: Awaited<ReturnType<typeof getActiveBoardPosts>> = [];
+  try {
+    const ws = await getWorkspace();
+    boardItems = await getActiveBoardPosts(ws.id);
+    if (boardItems.length > 0 && !blocks.some((b) => b.type === "board")) {
+      const boardBlock: Block = { id: "board-auto", type: "board", content: {} };
+      const spotlightIdx = blocks.findIndex((b) => b.type === "spotlight");
+      if (spotlightIdx >= 0) blocks.splice(spotlightIdx, 0, boardBlock);
+      else blocks.push(boardBlock);
+    }
+  } catch {
+    // Board lookup never blocks a send.
+  }
+
   // Render HTML once. Open/click tracking links embed a recipient-id
   // placeholder that gets swapped in per-recipient below, so the template
   // only needs to be rendered a single time regardless of list size.
   const htmlBody = renderTemplate(
     blocks,
     articles.map((a) => ({ ...a, publishedAt: a.publishedAt })),
-    { spotlights, presentingSponsor, presentingPartners, presentingSpotlight, inArticleAds },
+    { spotlights, presentingSponsor, presentingPartners, presentingSpotlight, inArticleAds, boardItems },
     willSend ? { baseUrl: appUrl, sign: signTrackingUrl } : undefined,
     events,
     pollsMap,
@@ -301,7 +320,7 @@ export async function POST(req: NextRequest) {
     renderTemplate(
       blocks,
       articles.map((a) => ({ ...a, publishedAt: a.publishedAt })),
-      { spotlights, presentingSponsor, inArticleAds },
+      { spotlights, presentingSponsor, inArticleAds, boardItems },
       undefined,
       events,
       pollsMap,

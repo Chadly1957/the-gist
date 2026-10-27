@@ -99,6 +99,9 @@ export default function SiteHeader() {
             <Link href="/games" className="text-sm font-semibold text-gray-700 hover:text-gray-900 transition-colors">
               Games
             </Link>
+            <Link href="/board" className="text-sm font-semibold text-gray-700 hover:text-gray-900 transition-colors">
+              Board
+            </Link>
             {products.length > 0 && (
               <Link href="/products" className="text-sm font-semibold text-gray-700 hover:text-gray-900 transition-colors">
                 Shop
@@ -140,6 +143,9 @@ export default function SiteHeader() {
             </Link>
             <Link href="/games" onClick={() => setShowMenu(false)} className="block py-3 text-sm font-semibold text-gray-700 border-b border-gray-50">
               Games
+            </Link>
+            <Link href="/board" onClick={() => setShowMenu(false)} className="block py-3 text-sm font-semibold text-gray-700 border-b border-gray-50">
+              Board
             </Link>
             {products.length > 0 && (
               <Link href="/products" onClick={() => setShowMenu(false)} className="block py-3 text-sm font-semibold text-gray-700 border-b border-gray-50">
