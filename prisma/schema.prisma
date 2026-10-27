@@ -131,6 +131,13 @@ model Subscriber {
   firstName    String?
   subscribedAt DateTime  @default(now())
   active       Boolean   @default(true)
+  // First-touch acquisition, captured at signup from the /join URL and the
+  // browser referrer. Null for every subscriber who joined before this
+  // shipped: UTM capture is forward-only and never backfilled.
+  utmSource    String?
+  utmMedium    String?
+  utmCampaign  String?
+  referrer     String?
   // Opt-out of the post-signup Deals nurture email sequence (stays subscribed
   // to the newsletter itself).
   dealsNurtureOptOut Boolean @default(false)

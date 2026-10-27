@@ -43,10 +43,21 @@ function JoinForm({ compact = false }: { compact?: boolean }) {
     setStatus("loading");
     setMessage("");
     try {
+      // Acquisition capture for the analytics dashboard: UTM params from
+      // the landing URL (ad traffic) plus the browser referrer. Stored on
+      // the subscriber at signup; nothing here changes the signup itself.
+      const params = new URLSearchParams(window.location.search);
       const res = await workspaceFetch("/api/subscribe", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, variant: getJoinVariant() }),
+        body: JSON.stringify({
+          email,
+          variant: getJoinVariant(),
+          utmSource: params.get("utm_source"),
+          utmMedium: params.get("utm_medium"),
+          utmCampaign: params.get("utm_campaign"),
+          referrer: document.referrer || null,
+        }),
       });
       const data = await res.json();
       if (res.ok) {

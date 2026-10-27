@@ -48,6 +48,96 @@ interface Summary {
 
 interface TypeStat { impressions: number; clicks: number; }
 
+interface OverviewReader {
+  id: string;
+  email: string;
+  firstName: string | null;
+  subscribedAt: string;
+  opens: number;
+  openEvents: number;
+  clicks: number;
+  clickEvents: number;
+  sends: number;
+  state: string;
+  dealsBuyer: boolean;
+  hasOrder: boolean;
+  referred: boolean;
+  referredBy: string | null;
+  utmSource: string | null;
+  utmMedium: string | null;
+  utmCampaign: string | null;
+  referrer: string | null;
+}
+
+interface OverviewData {
+  days: number;
+  totals: {
+    activeReaders: number;
+    newInPeriod: number;
+    avgOpensPerReader: number;
+    totalClickEvents: number;
+    dealsBuyers: number;
+    referredReaders: number;
+  };
+  segments: Record<string, number>;
+  acquisition: { label: string; count: number }[];
+  topLinks: { url: string; label: string; type: string; clicks: number }[];
+  trend: { subject: string; sentAt: string; opens: number; clicks: number; recipients: number }[];
+  topReaders: OverviewReader[];
+  readerCount: number;
+}
+
+interface ReaderDetail {
+  reader: {
+    id: string;
+    email: string;
+    firstName: string | null;
+    subscribedAt: string;
+    active: boolean;
+    state: string;
+    acquisition: { kind: string; source: string | null; medium?: string | null; campaign?: string | null };
+  };
+  stats: {
+    days: number;
+    opens: number;
+    openEvents: number;
+    clicks: number;
+    clickEvents: number;
+    sendsReceived: number;
+    lifetimeOpens: number;
+    lifetimeClickEvents: number;
+    clickByType: Record<string, number>;
+  };
+  purchases: {
+    deals: { id: string; createdAt: string; isLifetime: boolean }[];
+    orders: { id: string; name: string; amountCents: number; paidAt: string | null }[];
+  };
+  referrals: {
+    code: string | null;
+    referredCount: number;
+    referred: { id: string | null; email: string | null; firstName: string | null; at: string }[];
+  };
+  recentSends: {
+    id: string;
+    subject: string;
+    sentAt: string;
+    opened: boolean;
+    openCount: number;
+    clicked: boolean;
+    clickCount: number;
+  }[];
+  timeline: { kind: string; at: string; label: string; detail: string }[];
+}
+
+const STATE_BADGES: Record<string, string> = {
+  "Highly engaged": "bg-green-100 text-green-800",
+  Engaged: "bg-blue-100 text-blue-800",
+  New: "bg-purple-100 text-purple-800",
+  Quiet: "bg-gray-100 text-gray-600",
+  "At risk": "bg-amber-100 text-amber-800",
+  Fading: "bg-red-100 text-red-700",
+};
+
 interface SponsorEntry {
   type: string;
   label: string;
@@ -112,13 +202,337 @@ export default function AnalyticsPage() {
       .finally(() => setLoading(false));
   }, []);
 
+  // ── Readers (Command Center) ──────────────────────────────────────────
+  const [days, setDays] = useState(30);
+  const [overview, setOverview] = useState<OverviewData | null>(null);
+  const [ovLoading, setOvLoading] = useState(true);
+  const [readerQuery, setReaderQuery] = useState("");
+  const [submittedQuery, setSubmittedQuery] = useState("");
+  const [segmentFilter, setSegmentFilter] = useState<string>("All");
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [detail, setDetail] = useState<ReaderDetail | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+
+  useEffect(() => {
+    setOvLoading(true);
+    const params = new URLSearchParams({ days: String(days) });
+    if (submittedQuery) params.set("q", submittedQuery);
+    if (segmentFilter !== "All") params.set("segment", segmentFilter);
+    workspaceFetch(`/api/admin/analytics/overview?${params}`)
+      .then((res) => res.json())
+      .then((data) => setOverview(data))
+      .finally(() => setOvLoading(false));
+  }, [days, submittedQuery, segmentFilter]);
+
+  function openReader(id: string) {
+    setSelectedId(id);
+    setDetailLoading(true);
+    workspaceFetch(`/api/admin/analytics/readers/${id}?days=${days}`)
+      .then((res) => res.json())
+      .then((data) => setDetail(data))
+      .finally(() => setDetailLoading(false));
+  }
+
+  // Segment filtering happens server-side (see the overview API): the table
+  // holds the top 50 of the selected segment, not the top 50 overall.
+  const visibleReaders = overview?.topReaders ?? [];
+
   return (
     <div className="p-4 sm:p-8">
       <div className="mb-6 sm:mb-8">
         <h1 className="text-2xl font-bold text-gray-900">Analytics</h1>
         <p className="text-gray-500 text-sm mt-1">
-          Open rates, click rates, unsubscribes, and sponsor performance across your sends.
+          Readers first: who opens, clicks, buys, and refers. Per-issue performance is further down the page.
         </p>
+      </div>
+
+      {/* ── Readers (Command Center) ─────────────────────────────────────── */}
+      <div className="mb-10">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+          <h2 className="text-base font-bold text-gray-900">Readers</h2>
+          <div className="flex items-center gap-2">
+            {[7, 30, 90].map((d) => (
+              <button
+                key={d}
+                type="button"
+                onClick={() => setDays(d)}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-full transition-colors ${
+                  days === d ? "bg-green-700 text-white" : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50"
+                }`}
+              >
+                {d} days
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {selectedId && detailLoading && (
+          <p className="text-sm text-gray-500 py-8 text-center">Loading reader…</p>
+        )}
+
+        {selectedId && !detailLoading && detail && (
+          <div className="bg-white rounded-xl border border-gray-200 p-5 sm:p-6">
+            <button type="button" onClick={() => { setSelectedId(null); setDetail(null); }} className="text-sm text-blue-600 hover:underline mb-4">
+              ← Back to readers
+            </button>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h3 className="text-xl font-bold text-gray-900">
+                  {detail.reader.firstName || detail.reader.email.split("@")[0]}
+                </h3>
+                <p className="text-sm text-gray-500">{detail.reader.email}</p>
+                <p className="text-xs text-gray-400 mt-1">
+                  Subscribed {new Date(detail.reader.subscribedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                  {!detail.reader.active && " · Unsubscribed"}
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${STATE_BADGES[detail.reader.state] ?? "bg-gray-100 text-gray-600"}`}>
+                  {detail.reader.state}
+                </span>
+                {detail.purchases.deals.length > 0 && (
+                  <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-amber-100 text-amber-800">Deals buyer</span>
+                )}
+                {detail.purchases.orders.length > 0 && (
+                  <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-blue-100 text-blue-800">Product buyer</span>
+                )}
+                {detail.referrals.referredCount > 0 && (
+                  <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-purple-100 text-purple-800">
+                    Referred {detail.referrals.referredCount}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <p className="text-sm text-gray-600 mt-3">
+              Came from:{" "}
+              {detail.reader.acquisition.kind === "ad" && (
+                <>Meta / {detail.reader.acquisition.source}{detail.reader.acquisition.campaign ? ` · ${detail.reader.acquisition.campaign}` : ""}</>
+              )}
+              {detail.reader.acquisition.kind === "referral" && <>Referred by {detail.reader.acquisition.source}</>}
+              {detail.reader.acquisition.kind === "link" && <>{detail.reader.acquisition.source}</>}
+              {detail.reader.acquisition.kind === "unknown" && (
+                <span className="text-gray-400">Unknown (joined before UTM capture)</span>
+              )}
+            </p>
+
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-5">
+              {[
+                { label: `Opens · last ${detail.stats.days}d`, value: detail.stats.opens, sub: `${detail.stats.openEvents} open events` },
+                { label: `Clicks · last ${detail.stats.days}d`, value: detail.stats.clickEvents, sub: `${detail.stats.clicks} issues with a click` },
+                { label: "Sends received", value: detail.stats.sendsReceived, sub: `in the last ${detail.stats.days} days` },
+                { label: "Lifetime opens", value: detail.stats.lifetimeOpens, sub: `${detail.stats.lifetimeClickEvents} lifetime clicks` },
+              ].map((s) => (
+                <div key={s.label} className="bg-gray-50 rounded-lg p-4">
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">{s.label}</p>
+                  <p className="text-2xl font-bold text-gray-900 mt-1">{s.value.toLocaleString()}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">{s.sub}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+              <div>
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Recent sends</p>
+                {detail.recentSends.length === 0 ? (
+                  <p className="text-sm text-gray-400">No sends on record.</p>
+                ) : (
+                  <div className="space-y-1.5">
+                    {detail.recentSends.map((s) => (
+                      <div key={s.id} className="flex items-center justify-between gap-3 text-sm">
+                        <span className="text-gray-700 truncate">{s.subject}</span>
+                        <span className="text-xs text-gray-500 shrink-0">
+                          {new Date(s.sentAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                          {" · "}
+                          {s.opened ? <span className="text-green-700 font-medium">Opened{s.openCount > 1 ? ` ×${s.openCount}` : ""}</span> : "Not opened"}
+                          {s.clicked && <span className="text-blue-700 font-medium"> · Clicked</span>}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Activity timeline</p>
+                {detail.timeline.length === 0 ? (
+                  <p className="text-sm text-gray-400">Nothing yet.</p>
+                ) : (
+                  <div className="space-y-1.5">
+                    {detail.timeline.map((t, i) => (
+                      <div key={i} className="flex items-center justify-between gap-3 text-sm">
+                        <span className="text-gray-700 truncate">
+                          <span className="text-gray-400 text-xs uppercase mr-2">{t.kind}</span>
+                          {t.label}
+                        </span>
+                        <span className="text-xs text-gray-500 shrink-0">
+                          {new Date(t.at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {detail.referrals.referred.length > 0 && (
+                  <div className="mt-4">
+                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
+                      Readers they referred ({detail.referrals.referredCount})
+                    </p>
+                    {detail.referrals.referred.map((r) => (
+                      <p key={r.id ?? r.email ?? ""} className="text-sm text-gray-600">
+                        {r.firstName || r.email} · {new Date(r.at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                      </p>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {!selectedId && (
+          <>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+              {[
+                { label: "Active readers", value: overview?.totals.activeReaders ?? "—", sub: "this workspace" },
+                { label: `New · last ${days}d`, value: overview?.totals.newInPeriod ?? "—", sub: "joined in period" },
+                { label: "Avg opens / reader", value: overview ? overview.totals.avgOpensPerReader.toFixed(1) : "—", sub: `last ${days} days` },
+                { label: "Deals buyers", value: overview?.totals.dealsBuyers ?? "—", sub: `${overview?.totals.referredReaders ?? 0} readers came via referral` },
+              ].map((s) => (
+                <div key={s.label} className="bg-white rounded-xl border border-gray-200 p-5">
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">{s.label}</p>
+                  <p className="text-3xl font-bold text-gray-900">{typeof s.value === "number" ? s.value.toLocaleString() : s.value}</p>
+                  <p className="text-xs text-gray-400 mt-1">{s.sub}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex flex-wrap gap-2 mb-4">
+              {["All", "Highly engaged", "Engaged", "New", "Quiet", "At risk", "Fading"].map((seg) => (
+                <button
+                  key={seg}
+                  type="button"
+                  onClick={() => setSegmentFilter(seg)}
+                  className={`px-3 py-1.5 text-xs font-semibold rounded-full transition-colors ${
+                    segmentFilter === seg ? "bg-green-700 text-white" : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50"
+                  }`}
+                >
+                  {seg} ({seg === "All" ? overview?.totals.activeReaders ?? "…" : overview?.segments[seg] ?? 0})
+                </button>
+              ))}
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+              <div className="bg-white rounded-xl border border-gray-200 p-5">
+                <p className="text-sm font-semibold text-gray-800 mb-3">Where readers came from</p>
+                {ovLoading || !overview ? (
+                  <p className="text-sm text-gray-400">Loading…</p>
+                ) : overview.acquisition.length === 0 ? (
+                  <p className="text-sm text-gray-400">No acquisition data yet.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {overview.acquisition.map((a) => (
+                      <div key={a.label} className="flex items-center justify-between text-sm gap-3">
+                        <span className="text-gray-700 truncate">{a.label}</span>
+                        <span className="font-semibold text-gray-900 shrink-0">{a.count.toLocaleString()}</span>
+                      </div>
+                    ))}
+                    <p className="text-xs text-gray-400 pt-1">
+                      UTM capture started with this dashboard; earlier readers show as Unknown.
+                    </p>
+                  </div>
+                )}
+              </div>
+              <div className="bg-white rounded-xl border border-gray-200 p-5">
+                <p className="text-sm font-semibold text-gray-800 mb-3">Most-clicked links · last {days} days</p>
+                {ovLoading || !overview ? (
+                  <p className="text-sm text-gray-400">Loading…</p>
+                ) : overview.topLinks.length === 0 ? (
+                  <p className="text-sm text-gray-400">No clicks in this period.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {overview.topLinks.slice(0, 6).map((l) => (
+                      <div key={l.url} className="flex items-center justify-between text-sm gap-3">
+                        <span className="text-gray-700 truncate" title={l.url}>{l.label}</span>
+                        <span className="font-semibold text-gray-900 shrink-0">{l.clicks} clicks</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <form
+              onSubmit={(e) => { e.preventDefault(); setSubmittedQuery(readerQuery); }}
+              className="flex gap-2 mb-4"
+            >
+              <input
+                value={readerQuery}
+                onChange={(e) => setReaderQuery(e.target.value)}
+                placeholder="Search readers by name or email…"
+                className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
+              />
+              <button type="submit" className="px-4 py-2 bg-green-700 text-white text-sm font-semibold rounded-lg hover:bg-green-800">
+                Search
+              </button>
+              {submittedQuery && (
+                <button type="button" onClick={() => { setReaderQuery(""); setSubmittedQuery(""); }} className="px-3 py-2 text-sm text-gray-500 hover:underline">
+                  Clear
+                </button>
+              )}
+            </form>
+
+            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+              <div className="px-5 py-4 border-b border-gray-100">
+                <p className="text-sm font-semibold text-gray-800">
+                  Top readers · {overview?.readerCount.toLocaleString() ?? "…"} matching
+                </p>
+                <p className="text-xs text-gray-400 mt-0.5">Click a reader for their full history. Ranked by opens, then clicks.</p>
+              </div>
+              {ovLoading || !overview ? (
+                <div className="py-10 text-center">
+                  <div className="w-5 h-5 border-2 border-green-600 border-t-transparent rounded-full animate-spin mx-auto" />
+                </div>
+              ) : visibleReaders.length === 0 ? (
+                <p className="px-5 py-8 text-sm text-gray-400 text-center">No readers match.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-gray-50 border-b border-gray-100">
+                        <th className="text-left px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wide">Reader</th>
+                        <th className="text-left px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wide">State</th>
+                        <th className="text-right px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wide">Opens</th>
+                        <th className="text-right px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wide">Clicks</th>
+                        <th className="text-left px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wide">Came from</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {visibleReaders.map((r) => (
+                        <tr key={r.id} onClick={() => openReader(r.id)} className="border-b border-gray-50 last:border-0 hover:bg-gray-50 cursor-pointer">
+                          <td className="px-5 py-3">
+                            <span className="font-medium text-gray-800">{r.firstName || r.email.split("@")[0]}</span>
+                            <span className="text-gray-400 text-xs block">{r.email}</span>
+                          </td>
+                          <td className="px-5 py-3">
+                            <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${STATE_BADGES[r.state] ?? "bg-gray-100 text-gray-600"}`}>
+                              {r.state}
+                            </span>
+                            {r.dealsBuyer && <span className="ml-1.5 text-xs font-medium px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">Deals</span>}
+                            {r.referred && <span className="ml-1.5 text-xs font-medium px-2 py-0.5 rounded-full bg-purple-100 text-purple-800">Referred</span>}
+                          </td>
+                          <td className="px-5 py-3 text-right font-semibold text-gray-900">{r.opens}</td>
+                          <td className="px-5 py-3 text-right text-gray-600">{r.clickEvents}</td>
+                          <td className="px-5 py-3 text-gray-500 text-xs">
+                            {r.utmSource ? `Ad · ${r.utmSource}${r.utmCampaign ? ` / ${r.utmCampaign}` : ""}` : r.referred ? `Referred${r.referredBy ? ` by ${r.referredBy}` : ""}` : "Unknown"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </>
+        )}
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
