@@ -56,7 +56,10 @@ export default function AdminNotifications({
             className="fixed inset-0 z-40 cursor-default"
             onClick={() => setOpen(false)}
           />
-          <div className="absolute right-0 top-full mt-2 w-80 max-w-[calc(100vw-2rem)] bg-white border border-gray-200 rounded-xl shadow-lg z-50 overflow-hidden">
+          {/* left-0, not right-0: the bell sits at the page's left edge in the
+              sidebar header, so a right-aligned panel extended 320px off the
+              left side of the viewport and could not be read. */}
+          <div className="absolute left-0 top-full mt-2 w-80 max-w-[calc(100vw-2rem)] bg-white border border-gray-200 rounded-xl shadow-lg z-50 overflow-hidden">
             <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
               <p className="text-sm font-semibold text-gray-800">Notifications</p>
               <button type="button" onClick={onRefresh} className="text-xs text-blue-600 hover:underline">
