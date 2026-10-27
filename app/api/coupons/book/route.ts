@@ -50,7 +50,7 @@ export async function GET(req: NextRequest) {
           });
         }
       }
-      const minis = [...seen.values()];
+      const minis = Array.from(seen.values());
       return NextResponse.json({
         email: miniTokenRow.email,
         dealsLogoUrl: workspace.dealsLogoUrl,

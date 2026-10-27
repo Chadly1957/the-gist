@@ -45,8 +45,8 @@ export async function getMiniAccessProfile(
     select: { miniId: true, mini: { select: { slug: true } } },
   });
   const hasDeals = !!deals;
-  const ownedMiniIds = [...new Set(purchases.map((p) => p.miniId))];
-  const ownedMiniSlugs = [...new Set(purchases.map((p) => p.mini.slug))];
+  const ownedMiniIds = Array.from(new Set(purchases.map((p) => p.miniId)));
+  const ownedMiniSlugs = Array.from(new Set(purchases.map((p) => p.mini.slug)));
   return {
     hasDeals,
     ownedMiniIds,
