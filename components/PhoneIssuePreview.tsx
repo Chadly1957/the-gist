@@ -166,7 +166,7 @@ export default function PhoneIssuePreview({
 
   // Same slot and responsive visibility as the hero photo this replaces.
   return (
-    <div className="hidden lg:flex items-center justify-center">
+    <div className="flex items-center justify-center">
       <div className="relative w-full max-w-md">
         {status === "fallback" ? (
           <div className="rounded-3xl overflow-hidden">
