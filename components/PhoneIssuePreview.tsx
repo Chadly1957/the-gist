@@ -181,7 +181,7 @@ export default function PhoneIssuePreview({
           </div>
         ) : (
           <>
-            <div className="relative mx-auto w-[300px] rounded-[48px] bg-gray-950 p-2.5 shadow-2xl shadow-gray-400/40 ring-1 ring-gray-900">
+            <div className="relative isolate mx-auto w-[300px] rounded-[48px] bg-gray-950 p-2.5 shadow-2xl shadow-gray-400/40 ring-1 ring-gray-900">
               {/* Side buttons, decorative */}
               <div aria-hidden className="absolute -left-[2px] top-28 h-10 w-[3px] rounded-full bg-gray-700" />
               <div aria-hidden className="absolute -left-[2px] top-44 h-14 w-[3px] rounded-full bg-gray-700" />
