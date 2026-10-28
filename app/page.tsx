@@ -3,13 +3,13 @@ import { workspaceFetch } from "@/lib/workspace-client";
 
 import { useState, useEffect } from "react";
 import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
-import Image from "next/image";
 import Link from "@/components/workspace/WorkspaceLink";
 import Logo from "@/components/Logo";
 import DealsOto from "@/components/DealsOto";
 import SponsorsMarquee from "@/components/SponsorsMarquee";
 import RecentIssues from "@/components/RecentIssues";
 import ProductsSection, { type ShopProduct } from "@/components/ProductsSection";
+import PhoneIssuePreview from "@/components/PhoneIssuePreview";
 import SiteHeader from "@/components/SiteHeader";
 
 function CityLandingPage() {
@@ -164,21 +164,11 @@ function CityLandingPage() {
               )}
             </div>
 
-            {/* Right: hero photo (per-workspace) */}
-            <div className="hidden lg:flex items-center justify-center">
-              <div className="relative w-full max-w-md">
-                <div className="rounded-3xl overflow-hidden">
-                  <Image
-                    src={workspace.heroImageUrl ?? (brand === "effingham" ? "/hero-effingham.png" : "/hero-decatur.jpg")}
-                    alt={workspace.heroImageUrl ? `${workspace.name} hero image` : brand === "effingham" ? "Effingham County Courthouse" : "Historic Decatur pavilion"}
-                    width={640}
-                    height={700}
-                    className="w-full h-auto object-cover"
-                    priority
-                  />
-                </div>
-              </div>
-            </div>
+            {/* Right: phone preview of the latest issue (falls back to the hero photo) */}
+            <PhoneIssuePreview
+              heroSrc={workspace.heroImageUrl ?? (brand === "effingham" ? "/hero-effingham.png" : "/hero-decatur.jpg")}
+              heroAlt={workspace.heroImageUrl ? `${workspace.name} hero image` : brand === "effingham" ? "Effingham County Courthouse" : "Historic Decatur pavilion"}
+            />
           </div>
         </section>
 
