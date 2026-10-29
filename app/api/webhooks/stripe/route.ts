@@ -256,6 +256,82 @@ async function fulfillPaymentLinkOrder(session: Stripe.Checkout.Session): Promis
   return true;
 }
 
+// Guide purchase: the checkout route never creates the row; fulfillment
+// does, so a captured payment never goes unrecorded. Idempotent: a
+// re-delivered event reuses the row by session id.
+async function fulfillMiniPurchase(workspaceId: string, session: Stripe.Checkout.Session) {
+  const email = (session.customer_details?.email || session.metadata?.email || "").trim().toLowerCase();
+  const miniId = session.metadata?.miniId || "";
+  if (!email || !email.includes("@") || !miniId) {
+    console.error(`Guide payment captured but metadata incomplete for session ${session.id}`);
+    return;
+  }
+  const mini = await basePrisma.mini.findFirst({
+    where: { id: miniId, workspaceId },
+    select: { title: true, slug: true },
+  });
+  if (!mini) {
+    console.error(`Guide payment captured but no guide ${miniId} in workspace ${workspaceId} for session ${session.id}`);
+    return;
+  }
+  const purchase = await basePrisma.miniPurchase.upsert({
+    where: { stripeSessionId: session.id },
+    update: {},
+    create: { workspaceId, email, miniId, stripeSessionId: session.id },
+  });
+  const { sendMiniMagicLinkEmail } = await import("@/lib/coupon-book-email");
+  await sendMiniMagicLinkEmail({
+    workspaceId,
+    to: email,
+    magicToken: purchase.magicToken,
+    miniTitle: mini.title,
+    miniSlug: mini.slug,
+  });
+}
+
+// Upgrade to the full Deals book (flat $10, Option B). A re-delivered event
+// for the same session just resends the link; only a genuinely different
+// session for an email that already owns Deals is flagged for manual refund.
+async function fulfillMiniUpgrade(workspaceId: string, session: Stripe.Checkout.Session) {
+  const email = (session.customer_details?.email || session.metadata?.email || "").trim().toLowerCase();
+  if (!email || !email.includes("@")) {
+    console.error(`Guide upgrade payment captured but no email for session ${session.id}`);
+    return;
+  }
+  const sameSession = await basePrisma.couponBookPurchase.findUnique({
+    where: { stripeSessionId: session.id },
+    select: { magicToken: true },
+  });
+  if (sameSession) {
+    const { sendCouponBookMagicLinkEmail } = await import("@/lib/coupon-book-email");
+    await sendCouponBookMagicLinkEmail({ workspaceId, to: email, magicToken: sameSession.magicToken });
+    return;
+  }
+  const existing = await basePrisma.couponBookPurchase.findFirst({
+    where: { workspaceId, email, active: true },
+    select: { magicToken: true },
+  });
+  if (existing) {
+    console.error(`Guide upgrade payment captured but Deals purchase already exists for ${email} in ${workspaceId}; flagging session ${session.id} for manual refund.`);
+    const { sendCouponBookMagicLinkEmail } = await import("@/lib/coupon-book-email");
+    await sendCouponBookMagicLinkEmail({ workspaceId, to: email, magicToken: existing.magicToken });
+    return;
+  }
+  const purchase = await basePrisma.couponBookPurchase.upsert({
+    where: { stripeSessionId: session.id },
+    update: { active: true, email },
+    create: { workspaceId, email, stripeSessionId: session.id, active: true },
+  });
+  // Record-keeping: the consumed guide credits can never be spent twice.
+  // Gating checks hasDeals first anyway, so this flag is belt and braces.
+  await basePrisma.miniPurchase.updateMany({
+    where: { workspaceId, email, upgradedAt: null },
+    data: { upgradedAt: new Date() },
+  });
+  const { sendCouponBookMagicLinkEmail } = await import("@/lib/coupon-book-email");
+  await sendCouponBookMagicLinkEmail({ workspaceId, to: email, magicToken: purchase.magicToken });
+}
+
 export async function POST(req: NextRequest) {
   if (!process.env.STRIPE_SECRET_KEY || !process.env.STRIPE_WEBHOOK_SECRET) {
     return NextResponse.json({ error: "Stripe not configured." }, { status: 503 });
@@ -319,6 +395,10 @@ export async function POST(req: NextRequest) {
       await fulfillProductOrder(workspaceId, session);
     } else if (session.metadata?.kind === "board_post") {
       await fulfillBoardPost(workspaceId, session);
+    } else if (session.metadata?.kind === "deals_mini") {
+      await fulfillMiniPurchase(workspaceId, session);
+    } else if (session.metadata?.kind === "coupon_book_upgrade") {
+      await fulfillMiniUpgrade(workspaceId, session);
     } else {
       await basePrisma.adBooking.updateMany({
         where: { workspaceId, stripeSessionId: sessionId, status: "pending_payment" },

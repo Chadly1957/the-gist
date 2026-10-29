@@ -87,6 +87,30 @@ interface GasData {
   eiaPeriod?: string | null;
 }
 
+interface MiniGuideBlock {
+  type: "option" | "idea" | "tip";
+  name?: string;
+  description?: string;
+  whyItFits?: string;
+  link?: string;
+  dealRef?: string;
+  text?: string;
+}
+
+interface MiniGuide {
+  id: string;
+  slug: string;
+  title: string;
+  question: string;
+  content: MiniGuideBlock[];
+}
+
+interface MiniAccess {
+  hasDeals: boolean;
+  ownedMiniSlugs: string[];
+  upgradePriceCents: number | null;
+}
+
 interface BookData {
   email: string;
   dealsLogoUrl?: string | null;
@@ -103,6 +127,8 @@ interface BookData {
     ibotta: string;
     note: string;
   };
+  minis: MiniGuide[];
+  access: MiniAccess;
 }
 
 function cents(n: number) {
@@ -360,6 +386,113 @@ function PhonePreview() {
   );
 }
 
+function UpgradeCard({ email, priceCents }: { email: string; priceCents: number }) {
+  const [buying, setBuying] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  async function upgrade() {
+    setBuying(true);
+    setError(null);
+    try {
+      const res = await workspaceFetch("/api/minis/upgrade-checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Checkout failed.");
+      window.location.href = data.url;
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Checkout failed.");
+      setBuying(false);
+    }
+  }
+  return (
+    <div className="bg-green-50 border border-green-100 rounded-3xl shadow-sm p-5">
+      <p className="font-bold text-stone-900">Upgrade to the full Deals book</p>
+      <p className="text-sm text-gray-600 mt-1">
+        Get every coupon, every weekly deal, gas prices, and every future guide, for{" "}
+        {cents(priceCents)} one time. Your guide purchase already counts toward it.
+      </p>
+      <button
+        type="button"
+        onClick={upgrade}
+        disabled={buying}
+        className="mt-3 bg-green-700 text-white font-semibold rounded-xl px-4 py-2 text-sm disabled:opacity-50"
+      >
+        {buying ? "Starting checkout…" : `Upgrade — ${cents(priceCents)}`}
+      </button>
+      {error && <p className="text-red-600 text-sm mt-2">{error}</p>}
+    </div>
+  );
+}
+
+function MiniGuideSection({
+  guide,
+  showUpgrade,
+  email,
+  upgradePriceCents,
+}: {
+  guide: MiniGuide;
+  showUpgrade: boolean;
+  email: string;
+  upgradePriceCents: number;
+}) {
+  const options = guide.content.filter((b) => b.type === "option");
+  const ideas = guide.content.filter((b) => b.type === "idea");
+  const tips = guide.content.filter((b) => b.type === "tip");
+  return (
+    <section id={`guide-${guide.slug}`} className="mb-6 scroll-mt-6">
+      <h2 className="font-bold text-lg text-stone-900 mb-1 px-1">{guide.title}</h2>
+      <p className="text-sm text-gray-500 mb-3 px-1">{guide.question}</p>
+      <div className="space-y-4">
+        {options.map((o, i) => (
+          <div key={i} className="bg-white rounded-3xl border border-stone-100 shadow-sm p-5">
+            <p className="font-bold text-stone-900">{o.name}</p>
+            {o.description && <p className="text-gray-600 text-sm mt-1">{o.description}</p>}
+            {o.whyItFits && (
+              <p className="text-gray-600 text-sm mt-1">
+                <span className="font-semibold text-stone-900">Why it fits: </span>
+                {o.whyItFits}
+              </p>
+            )}
+            {o.dealRef && <p className="text-xs text-green-700 font-semibold mt-2">{o.dealRef}</p>}
+            {o.link && (
+              <a
+                href={o.link}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-block mt-3 text-xs font-semibold text-green-700 bg-green-50 hover:bg-green-100 rounded-full px-3 py-1"
+              >
+                View details
+              </a>
+            )}
+          </div>
+        ))}
+        {ideas.length > 0 && (
+          <div className="bg-white rounded-3xl border border-stone-100 shadow-sm p-5">
+            <p className="font-bold text-stone-900 mb-2">Ideas</p>
+            <ul className="space-y-2">
+              {ideas.map((d, i) => (
+                <li key={i} className="text-sm text-gray-700">• {d.text}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {tips.map((t, i) => (
+          <div key={i} className="bg-amber-50 border border-amber-100 rounded-3xl p-5">
+            <p className="text-sm text-amber-900">{t.text}</p>
+          </div>
+        ))}
+      </div>
+      {showUpgrade && (
+        <div className="mt-4">
+          <UpgradeCard email={email} priceCents={upgradePriceCents} />
+        </div>
+      )}
+    </section>
+  );
+}
+
 function DealsPageInner() {
   const searchParams = useSearchParams();
   const token = searchParams.get("token");
@@ -446,6 +579,9 @@ function DealsPageInner() {
     const totalDeals = retailers.reduce((n, r) => n + r.deals.length, 0);
     const weekLabel = book.deals?.weekLabel || null;
     const hasDeals = totalDeals > 0;
+    // Portal mode: Deals owners see the full book plus every guide free;
+    // guide-only owners see a stripped portal (guides + upgrade card).
+    const isDealsOwner = book.access?.hasDeals ?? true;
 
     return (
       <OutboundLinkContext.Provider value={setPreview}>
@@ -461,12 +597,34 @@ function DealsPageInner() {
                 /* eslint-disable-next-line @next/next/no-img-element */
                 <img src={book.dealsLogoUrl} alt="The Gist Deals" className="mx-auto h-16 w-auto mb-3" />
               ) : null}
-              <h1 className="text-2xl font-bold text-stone-900">My Gist Deals Book</h1>
+              <h1 className="text-2xl font-bold text-stone-900">{isDealsOwner ? "My Gist Deals Book" : "My Guides"}</h1>
               <p className="text-stone-500 text-sm mt-1">{book.email}</p>
             </div>
 
+            {/* Guides index */}
+            {book.minis.length > 0 && (
+              <div className="bg-white rounded-3xl border border-stone-100 shadow-sm p-5 mb-6">
+                <h2 className="font-bold text-lg text-stone-900 mb-1">Guides</h2>
+                <p className="text-sm text-gray-500 mb-3">
+                  {isDealsOwner
+                    ? "Included free with your Deals book."
+                    : "Your guides."}
+                </p>
+                <ul className="space-y-2">
+                  {book.minis.map((g) => (
+                    <li key={g.slug}>
+                      <a href={`#guide-${g.slug}`} className="text-sm font-semibold text-green-800">
+                        {g.title}
+                      </a>
+                      <p className="text-xs text-gray-500">{g.question}</p>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
             {/* Trust bar */}
-            {hasDeals && (
+            {isDealsOwner && hasDeals && (
               <div className="flex items-center gap-2 bg-green-50 border border-green-100 rounded-2xl px-4 py-2.5 mb-6">
                 <span className="text-green-700 font-bold">✓</span>
                 <p className="text-sm text-green-900">
@@ -476,11 +634,12 @@ function DealsPageInner() {
             )}
 
             {/* This week's best */}
-            {book.deals && (
+            {isDealsOwner && book.deals && (
               <PicksRow picks={book.deals.topPicks} retailers={retailers} checked={weekLabel} />
             )}
 
             {/* Local coupons */}
+            {isDealsOwner && (
             <section className="mb-6">
               <h2 className="font-bold text-lg text-stone-900 mb-1 px-1">From your neighbors</h2>
               <p className="text-sm text-gray-500 mb-3 px-1">Coupons from local businesses. Show the QR code at checkout.</p>
@@ -523,9 +682,10 @@ function DealsPageInner() {
                 </div>
               )}
             </section>
+            )}
 
             {/* The full book */}
-            {hasDeals && (
+            {isDealsOwner && hasDeals && (
               <section className="mb-6">
                 <h2 className="font-bold text-lg text-stone-900 mb-1 px-1">The full book</h2>
                 <p className="text-sm text-gray-500 mb-3 px-1">Every deal we found this week, organized by store.</p>
@@ -582,6 +742,7 @@ function DealsPageInner() {
               </section>
             )}
 
+            {isDealsOwner && (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {/* Gas prices */}
               <GasBox gas={book.gas} />
@@ -618,6 +779,25 @@ function DealsPageInner() {
                 </div>
               )}
             </div>
+            )}
+
+            {/* Upgrade card (guide-only owners) */}
+            {book.access.upgradePriceCents != null && (
+              <div className="mb-6">
+                <UpgradeCard email={book.email} priceCents={book.access.upgradePriceCents} />
+              </div>
+            )}
+
+            {/* Guide sections */}
+            {book.minis.map((g) => (
+              <MiniGuideSection
+                key={g.slug}
+                guide={g}
+                showUpgrade={book.access.upgradePriceCents != null}
+                email={book.email}
+                upgradePriceCents={book.access.upgradePriceCents ?? 1000}
+              />
+            ))}
           </div>
         </div>
         <LinkPreviewSheet link={preview} onClose={() => setPreview(null)} />

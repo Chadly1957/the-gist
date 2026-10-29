@@ -174,3 +174,52 @@ export async function sendCouponRedemptionEmail(opts: {
     throw err instanceof Error ? err : new Error(String(err));
   }
 }
+
+// Magic link for a guide-only buyer: opens the stripped portal (their guides
+// plus the upgrade card) at the guide's section. Same no-password pattern
+// as the book link.
+export async function sendMiniMagicLinkEmail(opts: {
+  workspaceId: string;
+  to: string;
+  magicToken: string;
+  miniTitle: string;
+  miniSlug: string;
+}): Promise<void> {
+  try {
+    await withWorkspaceById(opts.workspaceId, async () => {
+      const workspaceUrl = await getWorkspaceUrl();
+      const guideUrl = `${workspaceUrl}/deals?token=${opts.magicToken}#guide-${opts.miniSlug}`;
+      const rows = await prisma.setting.findMany();
+      const settings = Object.fromEntries(rows.map((r) => [r.key, r.value]));
+      const client = await getEmailClient(settings);
+      if (!client) throw new Error("No email provider configured for this workspace");
+      const ws = await getWorkspace();
+      const logoHtml = ws.dealsLogoUrl
+        ? `<img src="${escapeHtml(ws.dealsLogoUrl)}" alt="The Gist Deals" style="height: 96px; width: auto; display: block; margin: 0 0 16px;" />`
+        : "";
+      await client.sendEmail({
+        to: opts.to,
+        subject: `Your ${opts.miniTitle} is ready`,
+        htmlBody: `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 480px; margin: 0 auto; padding: 32px 24px;">
+      ${logoHtml}
+      <h2 style="color: #111827; margin: 0 0 12px;">Your ${escapeHtml(opts.miniTitle)}</h2>
+      <p style="color: #4b5563; font-size: 14px; line-height: 1.5;">
+        Thanks for grabbing the ${escapeHtml(opts.miniTitle)}! Tap below to open your guide.
+      </p>
+      <p style="margin: 24px 0;">
+        <a href="${guideUrl}" style="background: #24726f; color: #ffffff; padding: 12px 22px; border-radius: 10px; text-decoration: none; font-weight: 600; font-size: 14px; display: inline-block;">
+          Open My Guide
+        </a>
+      </p>
+      <p style="color: #9ca3af; font-size: 12px; word-break: break-all;">Or copy this link: ${guideUrl}</p>
+      <p style="color: #9ca3af; font-size: 12px;">This link is unique to you. If you weren't expecting a guide, you can ignore this email.</p>
+    </div>
+  `,
+      });
+    });
+  } catch (err) {
+    console.error("Failed to send mini magic link email:", err);
+    throw err instanceof Error ? err : new Error(String(err));
+  }
+}

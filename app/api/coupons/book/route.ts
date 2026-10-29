@@ -5,6 +5,7 @@ import QRCode from "qrcode";
 import { getPublishedDigestData } from "@/lib/deals/digest";
 import { getGasPrices } from "@/lib/deals/gas";
 import { intervalStart, isRefreshInterval } from "@/lib/coupons/intervals";
+import { ensureSeedMinis } from "@/lib/minis";
 
 export const dynamic = "force-dynamic";
 
@@ -15,11 +16,56 @@ export async function GET(req: NextRequest) {
   if (!token) return NextResponse.json({ error: "Token required." }, { status: 400 });
 
   const workspace = await getWorkspace();
-  const purchase = await basePrisma.couponBookPurchase.findFirst({
+  await ensureSeedMinis(workspace.id, workspace.slug);
+  let purchase = await basePrisma.couponBookPurchase.findFirst({
     where: { workspaceId: workspace.id, magicToken: token, active: true },
     select: { id: true, email: true, buyerToken: true, createdAt: true },
   });
-  if (!purchase) return NextResponse.json({ error: "Invalid or expired link." }, { status: 404 });
+  if (!purchase) {
+    // Guide-only owners have no Deals purchase; their MiniPurchase token
+    // opens the stripped portal (owned guides + upgrade card) instead.
+    const miniTokenRow = await basePrisma.miniPurchase.findFirst({
+      where: { workspaceId: workspace.id, magicToken: token },
+      select: { email: true },
+    });
+    if (!miniTokenRow) return NextResponse.json({ error: "Invalid or expired link." }, { status: 404 });
+    purchase = await basePrisma.couponBookPurchase.findFirst({
+      where: { workspaceId: workspace.id, email: miniTokenRow.email, active: true },
+      select: { id: true, email: true, buyerToken: true, createdAt: true },
+    });
+    if (!purchase) {
+      const owned = await basePrisma.miniPurchase.findMany({
+        where: { workspaceId: workspace.id, email: miniTokenRow.email },
+        include: { mini: true },
+      });
+      const seen = new Map<string, { id: string; slug: string; title: string; question: string; content: unknown }>();
+      for (const row of owned) {
+        if (row.mini.active) {
+          seen.set(row.mini.id, {
+            id: row.mini.id,
+            slug: row.mini.slug,
+            title: row.mini.title,
+            question: row.mini.question,
+            content: row.mini.content,
+          });
+        }
+      }
+      const minis = Array.from(seen.values());
+      return NextResponse.json({
+        email: miniTokenRow.email,
+        dealsLogoUrl: workspace.dealsLogoUrl,
+        dealsEmailHeaderUrl: workspace.dealsEmailHeaderUrl,
+        coupons: [],
+        deals: { topPicks: [], retailers: [], weekLabel: "" },
+        minis,
+        access: {
+          hasDeals: false,
+          ownedMiniSlugs: minis.map((m) => m.slug),
+          upgradePriceCents: 1000,
+        },
+      });
+    }
+  }
 
   const appUrl = await getWorkspaceUrl();
 
@@ -83,6 +129,14 @@ export async function GET(req: NextRequest) {
 
   const gas = await getGasPrices(workspace.id);
 
+  // Deals owners see every active guide free; the portal renders them in
+  // the Guides sections below the existing sections.
+  const allMinis = await basePrisma.mini.findMany({
+    where: { workspaceId: workspace.id, active: true },
+    orderBy: { createdAt: "asc" },
+    select: { id: true, slug: true, title: true, question: true, content: true },
+  });
+
   return NextResponse.json({
     email: purchase.email,
     dealsLogoUrl: workspace.dealsLogoUrl,
@@ -93,6 +147,12 @@ export async function GET(req: NextRequest) {
       topPicks: digestData.topPicks,
       retailers: digestData.retailers,
       weekLabel: digestData.weekLabel,
+    },
+    minis: allMinis,
+    access: {
+      hasDeals: true,
+      ownedMiniSlugs: allMinis.map((m) => m.slug),
+      upgradePriceCents: null,
     },
     referrals: {
       rakuten: settings["deals_referral_rakuten"] || "",

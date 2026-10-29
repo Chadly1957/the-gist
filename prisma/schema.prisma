@@ -65,6 +65,8 @@ model Workspace {
   productOrderRows            ProductOrder[]
   storyRows                   Story[]
   boardPostRows               BoardPost[]
+  miniRows                      Mini[]
+  miniPurchaseRows              MiniPurchase[]
 }
 
 model AdminUser {
@@ -976,4 +978,37 @@ model BoardPost {
   @@unique([id, workspaceId])
   @@index([workspaceId, status])
   @@index([workspaceId, approvedAt])
+}
+
+model Mini {
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  id          String   @id @default(cuid())
+  slug        String
+  title       String
+  question    String
+  content     Json
+  priceCents  Int      @default(500)
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  purchases   MiniPurchase[]
+
+  @@unique([workspaceId, slug])
+  @@index([workspaceId])
+}
+
+model MiniPurchase {
+  workspaceId     String
+  workspace       Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  id              String   @id @default(cuid())
+  email           String
+  miniId          String
+  mini            Mini     @relation(fields: [miniId], references: [id], onDelete: Restrict)
+  stripeSessionId String?  @unique
+  magicToken      String   @unique @default(cuid())
+  upgradedAt      DateTime?
+  createdAt       DateTime @default(now())
+
+  @@index([workspaceId, email])
+  @@index([workspaceId, miniId])
 }
