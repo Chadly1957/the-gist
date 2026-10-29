@@ -5,6 +5,15 @@ import Stripe from "stripe";
 import { alertBookingFailureOnce } from "@/lib/sponsor-booking-alerts";
 import { recordPaidProductOrder, shippingFromSession } from "@/lib/products";
 import { isProductSize } from "@/lib/product-sizes";
+import {
+  couponBookPrepaidYearEnd,
+  couponBookPurchaseHasAccess,
+} from "@/lib/coupon-book";
+import {
+  getBookSubscriptionState,
+  subscriptionPeriodEnd,
+  type BookSubscriptionState,
+} from "@/lib/stripe-subscriptions";
 
 export const dynamic = "force-dynamic";
 
@@ -47,13 +56,55 @@ async function fulfillWeekBooking(workspaceId: string, session: Stripe.Checkout.
   await fulfillPaidWeekBooking(workspaceId, booking);
 }
 
-async function fulfillCouponBookPurchase(workspaceId: string, session: Stripe.Checkout.Session) {
+async function fulfillCouponBookPurchase(stripe: Stripe, workspaceId: string, session: Stripe.Checkout.Session) {
   const email = (session.customer_details?.email || session.metadata?.email || "").trim().toLowerCase();
   if (!email || !email.includes("@")) {
     // Money is captured but we have no address to deliver the book to.
     console.error(`Coupon book payment captured but no email for session ${session.id}`);
     return;
   }
+  if (session.mode === "subscription") {
+    // Annual billing (2026-10-29 switch): the row is NOT lifetime; access
+    // runs through the subscription's paid-through date.
+    const subscriptionId = typeof session.subscription === "string" ? session.subscription : null;
+    const state = subscriptionId ? await getBookSubscriptionState(stripe, subscriptionId) : null;
+    // Year one is paid even if the subscription lookup failed: fall back to
+    // a prepaid year from today rather than granting nothing.
+    const annual: BookSubscriptionState = state ?? {
+      stripeSubscriptionId: subscriptionId,
+      subscriptionStatus: "active",
+      accessUntil: couponBookPrepaidYearEnd(new Date()),
+      cancelAtPeriodEnd: false,
+    };
+    // Idempotent: the same session completing twice reuses the purchase row.
+    const purchase = await basePrisma.couponBookPurchase.upsert({
+      where: { stripeSessionId: session.id },
+      update: {
+        active: true,
+        email,
+        stripeSubscriptionId: annual.stripeSubscriptionId ?? undefined,
+        subscriptionStatus: annual.subscriptionStatus,
+        ...(annual.accessUntil ? { accessUntil: annual.accessUntil } : {}),
+        cancelAtPeriodEnd: annual.cancelAtPeriodEnd,
+      },
+      create: {
+        workspaceId,
+        email,
+        stripeSessionId: session.id,
+        active: true,
+        isLifetime: false,
+        stripeSubscriptionId: annual.stripeSubscriptionId,
+        subscriptionStatus: annual.subscriptionStatus,
+        accessUntil: annual.accessUntil,
+        cancelAtPeriodEnd: annual.cancelAtPeriodEnd,
+      },
+    });
+    const { sendCouponBookMagicLinkEmail } = await import("@/lib/coupon-book-email");
+    await sendCouponBookMagicLinkEmail({ workspaceId, to: email, magicToken: purchase.magicToken });
+    return;
+  }
+  // Legacy one-time sessions (started before the annual switch) complete
+  // under the terms they were sold on: lifetime, exactly as before.
   // Idempotent: the same session completing twice reuses the purchase row.
   const purchase = await basePrisma.couponBookPurchase.upsert({
     where: { stripeSessionId: session.id },
@@ -73,10 +124,20 @@ async function fulfillCouponBookGift(workspaceId: string, session: Stripe.Checko
     return;
   }
   // Idempotent: the same session completing twice reuses the purchase row.
+  // A gift buys the recipient's FIRST YEAR (annual billing switch,
+  // 2026-10-29): not lifetime. After the prepaid year the recipient renews
+  // or lapses like any annual owner.
   const purchase = await basePrisma.couponBookPurchase.upsert({
     where: { stripeSessionId: session.id },
     update: { active: true, email },
-    create: { workspaceId, email, stripeSessionId: session.id, active: true },
+    create: {
+      workspaceId,
+      email,
+      stripeSessionId: session.id,
+      active: true,
+      isLifetime: false,
+      accessUntil: couponBookPrepaidYearEnd(new Date()),
+    },
   });
   const { sendCouponBookGiftEmail } = await import("@/lib/coupon-book-email");
   await sendCouponBookGiftEmail({
@@ -140,6 +201,86 @@ async function handlePartnershipEvent(event: Stripe.Event): Promise<boolean> {
     await basePrisma.presentingPartnership.update({
       where: { id: partnership.id },
       data: { status },
+    });
+  }
+  return true;
+}
+
+// Deals book subscription lifecycle (annual billing, 2026-10-29). Runs after
+// the partnership handler: finds the book purchase by its Stripe
+// subscription id and keeps the row's paid-through state in sync. Returns
+// true when the subscription belonged to a book purchase. Access itself is
+// always derived from isLifetime / accessUntil at read time, so a failed
+// renewal never cuts a reader off before the date they paid through.
+async function handleCouponBookSubscriptionEvent(event: Stripe.Event, stripe: Stripe): Promise<boolean> {
+  const obj = event.data.object as unknown as Record<string, unknown>;
+  let subscriptionId: string | null = null;
+  if (event.type.startsWith("customer.subscription")) {
+    subscriptionId = typeof obj.id === "string" ? obj.id : null;
+  } else {
+    // invoice.* events: the subscription id has lived in different places
+    // across Stripe API versions; check both shapes.
+    if (typeof obj.subscription === "string") subscriptionId = obj.subscription;
+    const parent = obj.parent as
+      | { subscription_details?: { subscription?: string } }
+      | undefined;
+    if (!subscriptionId && typeof parent?.subscription_details?.subscription === "string") {
+      subscriptionId = parent.subscription_details.subscription;
+    }
+  }
+  if (!subscriptionId) return false;
+
+  const purchase = await basePrisma.couponBookPurchase.findUnique({
+    where: { stripeSubscriptionId: subscriptionId },
+    select: { id: true },
+  });
+  if (!purchase) return false;
+
+  if (event.type === "invoice.paid") {
+    // A renewal landed: re-sync status + paid-through date from Stripe.
+    const state = await getBookSubscriptionState(stripe, subscriptionId);
+    if (state) {
+      await basePrisma.couponBookPurchase.update({
+        where: { id: purchase.id },
+        data: {
+          subscriptionStatus: state.subscriptionStatus,
+          ...(state.accessUntil ? { accessUntil: state.accessUntil } : {}),
+          cancelAtPeriodEnd: state.cancelAtPeriodEnd,
+        },
+      });
+    } else {
+      console.error(`Book renewal paid for subscription ${subscriptionId} but its state could not be loaded; paid-through date unchanged.`);
+    }
+  } else if (event.type === "invoice.payment_failed") {
+    // Flag it, but access continues through the paid-through date.
+    await basePrisma.couponBookPurchase.update({
+      where: { id: purchase.id },
+      data: { subscriptionStatus: "past_due" },
+    });
+    console.error(`Deals book payment failed for subscription ${subscriptionId} (purchase ${purchase.id}); access runs through the paid-through date.`);
+  } else if (event.type === "customer.subscription.updated") {
+    const sub = event.data.object as Stripe.Subscription;
+    const periodEnd = subscriptionPeriodEnd(sub);
+    await basePrisma.couponBookPurchase.update({
+      where: { id: purchase.id },
+      data: {
+        subscriptionStatus: sub.status,
+        ...(periodEnd ? { accessUntil: periodEnd } : {}),
+        cancelAtPeriodEnd: sub.cancel_at_period_end,
+      },
+    });
+  } else if (event.type === "customer.subscription.deleted") {
+    // The subscription is over; access ends at the paid-through date on the
+    // final subscription object (or the date we already hold).
+    const sub = event.data.object as Stripe.Subscription;
+    const periodEnd = subscriptionPeriodEnd(sub);
+    await basePrisma.couponBookPurchase.update({
+      where: { id: purchase.id },
+      data: {
+        subscriptionStatus: "canceled",
+        ...(periodEnd ? { accessUntil: periodEnd } : {}),
+        cancelAtPeriodEnd: false,
+      },
     });
   }
   return true;
@@ -300,7 +441,7 @@ async function fulfillMiniPurchase(workspaceId: string, session: Stripe.Checkout
 // Upgrade to the full Deals book (flat $10, Option B). A re-delivered event
 // for the same session just resends the link; only a genuinely different
 // session for an email that already owns Deals is flagged for manual refund.
-async function fulfillMiniUpgrade(workspaceId: string, session: Stripe.Checkout.Session) {
+async function fulfillMiniUpgrade(stripe: Stripe, workspaceId: string, session: Stripe.Checkout.Session) {
   const email = (session.customer_details?.email || session.metadata?.email || "").trim().toLowerCase();
   if (!email || !email.includes("@")) {
     console.error(`Guide upgrade payment captured but no email for session ${session.id}`);
@@ -315,20 +456,59 @@ async function fulfillMiniUpgrade(workspaceId: string, session: Stripe.Checkout.
     await sendCouponBookMagicLinkEmail({ workspaceId, to: email, magicToken: sameSession.magicToken });
     return;
   }
-  const existing = await basePrisma.couponBookPurchase.findFirst({
+  // Only an access-VALID purchase counts as "already owns": a lapsed annual
+  // row must not block the new subscription (the upgrade is their renewal).
+  const existingRows = await basePrisma.couponBookPurchase.findMany({
     where: { workspaceId, email, active: true },
-    select: { magicToken: true },
+    select: { magicToken: true, isLifetime: true, accessUntil: true },
   });
+  const existing = existingRows.find((row) => couponBookPurchaseHasAccess(row));
   if (existing) {
     console.error(`Guide upgrade payment captured but Deals purchase already exists for ${email} in ${workspaceId}; flagging session ${session.id} for manual refund.`);
     const { sendCouponBookMagicLinkEmail } = await import("@/lib/coupon-book-email");
     await sendCouponBookMagicLinkEmail({ workspaceId, to: email, magicToken: existing.magicToken });
     return;
   }
+  // Annual billing (2026-10-29 switch): subscription sessions create an
+  // annual row (year one is $10 after the $5 guide credit discount on the
+  // checkout). Legacy one-time upgrade sessions still in flight when the
+  // switch shipped complete as lifetime, exactly as sold.
+  let annualFields: {
+    isLifetime?: boolean;
+    stripeSubscriptionId?: string | null;
+    subscriptionStatus?: string;
+    accessUntil?: Date | null;
+    cancelAtPeriodEnd?: boolean;
+  } = {};
+  if (session.mode === "subscription") {
+    const subscriptionId = typeof session.subscription === "string" ? session.subscription : null;
+    const state = subscriptionId ? await getBookSubscriptionState(stripe, subscriptionId) : null;
+    const annual: BookSubscriptionState = state ?? {
+      stripeSubscriptionId: subscriptionId,
+      subscriptionStatus: "active",
+      accessUntil: couponBookPrepaidYearEnd(new Date()),
+      cancelAtPeriodEnd: false,
+    };
+    annualFields = {
+      isLifetime: false,
+      stripeSubscriptionId: annual.stripeSubscriptionId,
+      subscriptionStatus: annual.subscriptionStatus,
+      accessUntil: annual.accessUntil,
+      cancelAtPeriodEnd: annual.cancelAtPeriodEnd,
+    };
+  }
   const purchase = await basePrisma.couponBookPurchase.upsert({
     where: { stripeSessionId: session.id },
-    update: { active: true, email },
-    create: { workspaceId, email, stripeSessionId: session.id, active: true },
+    update: {
+      active: true,
+      email,
+      ...annualFields,
+      // Never clear a paid-through date we already hold.
+      ...(session.mode === "subscription" && !annualFields.accessUntil
+        ? { accessUntil: undefined }
+        : {}),
+    },
+    create: { workspaceId, email, stripeSessionId: session.id, active: true, ...annualFields },
   });
   // Record-keeping: the consumed guide credits can never be spent twice.
   // Gating checks hasDeals first anyway, so this flag is belt and braces.
@@ -370,7 +550,9 @@ export async function POST(req: NextRequest) {
   ) {
     const handled = await handlePartnershipEvent(event);
     if (handled) return NextResponse.json({ received: true, partnership: true });
-    // Not a partnership event: fall through to normal handling.
+    const bookHandled = await handleCouponBookSubscriptionEvent(event, stripe);
+    if (bookHandled) return NextResponse.json({ received: true, couponBook: true });
+    // Not a partnership or book event: fall through to normal handling.
   }
 
   // Legacy Payment Link sales carry no metadata; route them by link ID to
@@ -396,7 +578,7 @@ export async function POST(req: NextRequest) {
     if (session.metadata?.kind === "sponsor_week") {
       await fulfillWeekBooking(workspaceId, session);
     } else if (session.metadata?.kind === "coupon_book") {
-      await fulfillCouponBookPurchase(workspaceId, session);
+      await fulfillCouponBookPurchase(stripe, workspaceId, session);
     } else if (session.metadata?.kind === "coupon_book_gift") {
       await fulfillCouponBookGift(workspaceId, session);
     } else if (session.metadata?.kind === "product") {
@@ -406,7 +588,7 @@ export async function POST(req: NextRequest) {
     } else if (session.metadata?.kind === "deals_mini") {
       await fulfillMiniPurchase(workspaceId, session);
     } else if (session.metadata?.kind === "coupon_book_upgrade") {
-      await fulfillMiniUpgrade(workspaceId, session);
+      await fulfillMiniUpgrade(stripe, workspaceId, session);
     } else {
       await basePrisma.adBooking.updateMany({
         where: { workspaceId, stripeSessionId: sessionId, status: "pending_payment" },

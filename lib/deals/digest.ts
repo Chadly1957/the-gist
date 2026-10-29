@@ -5,6 +5,7 @@
 import { basePrisma } from "@/lib/db-base";
 import { withWorkspace, getWorkspace, getWorkspaceUrl } from "@/lib/workspace";
 import { getEmailClient, htmlToText } from "@/lib/email";
+import { couponBookAccessWhere } from "@/lib/coupon-book";
 import { escapeHtml } from "@/lib/html";
 
 export interface DigestDeal {
@@ -261,7 +262,7 @@ export async function sendWeeklyDigest(
   }
 
   const buyers = await basePrisma.couponBookPurchase.findMany({
-    where: { workspaceId, active: true, digestOptOut: false },
+    where: { workspaceId, active: true, digestOptOut: false, ...couponBookAccessWhere() },
     select: { email: true, magicToken: true },
   });
   // One email per buyer even if duplicate purchase rows ever exist for the

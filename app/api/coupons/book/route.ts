@@ -5,6 +5,7 @@ import QRCode from "qrcode";
 import { getPublishedDigestData } from "@/lib/deals/digest";
 import { getGasPrices } from "@/lib/deals/gas";
 import { intervalStart, isRefreshInterval } from "@/lib/coupons/intervals";
+import { couponBookPurchaseHasAccess } from "@/lib/coupon-book";
 import { ensureSeedMinis } from "@/lib/minis";
 
 export const dynamic = "force-dynamic";
@@ -17,10 +18,82 @@ export async function GET(req: NextRequest) {
 
   const workspace = await getWorkspace();
   await ensureSeedMinis(workspace.id, workspace.slug);
-  let purchase = await basePrisma.couponBookPurchase.findFirst({
+  const purchaseSelect = {
+    id: true,
+    email: true,
+    buyerToken: true,
+    createdAt: true,
+    isLifetime: true,
+    accessUntil: true,
+    subscriptionStatus: true,
+    cancelAtPeriodEnd: true,
+    stripeSubscriptionId: true,
+  } as const;
+  type PurchaseRow = {
+    id: string;
+    email: string;
+    buyerToken: string;
+    createdAt: Date;
+    isLifetime: boolean;
+    accessUntil: Date | null;
+    subscriptionStatus: string | null;
+    cancelAtPeriodEnd: boolean;
+    stripeSubscriptionId: string | null;
+  };
+
+  // The stripped portal: owned guides, no book content. Guide-only owners
+  // land here normally; a LAPSED annual owner lands here too, flagged
+  // expired so the page offers renewal (not the Mini upgrade: their way
+  // back is the plain $15/year renewal).
+  async function strippedResponse(email: string, lapsed: PurchaseRow | null) {
+    const owned = await basePrisma.miniPurchase.findMany({
+      where: { workspaceId: workspace.id, email },
+      include: { mini: true },
+    });
+    const seen = new Map<string, { id: string; slug: string; title: string; question: string; content: unknown }>();
+    for (const row of owned) {
+      if (row.mini.active) {
+        seen.set(row.mini.id, {
+          id: row.mini.id,
+          slug: row.mini.slug,
+          title: row.mini.title,
+          question: row.mini.question,
+          content: row.mini.content,
+        });
+      }
+    }
+    const minis = Array.from(seen.values());
+    return NextResponse.json({
+      email,
+      dealsLogoUrl: workspace.dealsLogoUrl,
+      dealsEmailHeaderUrl: workspace.dealsEmailHeaderUrl,
+      coupons: [],
+      deals: { topPicks: [], retailers: [], weekLabel: "" },
+      minis,
+      access: {
+        hasDeals: false,
+        ownedMiniSlugs: minis.map((m) => m.slug),
+        upgradePriceCents: lapsed ? null : 1000,
+        ...(lapsed
+          ? {
+              expired: true,
+              accessUntil: lapsed.accessUntil ? lapsed.accessUntil.toISOString() : null,
+            }
+          : {}),
+      },
+    });
+  }
+
+  const tokenPurchase = await basePrisma.couponBookPurchase.findFirst({
     where: { workspaceId: workspace.id, magicToken: token, active: true },
-    select: { id: true, email: true, buyerToken: true, createdAt: true },
+    select: purchaseSelect,
   });
+  // Access rule: lifetime OR paid-through date in the future. A lapsed
+  // annual row keeps its token valid for the stripped portal + renewal.
+  let purchase: PurchaseRow | null =
+    tokenPurchase && couponBookPurchaseHasAccess(tokenPurchase) ? tokenPurchase : null;
+  let lapsedPurchase: PurchaseRow | null =
+    tokenPurchase && !couponBookPurchaseHasAccess(tokenPurchase) ? tokenPurchase : null;
   if (!purchase) {
     // Guide-only owners have no Deals purchase; their MiniPurchase token
     // opens the stripped portal (owned guides + upgrade card) instead.
@@ -28,42 +101,22 @@ export async function GET(req: NextRequest) {
       where: { workspaceId: workspace.id, magicToken: token },
       select: { email: true },
     });
-    if (!miniTokenRow) return NextResponse.json({ error: "Invalid or expired link." }, { status: 404 });
-    purchase = await basePrisma.couponBookPurchase.findFirst({
+    if (!miniTokenRow) {
+      if (lapsedPurchase) return strippedResponse(lapsedPurchase.email, lapsedPurchase);
+      return NextResponse.json({ error: "Invalid or expired link." }, { status: 404 });
+    }
+    const byEmail = await basePrisma.couponBookPurchase.findFirst({
       where: { workspaceId: workspace.id, email: miniTokenRow.email, active: true },
-      select: { id: true, email: true, buyerToken: true, createdAt: true },
+      select: purchaseSelect,
     });
-    if (!purchase) {
-      const owned = await basePrisma.miniPurchase.findMany({
-        where: { workspaceId: workspace.id, email: miniTokenRow.email },
-        include: { mini: true },
-      });
-      const seen = new Map<string, { id: string; slug: string; title: string; question: string; content: unknown }>();
-      for (const row of owned) {
-        if (row.mini.active) {
-          seen.set(row.mini.id, {
-            id: row.mini.id,
-            slug: row.mini.slug,
-            title: row.mini.title,
-            question: row.mini.question,
-            content: row.mini.content,
-          });
-        }
-      }
-      const minis = Array.from(seen.values());
-      return NextResponse.json({
-        email: miniTokenRow.email,
-        dealsLogoUrl: workspace.dealsLogoUrl,
-        dealsEmailHeaderUrl: workspace.dealsEmailHeaderUrl,
-        coupons: [],
-        deals: { topPicks: [], retailers: [], weekLabel: "" },
-        minis,
-        access: {
-          hasDeals: false,
-          ownedMiniSlugs: minis.map((m) => m.slug),
-          upgradePriceCents: 1000,
-        },
-      });
+    if (byEmail && couponBookPurchaseHasAccess(byEmail)) {
+      purchase = byEmail;
+    } else {
+      if (byEmail && !lapsedPurchase) lapsedPurchase = byEmail;
+      return strippedResponse(
+        miniTokenRow.email,
+        lapsedPurchase && lapsedPurchase.email === miniTokenRow.email ? lapsedPurchase : null,
+      );
     }
   }
 
@@ -153,6 +206,16 @@ export async function GET(req: NextRequest) {
       hasDeals: true,
       ownedMiniSlugs: allMinis.map((m) => m.slug),
       upgradePriceCents: null,
+    },
+    // Plan state for the portal's subscription card: lifetime rows are
+    // grandfathered (nothing to manage); annual rows show their
+    // paid-through date, and Stripe-backed ones can cancel/resume.
+    subscription: {
+      isLifetime: purchase.isLifetime,
+      status: purchase.subscriptionStatus,
+      accessUntil: purchase.accessUntil ? purchase.accessUntil.toISOString() : null,
+      cancelAtPeriodEnd: purchase.cancelAtPeriodEnd,
+      managed: !!purchase.stripeSubscriptionId,
     },
     referrals: {
       rakuten: settings["deals_referral_rakuten"] || "",

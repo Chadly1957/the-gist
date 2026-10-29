@@ -5,7 +5,7 @@ import { WorkspaceAnchor } from "@/components/workspace/WorkspaceLink";
 
 // Post-signup one-time offer for The Gist Deals book.
 // Shown in the signup success state. The offer is simple on purpose: the
-// book, $15 once, backed by the One-Deal Promise. No bundles, no bonus
+// book, $15 a year, backed by the One-Deal Promise. No bundles, no bonus
 // stack, no manufactured urgency.
 export default function DealsOto({
   area,
@@ -55,7 +55,7 @@ export default function DealsOto({
       </ul>
 
       <p className="text-sm text-gray-600 mb-1">
-        <strong className="text-gray-900 text-base">$15 once, yours for life.</strong>{" "}
+        <strong className="text-gray-900 text-base">$15 a year.</strong>{" "}
         One grocery run usually covers it.
       </p>
       <p className="text-[13px] text-gray-500 mb-4">
@@ -79,13 +79,13 @@ export default function DealsOto({
         href={href}
         className="flex items-center justify-center gap-2 w-full bg-green-700 hover:bg-green-800 text-white font-bold px-5 py-3.5 rounded-xl text-[15px] transition-colors mb-2"
       >
-        Get the Book, $15 once
+        Get the Book, $15 a year
         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3" />
         </svg>
       </WorkspaceAnchor>
       <p className="text-xs text-gray-400 text-center mb-4">
-        One-time payment. No subscription. You only see this offer right after
+        Renews yearly. Cancel anytime. You only see this offer right after
         joining.
       </p>
 

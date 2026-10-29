@@ -254,7 +254,8 @@ function MiniPageInner({ slug }: { slug: string }) {
                         <p className="font-bold text-sm text-stone-900">Already have a guide?</p>
                         <p className="text-sm text-gray-600 mt-1">
                           Upgrade to the full Deals book instead, every coupon, every weekly
-                          deal, and every future guide, for {cents(upgradePriceCents)} one time.
+                          deal, and every future guide, for {cents(upgradePriceCents)} for your
+                          first year, then $15 a year.
                         </p>
                         <button
                           type="button"

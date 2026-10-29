@@ -2,6 +2,7 @@ import { getWorkspace } from "@/lib/workspace";
 import { NextRequest, NextResponse } from "next/server";
 import { basePrisma } from "@/lib/db-base";
 import { sendCouponBookMagicLinkEmail } from "@/lib/coupon-book-email";
+import { couponBookAccessWhere } from "@/lib/coupon-book";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +17,7 @@ export async function POST(req: NextRequest) {
 
   const workspace = await getWorkspace();
   const purchase = await basePrisma.couponBookPurchase.findFirst({
-    where: { workspaceId: workspace.id, email: normalized, active: true },
+    where: { workspaceId: workspace.id, email: normalized, active: true, ...couponBookAccessWhere() },
     orderBy: { createdAt: "desc" },
   });
 

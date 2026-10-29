@@ -8,10 +8,11 @@ import {
 
 export const dynamic = "force-dynamic";
 
-// Start Stripe Checkout for a GIFTED coupon book. The buyer pays (their email
-// goes on the Stripe receipt); the recipient's email lands in metadata.email
-// so the webhook creates the purchase row for the recipient and sends them
-// the gift email.
+// Start Stripe Checkout for a GIFTED coupon book. The buyer pays once
+// (their email goes on the Stripe receipt) for the recipient's first year;
+// the recipient's email lands in metadata.email so the webhook creates the
+// purchase row for the recipient and sends them the gift email. After the
+// prepaid year, the recipient renews or lapses like any annual owner.
 export async function POST(req: NextRequest) {
   const { recipientEmail, buyerEmail, gifterName, giftMessage } = await req.json();
   const normalizedRecipient = recipientEmail?.trim().toLowerCase();
@@ -47,8 +48,8 @@ export async function POST(req: NextRequest) {
             currency: "usd",
             unit_amount: amountCents,
             product_data: {
-              name: `${workspace.name} Coupon Book (Gift)`,
-              description: `One-time gift purchase — theirs for life`,
+              name: `${workspace.name} Deals Book (Gift)`,
+              description: `One year of the Deals Book, prepaid as a gift`,
             },
           },
           quantity: 1,

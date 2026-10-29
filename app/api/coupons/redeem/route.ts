@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { basePrisma } from "@/lib/db-base";
 import { sendCouponRedemptionEmail } from "@/lib/coupon-book-email";
+import { couponBookPurchaseHasAccess } from "@/lib/coupon-book";
 import { intervalStart, isRefreshInterval, refreshesLabel } from "@/lib/coupons/intervals";
 
 export const dynamic = "force-dynamic";
@@ -17,9 +18,9 @@ export async function POST(req: NextRequest) {
 
   const purchase = await basePrisma.couponBookPurchase.findUnique({
     where: { buyerToken },
-    select: { id: true, workspaceId: true, email: true, active: true },
+    select: { id: true, workspaceId: true, email: true, active: true, isLifetime: true, accessUntil: true },
   });
-  if (!purchase || !purchase.active) {
+  if (!purchase || !purchase.active || !couponBookPurchaseHasAccess(purchase)) {
     return NextResponse.json({ error: "This Gist Deals Book isn't valid." }, { status: 404 });
   }
 
