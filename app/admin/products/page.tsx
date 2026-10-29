@@ -16,6 +16,7 @@ interface Product {
   fulfillmentNote: string | null;
   quantity: number | null;
   requiresShipping: boolean;
+  offersSizes: boolean;
   stripePaymentLinkId: string | null;
   status: string;
   paidCount?: number;
@@ -33,6 +34,7 @@ const EMPTY_FORM = {
   fulfillmentNote: "",
   quantity: "",
   requiresShipping: true,
+  offersSizes: false,
   stripePaymentLinkId: "",
   status: "draft",
 };
@@ -43,6 +45,7 @@ interface ProductOrder {
   amountCents: number;
   paidAt: string | null;
   fulfilledAt: string | null;
+  size: string | null;
   shippingName: string | null;
   shippingLine1: string | null;
   shippingLine2: string | null;
@@ -153,6 +156,7 @@ export default function ProductsPage() {
       fulfillmentNote: p.fulfillmentNote || "",
       quantity: p.quantity === null || p.quantity === undefined ? "" : String(p.quantity),
       requiresShipping: p.requiresShipping !== false,
+      offersSizes: p.offersSizes === true,
       stripePaymentLinkId: p.stripePaymentLinkId || "",
       status: p.status,
     });
@@ -177,6 +181,7 @@ export default function ProductsPage() {
       fulfillmentNote: form.fulfillmentNote,
       quantity: form.quantity === "" ? null : Math.floor(Number(form.quantity)),
       requiresShipping: form.requiresShipping,
+      offersSizes: form.offersSizes,
       stripePaymentLinkId: form.stripePaymentLinkId.trim() || null,
       status: form.status,
     };
@@ -305,6 +310,13 @@ export default function ProductsPage() {
                 <span className="block text-xs text-gray-400">On for physical products: checkout requires the buyer's shipping name and address, and it is saved on the order for fulfillment. Turn off for digital products.</span>
               </span>
             </label>
+            <label className="flex items-start gap-2 md:col-span-2">
+              <input type="checkbox" checked={form.offersSizes} onChange={(e) => setForm({ ...form, offersSizes: e.target.checked })} className="mt-1" />
+              <span>
+                <span className="text-sm font-medium">Offer size selection</span>
+                <span className="block text-xs text-gray-400">On for apparel: buyers must pick a size (XS, S, M, L, XL, 2XL, 3XL) before checkout, and the size is saved on the order so you know what to print or pack.</span>
+              </span>
+            </label>
             <label className="block md:col-span-2">
               <span className="text-sm font-medium">Legacy Stripe Payment Link ID (optional)</span>
               <input value={form.stripePaymentLinkId} onChange={(e) => setForm({ ...form, stripePaymentLinkId: e.target.value })} className="mt-1 w-full border rounded-lg px-3 py-2" placeholder="plink_..." />
@@ -404,6 +416,7 @@ export default function ProductsPage() {
                           <div className="text-gray-500">
                             {money(o.amountCents)}
                             {o.paidAt && <> · {new Date(o.paidAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</>}
+                            {o.size && <> · Size <span className="font-semibold text-gray-800">{o.size}</span></>}
                           </div>
                           <div className="mt-1">
                             {o.fulfilledAt ? (

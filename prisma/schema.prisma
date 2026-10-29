@@ -662,6 +662,7 @@ model Product {
   fulfillmentNote String?        // e.g. "Pre-order: ships when the run prints"
   quantity        Int?           // total available; null = unlimited. Sold out when paid orders reach it
   requiresShipping Boolean       @default(true) // physical products collect a shipping address at checkout; digital ones do not
+  offersSizes     Boolean        @default(false) // when true, buyers must pick an apparel size (fixed set in lib/product-sizes.ts) before checkout
   stripePaymentLinkId String?    // legacy Stripe Payment Link (plink_...) whose sales file under this product
   status          String         @default("draft") // draft | active | archived
   createdAt       DateTime       @default(now())
@@ -699,6 +700,10 @@ model ProductOrder {
   shippingState      String?
   shippingPostalCode String?
   shippingCountry    String?
+  // Apparel size the buyer picked at checkout, when the product offers
+  // size selection (fixed set in lib/product-sizes.ts). Null for products
+  // without sizes and for orders placed before sizes existed.
+  size               String?
 
   @@unique([id, workspaceId])
   @@index([productId])

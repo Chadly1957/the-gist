@@ -4,6 +4,7 @@ import { withWorkspace } from "@/lib/workspace";
 import Stripe from "stripe";
 import { alertBookingFailureOnce } from "@/lib/sponsor-booking-alerts";
 import { recordPaidProductOrder, shippingFromSession } from "@/lib/products";
+import { isProductSize } from "@/lib/product-sizes";
 
 export const dynamic = "force-dynamic";
 
@@ -182,21 +183,27 @@ async function fulfillProductOrder(workspaceId: string, session: Stripe.Checkout
   // Shipping address collected at checkout (physical products); null for
   // digital products or sessions that collected none.
   const shipping = shippingFromSession(session);
+  // Apparel size from the checkout session metadata, when the product
+  // offered sizes. The pending order row normally already carries it (the
+  // checkout route stored it); this is the backfill for a missing row.
+  const rawSize = session.metadata?.size;
+  const sizeFromMeta = isProductSize(rawSize) ? rawSize : null;
   const existing = await basePrisma.productOrder.findUnique({
     where: { stripeSessionId: session.id },
-    select: { id: true, status: true },
+    select: { id: true, status: true, size: true },
   });
   if (existing) {
+    const sizeFill: { size?: string } = !existing.size && sizeFromMeta ? { size: sizeFromMeta } : {};
     if (existing.status !== "paid") {
       await basePrisma.productOrder.update({
         where: { id: existing.id },
-        data: { status: "paid", paidAt, ...(shipping ?? {}) },
+        data: { status: "paid", paidAt, ...(shipping ?? {}), ...sizeFill },
       });
-    } else if (shipping) {
-      // Redelivery after the flip: backfill the address if it is missing.
+    } else if (shipping || sizeFill.size) {
+      // Redelivery after the flip: backfill the address or size if missing.
       await basePrisma.productOrder.update({
         where: { id: existing.id },
-        data: { ...shipping },
+        data: { ...(shipping ?? {}), ...sizeFill },
       });
     }
     return;
@@ -217,6 +224,7 @@ async function fulfillProductOrder(workspaceId: string, session: Stripe.Checkout
       status: "paid",
       paidAt,
       ...(shipping ?? {}),
+      ...(sizeFromMeta ? { size: sizeFromMeta } : {}),
     },
   });
 }

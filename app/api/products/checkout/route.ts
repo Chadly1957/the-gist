@@ -1,15 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getWorkspace, getWorkspaceUrl } from "@/lib/workspace";
 import { prisma } from "@/lib/db";
+import { isProductSize } from "@/lib/product-sizes";
 import Stripe from "stripe";
 
 export const dynamic = "force-dynamic";
 
-// POST /api/products/checkout { productId, email }
+// POST /api/products/checkout { productId, email, size? }
 // Creates a pending ProductOrder, then a Stripe Checkout session. The
 // webhook marks the order paid on checkout.session.completed.
 export async function POST(req: NextRequest) {
-  const { productId, email } = await req.json().catch(() => ({}));
+  const { productId, email, size } = await req.json().catch(() => ({}));
   const normalizedEmail = typeof email === "string" ? email.trim().toLowerCase() : "";
   if (!normalizedEmail || !normalizedEmail.includes("@")) {
     return NextResponse.json({ error: "A valid email is required." }, { status: 400 });
@@ -20,7 +21,7 @@ export async function POST(req: NextRequest) {
 
   const product = await prisma.product.findFirst({
     where: { id: productId, status: "active" },
-    select: { id: true, name: true, slug: true, priceCents: true, imageUrl: true, quantity: true, requiresShipping: true },
+    select: { id: true, name: true, slug: true, priceCents: true, imageUrl: true, quantity: true, requiresShipping: true, offersSizes: true },
   });
   if (!product) return NextResponse.json({ error: "Product not found." }, { status: 404 });
 
@@ -35,12 +36,24 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // Size selection: a product that offers sizes requires one of the fixed
+  // apparel sizes, validated here so checkout can never start without one
+  // (or with a bogus one), whatever the client sent. Products without
+  // sizes ignore the field entirely.
+  let orderSize: string | null = null;
+  if (product.offersSizes) {
+    if (!isProductSize(size)) {
+      return NextResponse.json({ error: "Please choose a size." }, { status: 400 });
+    }
+    orderSize = size;
+  }
+
   const workspace = await getWorkspace();
   const appUrl = await getWorkspaceUrl();
   const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
   const order = await prisma.productOrder.create({
-    data: { productId: product.id, email: normalizedEmail, amountCents: product.priceCents, status: "pending_payment" },
+    data: { productId: product.id, email: normalizedEmail, amountCents: product.priceCents, status: "pending_payment", size: orderSize },
   });
 
   let session;
@@ -77,6 +90,9 @@ export async function POST(req: NextRequest) {
         productId: product.id,
         orderId: order.id,
         email: normalizedEmail,
+        // The webhook copies this onto the order if the pending row is
+        // ever missing; the row itself already carries the size.
+        ...(orderSize ? { size: orderSize } : {}),
       },
     });
   } catch (err) {

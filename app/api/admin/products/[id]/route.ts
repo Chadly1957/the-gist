@@ -51,6 +51,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     }
   }
   if (typeof body.requiresShipping === "boolean") data.requiresShipping = body.requiresShipping;
+  if (typeof body.offersSizes === "boolean") data.offersSizes = body.offersSizes;
   if (body.stripePaymentLinkId !== undefined) {
     data.stripePaymentLinkId = typeof body.stripePaymentLinkId === "string" && body.stripePaymentLinkId.trim() ? body.stripePaymentLinkId.trim() : null;
   }
