@@ -18,6 +18,10 @@ export type MiniBlock =
       whyItFits?: string;
       link?: string;
       dealRef?: string;
+      // Group label for the guide view's filter chips (e.g. "Splurge",
+      // "Rainy-Night Friendly"). Optional; untagged options always show
+      // under "All" and never get a chip of their own.
+      tag?: string;
     }
   | { type: "idea"; text: string }
   | { type: "tip"; text: string };
@@ -92,6 +96,7 @@ const DATE_NIGHT_CONTENT: MiniBlock[] = [
     description:
       "Pick a sit-down spot downtown, then walk the main strip while you decide on dessert.",
     whyItFits: "Easy to plan, easy to bail on if the night runs long.",
+    tag: "Casual",
   },
   {
     type: "option",
@@ -99,6 +104,7 @@ const DATE_NIGHT_CONTENT: MiniBlock[] = [
     description:
       "Keep it low-key: counter-service food, then wherever music is playing that night.",
     whyItFits: "Good when you want the night to feel fun without feeling formal.",
+    tag: "Late Night",
   },
   {
     type: "option",
@@ -106,6 +112,7 @@ const DATE_NIGHT_CONTENT: MiniBlock[] = [
     description:
       "Cook one thing together that feels a little special, then a movie you both actually pick.",
     whyItFits: "Cheapest option on the list, and sometimes the one you remember.",
+    tag: "Budget",
   },
   {
     type: "idea",
@@ -149,4 +156,62 @@ export async function ensureSeedMinis(
       active: true,
     },
   });
+}
+
+// --- Phase 2: admin editing helpers ---------------------------------------
+// Shared by the admin Mini create/update routes so the editor and the API
+// can never disagree about what a valid guide looks like. Sanitizes into
+// the exact MiniBlock shape Phase 1 renders; returns an error string for
+// anything an admin should fix rather than silently dropping content.
+export const MINI_SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+function cleanText(value: unknown, max: number): string {
+  return typeof value === "string" ? value.trim().slice(0, max) : "";
+}
+
+export function sanitizeMiniBlocks(input: unknown): { blocks?: MiniBlock[]; error?: string } {
+  if (!Array.isArray(input)) return { error: "Guide content must be a list of blocks." };
+  if (input.length > 60) return { error: "That guide has too many blocks (60 max)." };
+  const blocks: MiniBlock[] = [];
+  for (const raw of input) {
+    if (!raw || typeof raw !== "object") return { error: "Guide content has an invalid block." };
+    const b = raw as Record<string, unknown>;
+    if (b.type === "option") {
+      const name = cleanText(b.name, 120);
+      const description = cleanText(b.description, 600);
+      if (!name) return { error: "Every option needs a name." };
+      if (!description) return { error: `Option "${name}" needs a short description.` };
+      const block: Extract<MiniBlock, { type: "option" }> = { type: "option", name, description };
+      const whyItFits = cleanText(b.whyItFits, 300);
+      if (whyItFits) block.whyItFits = whyItFits;
+      const dealRef = cleanText(b.dealRef, 200);
+      if (dealRef) block.dealRef = dealRef;
+      const tag = cleanText(b.tag, 40);
+      if (tag) block.tag = tag;
+      const link = cleanText(b.link, 2048);
+      if (link) {
+        try {
+          const url = new URL(link);
+          if (url.protocol !== "https:" && url.protocol !== "http:") throw new Error("scheme");
+        } catch {
+          return { error: `Option "${name}" has a link that is not a valid http(s) URL.` };
+        }
+        block.link = link;
+      }
+      blocks.push(block);
+    } else if (b.type === "idea" || b.type === "tip") {
+      const text = cleanText(b.text, 400);
+      if (!text) return { error: `Every ${b.type} needs text.` };
+      blocks.push({ type: b.type, text });
+    } else {
+      return { error: "Guide content has a block of an unknown type." };
+    }
+  }
+  const optionCount = blocks.filter((b) => b.type === "option").length;
+  if (optionCount > 20) return { error: "A guide can have at most 20 options." };
+  return { blocks };
+}
+
+export function countMiniOptions(blocks: MiniBlock[]): number {
+  return blocks.filter((b) => b.type === "option").length;
 }

@@ -94,6 +94,7 @@ interface MiniGuideBlock {
   whyItFits?: string;
   link?: string;
   dealRef?: string;
+  tag?: string;
   text?: string;
 }
 
@@ -440,50 +441,135 @@ function MiniGuideSection({
   const options = guide.content.filter((b) => b.type === "option");
   const ideas = guide.content.filter((b) => b.type === "idea");
   const tips = guide.content.filter((b) => b.type === "tip");
+  // Options can carry one group tag each (Splurge, Casual, Budget, ...).
+  // When tags actually split the list, offer filter chips in the mockup
+  // pattern: All + one chip per distinct tag, filtering the cards in place
+  // so readers can take one group at face value or mix and match.
+  const [activeTag, setActiveTag] = useState<string | null>(null);
+  const tags: string[] = [];
+  for (const o of options) {
+    const t = o.tag?.trim();
+    if (t && tags.indexOf(t) === -1) tags.push(t);
+  }
+  const showChips =
+    tags.length >= 2 || (tags.length === 1 && options.some((o) => !o.tag?.trim()));
+  const visibleOptions = activeTag
+    ? options.filter((o) => o.tag?.trim() === activeTag)
+    : options;
   return (
-    <section id={`guide-${guide.slug}`} className="mb-6 scroll-mt-6">
-      <h2 className="font-bold text-lg text-stone-900 mb-1 px-1">{guide.title}</h2>
-      <p className="text-sm text-gray-500 mb-3 px-1">{guide.question}</p>
-      <div className="space-y-4">
-        {options.map((o, i) => (
-          <div key={i} className="bg-white rounded-3xl border border-stone-100 shadow-sm p-5">
-            <p className="font-bold text-stone-900">{o.name}</p>
-            {o.description && <p className="text-gray-600 text-sm mt-1">{o.description}</p>}
-            {o.whyItFits && (
-              <p className="text-gray-600 text-sm mt-1">
-                <span className="font-semibold text-stone-900">Why it fits: </span>
-                {o.whyItFits}
-              </p>
-            )}
-            {o.dealRef && <p className="text-xs text-green-700 font-semibold mt-2">{o.dealRef}</p>}
-            {o.link && (
-              <a
-                href={o.link}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-block mt-3 text-xs font-semibold text-green-700 bg-green-50 hover:bg-green-100 rounded-full px-3 py-1"
-              >
-                View details
-              </a>
-            )}
+    <section id={`guide-${guide.slug}`} className="mb-8 scroll-mt-6">
+      <div className="px-1 mb-4">
+        <p className="text-xs font-bold uppercase tracking-widest text-green-700 mb-1">Guide</p>
+        <h2 className="font-extrabold text-2xl text-stone-900 tracking-tight">{guide.title}</h2>
+        <p className="text-sm text-gray-500 mt-1">{guide.question}</p>
+      </div>
+
+      {options.length > 0 && (
+        <>
+          <h3 className="font-bold text-stone-900 px-1 mb-2">
+            Options{" "}
+            <span className="text-sm font-semibold text-gray-400">({options.length})</span>
+          </h3>
+          {showChips && (
+            <div className="flex flex-wrap gap-2 px-1 mb-3">
+              {[null, ...tags].map((t) => {
+                const isActive = activeTag === t;
+                return (
+                  <button
+                    key={t ?? "all"}
+                    type="button"
+                    onClick={() => setActiveTag(t)}
+                    className={`text-xs font-semibold rounded-full px-3 py-1.5 border transition-colors ${
+                      isActive
+                        ? "bg-green-700 text-white border-green-700"
+                        : "bg-white text-stone-700 border-stone-200 hover:border-green-400"
+                    }`}
+                  >
+                    {t ?? "All"}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+          <div className="space-y-3 mb-5">
+            {visibleOptions.map((o, i) => (
+              <div key={i} className="bg-white rounded-3xl border border-stone-100 shadow-sm p-5">
+                <div className="flex items-start gap-3">
+                  <span className="flex-none w-7 h-7 rounded-full bg-green-700 text-white text-xs font-bold flex items-center justify-center mt-0.5">
+                    {i + 1}
+                  </span>
+                  <div className="min-w-0">
+                    {o.tag && (
+                      <p className="text-[11px] font-bold uppercase tracking-widest text-green-700 mb-1">
+                        {o.tag}
+                      </p>
+                    )}
+                    <p className="font-bold text-stone-900 leading-snug">{o.name}</p>
+                    {o.description && <p className="text-gray-600 text-sm mt-1">{o.description}</p>}
+                    {o.whyItFits && (
+                      <p className="text-sm mt-2 bg-green-50 border border-green-100 rounded-2xl px-3 py-2 text-green-900">
+                        <span className="font-semibold">Why it fits: </span>
+                        {o.whyItFits}
+                      </p>
+                    )}
+                    {o.dealRef && (
+                      <p className="inline-block text-xs text-green-800 font-semibold bg-green-100 rounded-full px-2.5 py-1 mt-2.5">
+                        {o.dealRef}
+                      </p>
+                    )}
+                    {o.link && (
+                      <div>
+                        <a
+                          href={o.link}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-block mt-3 text-xs font-semibold text-green-700 bg-green-50 hover:bg-green-100 rounded-full px-3 py-1.5"
+                        >
+                          View details
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
-        ))}
-        {ideas.length > 0 && (
-          <div className="bg-white rounded-3xl border border-stone-100 shadow-sm p-5">
-            <p className="font-bold text-stone-900 mb-2">Ideas</p>
-            <ul className="space-y-2">
+        </>
+      )}
+
+      {ideas.length > 0 && (
+        <>
+          <h3 className="font-bold text-stone-900 px-1 mb-2">
+            Ideas <span className="text-sm font-semibold text-gray-400">({ideas.length})</span>
+          </h3>
+          <div className="bg-white rounded-3xl border border-stone-100 shadow-sm p-5 mb-5">
+            <ul className="space-y-2.5">
               {ideas.map((d, i) => (
-                <li key={i} className="text-sm text-gray-700">• {d.text}</li>
+                <li key={i} className="flex gap-2.5 text-sm text-gray-700">
+                  <span className="flex-none w-1.5 h-1.5 rounded-full bg-green-600 mt-2" />
+                  <span>{d.text}</span>
+                </li>
               ))}
             </ul>
           </div>
-        )}
-        {tips.map((t, i) => (
-          <div key={i} className="bg-amber-50 border border-amber-100 rounded-3xl p-5">
-            <p className="text-sm text-amber-900">{t.text}</p>
+        </>
+      )}
+
+      {tips.length > 0 && (
+        <>
+          <h3 className="font-bold text-stone-900 px-1 mb-2">
+            Tips <span className="text-sm font-semibold text-gray-400">({tips.length})</span>
+          </h3>
+          <div className="space-y-2.5">
+            {tips.map((t, i) => (
+              <div key={i} className="bg-amber-50 border border-amber-100 rounded-3xl px-5 py-4">
+                <p className="text-sm text-amber-900">{t.text}</p>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
+        </>
+      )}
+
       {showUpgrade && (
         <div className="mt-4">
           <UpgradeCard email={email} priceCents={upgradePriceCents} />
@@ -496,6 +582,10 @@ function MiniGuideSection({
 function DealsPageInner() {
   const searchParams = useSearchParams();
   const token = searchParams.get("token");
+  // Admin owner-view preview: set by the "View in portal (owner view)" link
+  // in /admin/minis. The value is a guide slug to scroll to. It unlocks
+  // nothing by itself; see the preview effect below.
+  const previewParam = searchParams.get("preview");
   // Attribution: which signup touchpoint sent this buyer (thank-you page vs
   // welcome email). Passed through to Stripe metadata at checkout.
   const srcParam = searchParams.get("src");
@@ -512,6 +602,7 @@ function DealsPageInner() {
   const [linkSent, setLinkSent] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [preview, setPreview] = useState<OutboundLink | null>(null);
+  const [adminPreview, setAdminPreview] = useState<"idle" | "loading" | "ok" | "failed">("idle");
 
   const priceCents = COUPON_BOOK_PRICE_CENTS;
 
@@ -525,6 +616,29 @@ function DealsPageInner() {
       })
       .catch((e) => setBookError(e instanceof Error ? e.message : "Could not open your book."));
   }, [token]);
+
+  // Admin owner-view preview: ask the admin-session-gated preview endpoint
+  // for the owner payload. A non-admin gets a 401, adminPreview lands on
+  // "failed", and the page falls through to the normal buy view, exactly as
+  // if the parameter were not there.
+  useEffect(() => {
+    if (token || !previewParam) return;
+    setAdminPreview("loading");
+    workspaceFetch(`/api/admin/minis/preview?guide=${encodeURIComponent(previewParam)}`)
+      .then(async (r) => {
+        if (!r.ok) throw new Error("not an admin");
+        const data = await r.json();
+        setBook(data);
+        setAdminPreview("ok");
+      })
+      .catch(() => setAdminPreview("failed"));
+  }, [token, previewParam]);
+
+  // Land on the guide the admin clicked, once its section has rendered.
+  useEffect(() => {
+    if (adminPreview !== "ok" || !previewParam) return;
+    document.getElementById(`guide-${previewParam}`)?.scrollIntoView({ block: "start" });
+  }, [adminPreview, previewParam]);
 
   async function buy() {
     setBuying(true);
@@ -561,8 +675,15 @@ function DealsPageInner() {
     }
   }
 
+  // Admin owner-view preview in flight: show the same loading screen as the
+  // token flow instead of flashing the buy view. A failed preview request
+  // (not an admin session) falls through to the normal buy view below.
+  if (!token && previewParam && adminPreview !== "ok" && adminPreview !== "failed") {
+    return <div className="min-h-screen flex items-center justify-center"><p className="text-gray-500">Opening your book…</p></div>;
+  }
+
   // Logged-in book view: Local Member Wallet.
-  if (token) {
+  if (token || adminPreview === "ok") {
     if (bookError) {
       return (
         <div className="min-h-screen flex items-center justify-center p-6">
@@ -588,6 +709,15 @@ function DealsPageInner() {
         <SiteHeader />
         <div className="min-h-screen bg-[#faf8f4] p-4 pb-10">
           <div className="max-w-2xl mx-auto">
+            {adminPreview === "ok" && (
+              <div className="bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 mb-4">
+                <p className="text-sm text-amber-900">
+                  <strong>Admin preview.</strong> This is the owner view of the portal, with full
+                  guide content. Per-buyer details (buyer email, coupon QR codes) are not part of
+                  a preview.
+                </p>
+              </div>
+            )}
             {/* Header */}
             <div className="bg-white rounded-3xl p-6 mb-4 text-center shadow-sm border border-stone-100">
               {book.dealsEmailHeaderUrl ? (
@@ -598,7 +728,7 @@ function DealsPageInner() {
                 <img src={book.dealsLogoUrl} alt="The Gist Deals" className="mx-auto h-16 w-auto mb-3" />
               ) : null}
               <h1 className="text-2xl font-bold text-stone-900">{isDealsOwner ? "My Gist Deals Book" : "My Guides"}</h1>
-              <p className="text-stone-500 text-sm mt-1">{book.email}</p>
+              <p className="text-stone-500 text-sm mt-1">{adminPreview === "ok" ? "Admin preview · owner view" : book.email}</p>
             </div>
 
             {/* Guides index */}
