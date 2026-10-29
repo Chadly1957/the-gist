@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminSession } from "@/lib/auth";
-import { prisma } from "@/lib/db";
+import { basePrisma } from "@/lib/db-base";
+import { getWorkspace } from "@/lib/workspace";
 import { MINI_SLUG_RE, countMiniOptions, sanitizeMiniBlocks, type MiniBlock } from "@/lib/minis";
 
 export const dynamic = "force-dynamic";
@@ -10,7 +11,8 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   const session = await getAdminSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id } = await params;
-  const mini = await prisma.mini.findUnique({ where: { id } });
+  const workspace = await getWorkspace();
+  const mini = await basePrisma.mini.findFirst({ where: { id, workspaceId: workspace.id } });
   if (!mini) return NextResponse.json({ error: "Guide not found." }, { status: 404 });
   return NextResponse.json({ mini });
 }
@@ -23,7 +25,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const session = await getAdminSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id } = await params;
-  const existing = await prisma.mini.findUnique({ where: { id } });
+  const workspace = await getWorkspace();
+  const existing = await basePrisma.mini.findFirst({ where: { id, workspaceId: workspace.id } });
   if (!existing) return NextResponse.json({ error: "Guide not found." }, { status: 404 });
 
   const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
@@ -44,8 +47,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (!MINI_SLUG_RE.test(slug)) {
       return NextResponse.json({ error: "Slug must be lowercase letters, numbers, and hyphens." }, { status: 400 });
     }
-    const clash = await prisma.mini.findFirst({
-      where: { slug, NOT: { id } },
+    const clash = await basePrisma.mini.findFirst({
+      where: { workspaceId: workspace.id, slug, NOT: { id } },
       select: { id: true },
     });
     if (clash) return NextResponse.json({ error: "That slug is already used by another guide in this city." }, { status: 400 });
@@ -74,6 +77,6 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     );
   }
 
-  const mini = await prisma.mini.update({ where: { id }, data });
+  const mini = await basePrisma.mini.update({ where: { id }, data });
   return NextResponse.json({ ok: true, mini });
 }

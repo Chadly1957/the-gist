@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminSession } from "@/lib/auth";
-import { prisma } from "@/lib/db";
+import { basePrisma } from "@/lib/db-base";
+import { getWorkspace } from "@/lib/workspace";
 import {
   MINI_PRICE_CENTS,
   MINI_SLUG_RE,
@@ -59,14 +60,18 @@ function validateMiniBody(body: MiniBody): {
   };
 }
 
-// GET /api/admin/minis — list this workspace's Minis (the scoped prisma
-// client filters by the admin's current workspace), newest first, with
-// purchase counts.
+// GET /api/admin/minis — list this workspace's Minis, newest first, with
+// purchase counts. Uses basePrisma with an explicit workspaceId (the Phase
+// 1 pattern in lib/minis.ts): the Mini model's workspaceId has no schema
+// default, so the workspace-scoped client's create input will not compile
+// without it.
 export async function GET() {
   const session = await getAdminSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const minis = await prisma.mini.findMany({
+  const workspace = await getWorkspace();
+  const minis = await basePrisma.mini.findMany({
+    where: { workspaceId: workspace.id },
     orderBy: { createdAt: "desc" },
     include: { _count: { select: { purchases: true } } },
   });
@@ -85,15 +90,22 @@ export async function POST(req: NextRequest) {
   const { data, error } = validateMiniBody(body);
   if (error || !data) return NextResponse.json({ error }, { status: 400 });
 
+  const workspace = await getWorkspace();
   let slug = data.slug;
   const base = slug;
   let n = 2;
-  while (await prisma.mini.findFirst({ where: { slug }, select: { id: true } })) {
+  while (
+    await basePrisma.mini.findFirst({
+      where: { workspaceId: workspace.id, slug },
+      select: { id: true },
+    })
+  ) {
     slug = `${base}-${n++}`;
   }
 
-  const mini = await prisma.mini.create({
+  const mini = await basePrisma.mini.create({
     data: {
+      workspaceId: workspace.id,
       title: data.title,
       slug,
       question: data.question,
