@@ -6,6 +6,7 @@ import { workspaceFetch } from "@/lib/workspace-client";
 import Link from "@/components/workspace/WorkspaceLink";
 import SiteHeader from "@/components/SiteHeader";
 import AboutGist from "@/components/AboutGist";
+import { PRODUCT_SIZES } from "@/lib/product-sizes";
 
 interface Product {
   id: string;
@@ -18,6 +19,7 @@ interface Product {
   imageUrl: string | null;
   galleryUrls: string[];
   fulfillmentNote: string | null;
+  offersSizes: boolean;
   soldOut: boolean;
   remaining: number | null;
 }
@@ -32,6 +34,8 @@ export default function ProductPage() {
   const [notFound, setNotFound] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [email, setEmail] = useState("");
+  const [size, setSize] = useState("");
+  const [needsSize, setNeedsSize] = useState(false);
   const [buying, setBuying] = useState(false);
   const [error, setError] = useState("");
 
@@ -50,13 +54,20 @@ export default function ProductPage() {
   const buy = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!product) return;
+    // A product that offers sizes requires one before checkout can start:
+    // no silent default size.
+    if (product.offersSizes && !size) {
+      setNeedsSize(true);
+      setError("Please choose a size.");
+      return;
+    }
     setBuying(true);
     setError("");
     try {
       const res = await workspaceFetch("/api/products/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ productId: product.id, email }),
+        body: JSON.stringify({ productId: product.id, email, ...(product.offersSizes ? { size } : {}) }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Could not start checkout.");
@@ -141,6 +152,29 @@ export default function ProductPage() {
               </div>
             ) : (
               <form onSubmit={buy} className="mt-6 space-y-3">
+                {product.offersSizes && (
+                  <div>
+                    <span className="text-sm font-medium text-gray-700">Size</span>
+                    <div className="mt-1.5 flex flex-wrap gap-2">
+                      {PRODUCT_SIZES.map((s) => (
+                        <button
+                          key={s}
+                          type="button"
+                          aria-pressed={size === s}
+                          onClick={() => { setSize(s); setNeedsSize(false); setError(""); }}
+                          className={`min-w-[3.25rem] px-3 py-2.5 rounded-lg text-sm font-semibold bg-white ${
+                            size === s
+                              ? "border-2 border-gray-900 text-gray-900"
+                              : "border-2 border-gray-200 text-gray-700 hover:border-gray-400"
+                          }`}
+                        >
+                          {s}
+                        </button>
+                      ))}
+                    </div>
+                    {needsSize && <p className="mt-1.5 text-sm text-red-600">Please choose a size.</p>}
+                  </div>
+                )}
                 <label className="block">
                   <span className="text-sm font-medium text-gray-700">Email for your receipt</span>
                   <input required type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="mt-1 w-full border rounded-lg px-3 py-2.5" placeholder="you@example.com" />

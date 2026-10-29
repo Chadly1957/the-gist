@@ -24,6 +24,7 @@ interface ProductBody {
   fulfillmentNote?: string;
   quantity?: number | null;
   requiresShipping?: boolean;
+  offersSizes?: boolean;
   stripePaymentLinkId?: string | null;
   status?: string;
 }
@@ -98,6 +99,7 @@ export async function POST(req: NextRequest) {
       fulfillmentNote: body.fulfillmentNote?.trim() || null,
       quantity,
       requiresShipping: body.requiresShipping !== false,
+      offersSizes: body.offersSizes === true,
       stripePaymentLinkId: body.stripePaymentLinkId?.trim() || null,
       status,
     },

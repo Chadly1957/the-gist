@@ -20,6 +20,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ slu
       imageUrl: true,
       galleryUrls: true,
       fulfillmentNote: true,
+      offersSizes: true,
       quantity: true,
     },
   });
