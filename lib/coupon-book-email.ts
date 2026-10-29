@@ -98,7 +98,8 @@ export async function sendCouponBookGiftEmail(opts: {
       <h2 style="color: #111827; margin: 0 0 12px;">You got a gift!</h2>
       <p style="color: #4b5563; font-size: 14px; line-height: 1.5;">
         <strong>${escapeHtml(fromLabel)}</strong> bought you the Gist Deals Book, every deal worth
-        knowing about, in one little book on your phone. One-time gift, yours for life, no subscription.
+        knowing about, in one little book on your phone. It covers your first year of the book, on
+        them. When the year is up, you can renew for $15 a year or let it lapse, your call.
       </p>
       ${opts.giftMessage ? `<div style="background: #f9fafb; border-left: 3px solid #24726f; padding: 12px 16px; margin: 16px 0;"><p style="color: #4b5563; font-size: 14px; font-style: italic; margin: 0;">&ldquo;${escapeHtml(opts.giftMessage)}&rdquo;</p></div>` : ""}
       <p style="margin: 24px 0;">

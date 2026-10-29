@@ -7,12 +7,55 @@ import {
   UPGRADE_PRICE_CENTS,
   getMiniAccessProfile,
 } from "@/lib/minis";
+import { COUPON_BOOK_PRICE_CENTS } from "@/lib/coupon-book";
 
 export const dynamic = "force-dynamic";
 
-// Start Stripe Checkout for the flat $10 upgrade to the full Deals book
-// (Option B: flat $5 off, no stacking). Eligibility is enforced here, not
-// just in the UI: only Mini owners without Deals may upgrade.
+// The $5 guide credit is a reusable $5-off-once Stripe coupon, created once
+// per workspace and remembered in Settings. Applied to the upgrade's
+// subscription checkout, it takes the first year from $15 to $10; renewals
+// bill the full $15 because the coupon's duration is "once".
+const CREDIT_COUPON_SETTING_KEY = "deals_upgrade_credit_coupon_id";
+const CREDIT_CENTS = COUPON_BOOK_PRICE_CENTS - UPGRADE_PRICE_CENTS; // $5
+
+async function getCreditCouponId(stripe: Stripe, workspaceId: string): Promise<string> {
+  const row = await basePrisma.setting.findFirst({
+    where: { workspaceId, key: CREDIT_COUPON_SETTING_KEY },
+    select: { id: true, value: true },
+  });
+  if (row?.value) {
+    try {
+      const existing = (await stripe.coupons.retrieve(row.value)) as Stripe.Coupon & {
+        deleted?: boolean;
+      };
+      if (!existing.deleted && existing.valid) return existing.id;
+    } catch {
+      // Stored coupon is gone or unreadable; recreate it below.
+    }
+  }
+  const coupon = await stripe.coupons.create({
+    amount_off: CREDIT_CENTS,
+    currency: "usd",
+    duration: "once",
+    name: "Guide upgrade credit",
+    metadata: { workspaceId, purpose: "mini_upgrade_credit" },
+  });
+  if (row) {
+    await basePrisma.setting.update({ where: { id: row.id }, data: { value: coupon.id } });
+  } else {
+    await basePrisma.setting.create({
+      data: { workspaceId, key: CREDIT_COUPON_SETTING_KEY, value: coupon.id },
+    });
+  }
+  return coupon.id;
+}
+
+// Start Stripe Checkout for the upgrade to the full Deals book (Option B:
+// flat $5 off, no stacking). Since the annual switch (2026-10-29) the
+// upgrade is a $15/year subscription with the $5 guide credit applied to
+// year one, so the buyer pays $10 for the first year, then $15/year.
+// Eligibility is enforced here, not just in the UI: only Mini owners
+// without Deals may upgrade.
 export async function POST(req: NextRequest) {
   const { email } = await req.json();
   const normalizedEmail = email?.trim().toLowerCase();
@@ -50,23 +93,27 @@ export async function POST(req: NextRequest) {
 
   let session;
   try {
+    const couponId = await getCreditCouponId(stripe, workspace.id);
     session = await stripe.checkout.sessions.create({
-      mode: "payment",
+      mode: "subscription",
       payment_method_types: ["card"],
       expires_at: Math.floor(Date.now() / 1000) + 60 * 60, // 1 hour
       line_items: [
         {
           price_data: {
             currency: "usd",
-            unit_amount: UPGRADE_PRICE_CENTS,
+            unit_amount: COUPON_BOOK_PRICE_CENTS,
+            recurring: { interval: "year" },
             product_data: {
-              name: `${workspace.name} Gist Deals Book`,
-              description: "One-time upgrade to the full book",
+              name: `${workspace.name} Deals Book`,
+              description:
+                "Full Deals book — $10 for your first year (your $5 guide credit applied), then $15 a year",
             },
           },
           quantity: 1,
         },
       ],
+      discounts: [{ coupon: couponId }],
       customer_email: normalizedEmail,
       success_url: `${appUrl}/deals/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: latestMini
@@ -77,6 +124,13 @@ export async function POST(req: NextRequest) {
         kind: MINI_UPGRADE_STRIPE_KIND,
         email: normalizedEmail,
         miniPurchaseIds: profile.ownedMiniIds.join(","),
+      },
+      subscription_data: {
+        metadata: {
+          workspaceId: workspace.id,
+          kind: MINI_UPGRADE_STRIPE_KIND,
+          email: normalizedEmail,
+        },
       },
     });
   } catch (err) {

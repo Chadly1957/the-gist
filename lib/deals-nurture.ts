@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { getEmailClient, htmlToText } from "@/lib/email";
 import { getWorkspace, getWorkspaceUrl } from "@/lib/workspace";
+import { couponBookAccessWhere } from "@/lib/coupon-book";
 import { escapeHtml } from "@/lib/html";
 
 // Post-signup Deals nurture sequence. New subscribers see the one-time offer
@@ -8,7 +9,7 @@ import { escapeHtml } from "@/lib/html";
 // sequence (2h / 24h / 72h / day 5). Stops when they buy the book, opt out of
 // deal reminders, or unsubscribe. Driven hourly by /api/cron/deals-nurture.
 //
-// The offer is deliberately simple: the book, $15 once, backed by the
+// The offer is deliberately simple: the book, $15 a year, backed by the
 // One-Deal Promise. No bundles, no bonus stack, no manufactured urgency.
 // Touch 3's urgency is real: it's the last email about the book.
 
@@ -95,8 +96,8 @@ function buildTouch(
         ${p(greeting)}
         ${p(`You joined <strong style="color: #111827;">${escapeHtml(opts.newsletterName)}</strong> a couple hours ago. Did you see the offer on the thank-you page?`)}
         ${p(`I built <strong style="color: #111827;">The Gist Deals</strong>: a digital book of real discounts from local ${escapeHtml(opts.area)} businesses, right on your phone. Weekly grocery deals, local coupons with QR codes, and the 10 best deals hand-picked every Monday.`)}
-        ${p(`It&apos;s <strong style="color: #111827;">$15 once, yours for life</strong>. One grocery run usually covers it.`)}
-        ${ctaHtml(opts.link, "Get the Book, $15 once")}
+        ${p(`It&apos;s <strong style="color: #111827;">$15 a year</strong>. One grocery run usually covers it.`)}
+        ${ctaHtml(opts.link, "Get the Book, $15 a year")}
         ${p(`You only see that offer right after you join, so I wanted to make sure you saw it.`)}
         ${sign}`),
     };
@@ -109,9 +110,9 @@ function buildTouch(
         ${p(greeting)}
         ${p(`Fair question. Here&apos;s how I think about it:`)}
         ${p(`The book has <strong style="color: #111827;">weekly grocery deals</strong> from stores like Aldi, Kroger, and Dollar General, <strong style="color: #111827;">real coupons from local ${escapeHtml(opts.area)} businesses</strong> you flash at checkout, and <strong style="color: #111827;">the 10 best deals</strong> hand-picked every Monday.`)}
-        ${p(`Use <strong style="color: #111827;">one</strong> grocery deal in a typical week and you&apos;ve covered the $15. Everything after that is money back in your pocket.`)}
+        ${p(`Use <strong style="color: #111827;">one</strong> grocery deal in a typical week and you&apos;ve covered the $15 for the year. Everything after that is money back in your pocket.`)}
         ${guaranteeHtml()}
-        ${ctaHtml(opts.link, "Get the Book, $15 once")}
+        ${ctaHtml(opts.link, "Get the Book, $15 a year")}
         ${sign}`),
     };
   }
@@ -122,8 +123,8 @@ function buildTouch(
       html: wrap(`
         ${p(greeting)}
         ${p(`This is the last email I&apos;ll send you about the Deals book. I don&apos;t want to be that guy.`)}
-        ${p(`If you want it, it&apos;s <strong style="color: #111827;">$15 once, yours for life</strong>, and the One-Deal Promise still applies: save $15 in 60 days or email me for a full refund.`)}
-        ${ctaHtml(opts.link, "Get the Book, $15 once")}
+        ${p(`If you want it, it&apos;s <strong style="color: #111827;">$15 a year</strong>, and the One-Deal Promise still applies: save $15 in 60 days or email me for a full refund.`)}
+        ${ctaHtml(opts.link, "Get the Book, $15 a year")}
         ${p(`Either way, the newsletter is free forever.`)}
         ${sign}`),
     };
@@ -243,9 +244,10 @@ export async function runDealsNurture(now = new Date()): Promise<NurtureRunResul
 
   for (const sub of subscribers) {
     result.checked++;
-    // Already bought the book -> never nurture.
+    // Already bought the book (and still has access) -> never nurture. A
+    // lapsed annual owner falls back into the nurture pool like any reader.
     const purchase = await prisma.couponBookPurchase.findFirst({
-      where: { email: sub.email, active: true },
+      where: { email: sub.email, active: true, ...couponBookAccessWhere() },
       select: { id: true },
     });
     if (purchase) {

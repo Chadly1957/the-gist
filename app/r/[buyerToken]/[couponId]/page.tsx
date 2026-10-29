@@ -1,4 +1,5 @@
 import { basePrisma } from "@/lib/db-base";
+import { couponBookPurchaseHasAccess } from "@/lib/coupon-book";
 import { intervalStart, isRefreshInterval } from "@/lib/coupons/intervals";
 import { notFound } from "next/navigation";
 import RedeemClient from "./RedeemClient";
@@ -15,9 +16,9 @@ export default async function RedeemPage({
 }) {
   const purchase = await basePrisma.couponBookPurchase.findUnique({
     where: { buyerToken: params.buyerToken },
-    select: { id: true, workspaceId: true, email: true, active: true },
+    select: { id: true, workspaceId: true, email: true, active: true, isLifetime: true, accessUntil: true },
   });
-  if (!purchase || !purchase.active) notFound();
+  if (!purchase || !purchase.active || !couponBookPurchaseHasAccess(purchase)) notFound();
 
   const ws = await basePrisma.workspace.findUnique({
     where: { id: purchase.workspaceId },

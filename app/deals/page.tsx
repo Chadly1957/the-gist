@@ -110,6 +110,18 @@ interface MiniAccess {
   hasDeals: boolean;
   ownedMiniSlugs: string[];
   upgradePriceCents: number | null;
+  // Set when an annual owner's paid-through date has passed: the portal
+  // renders the stripped shape plus a renewal card.
+  expired?: boolean;
+  accessUntil?: string | null;
+}
+
+interface BookSubscription {
+  isLifetime: boolean;
+  status: string | null;
+  accessUntil: string | null;
+  cancelAtPeriodEnd: boolean;
+  managed: boolean;
 }
 
 interface BookData {
@@ -130,6 +142,7 @@ interface BookData {
   };
   minis: MiniGuide[];
   access: MiniAccess;
+  subscription?: BookSubscription;
 }
 
 function cents(n: number) {
@@ -412,7 +425,8 @@ function UpgradeCard({ email, priceCents }: { email: string; priceCents: number 
       <p className="font-bold text-stone-900">Upgrade to the full Deals book</p>
       <p className="text-sm text-gray-600 mt-1">
         Get every coupon, every weekly deal, gas prices, and every future guide, for{" "}
-        {cents(priceCents)} one time. Your guide purchase already counts toward it.
+        {cents(priceCents)} for your first year, then $15 a year. Your guide purchase
+        already counts toward it.
       </p>
       <button
         type="button"
@@ -421,6 +435,131 @@ function UpgradeCard({ email, priceCents }: { email: string; priceCents: number 
         className="mt-3 bg-green-700 text-white font-semibold rounded-xl px-4 py-2 text-sm disabled:opacity-50"
       >
         {buying ? "Starting checkout…" : `Upgrade — ${cents(priceCents)}`}
+      </button>
+      {error && <p className="text-red-600 text-sm mt-2">{error}</p>}
+    </div>
+  );
+}
+
+function formatAccessDate(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return null;
+  return d.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+}
+
+// Plan status for Deals owners (annual billing, 2026-10-29). Lifetime rows
+// are grandfathered and just say so. Stripe-backed annual rows can cancel
+// or resume renewal right here; prepaid gift years show their end date.
+function SubscriptionCard({
+  subscription,
+  token,
+}: {
+  subscription: BookSubscription;
+  token: string | null;
+}) {
+  const [plan, setPlan] = useState(subscription);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const dateLabel = formatAccessDate(plan.accessUntil);
+
+  async function act(action: "cancel" | "resume") {
+    if (!token) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await workspaceFetch("/api/coupons/subscription", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token, action }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Something went wrong.");
+      setPlan((p) => ({
+        ...p,
+        cancelAtPeriodEnd: data.cancelAtPeriodEnd,
+        status: data.status ?? p.status,
+        accessUntil: data.accessUntil ?? p.accessUntil,
+      }));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Something went wrong.");
+    }
+    setBusy(false);
+  }
+
+  if (plan.isLifetime) {
+    return (
+      <div className="bg-white rounded-3xl border border-stone-100 shadow-sm p-5 mb-6">
+        <p className="font-bold text-stone-900">Lifetime access</p>
+        <p className="text-sm text-gray-600 mt-1">
+          You bought the book before it went annual, so it is yours for life.
+          Grandfathered, no renewals, nothing to manage.
+        </p>
+      </div>
+    );
+  }
+  return (
+    <div className="bg-white rounded-3xl border border-stone-100 shadow-sm p-5 mb-6">
+      <p className="font-bold text-stone-900">{plan.managed ? "Your annual plan" : "Your book year"}</p>
+      <p className="text-sm text-gray-600 mt-1">
+        {plan.managed
+          ? plan.cancelAtPeriodEnd
+            ? `Your plan ends${dateLabel ? ` ${dateLabel}` : ""}. You keep full access until then.`
+            : `Renews${dateLabel ? ` ${dateLabel}` : " yearly"} at $15 a year. New deals every Monday, every guide included.`
+          : `A gift covered your first year${dateLabel ? `, through ${dateLabel}` : ""}. When it ends you can renew here for $15 a year, or let it lapse.`}
+      </p>
+      {plan.managed && token && (
+        <button
+          type="button"
+          onClick={() => act(plan.cancelAtPeriodEnd ? "resume" : "cancel")}
+          disabled={busy}
+          className="mt-3 bg-white border border-stone-300 text-stone-800 font-semibold rounded-xl px-4 py-2 text-sm disabled:opacity-50"
+        >
+          {busy ? "Saving…" : plan.cancelAtPeriodEnd ? "Keep my book" : "Cancel renewal"}
+        </button>
+      )}
+      {error && <p className="text-red-600 text-sm mt-2">{error}</p>}
+    </div>
+  );
+}
+
+// Renewal card for a lapsed annual owner (book API returns the stripped
+// portal shape with access.expired set).
+function RenewCard({ email, accessUntil }: { email: string; accessUntil?: string | null }) {
+  const [buying, setBuying] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const dateLabel = formatAccessDate(accessUntil);
+  async function renew() {
+    setBuying(true);
+    setError(null);
+    try {
+      const res = await workspaceFetch("/api/coupons/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Checkout failed.");
+      window.location.href = data.url;
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Checkout failed.");
+      setBuying(false);
+    }
+  }
+  return (
+    <div className="bg-green-50 border border-green-100 rounded-3xl shadow-sm p-5">
+      <p className="font-bold text-stone-900">Your Deals year has ended</p>
+      <p className="text-sm text-gray-600 mt-1">
+        {dateLabel ? `Your access ran through ${dateLabel}. ` : ""}Renew for $15 a year
+        to get every deal, coupon, and guide back.
+      </p>
+      <button
+        type="button"
+        onClick={renew}
+        disabled={buying}
+        className="mt-3 bg-green-700 text-white font-semibold rounded-xl px-4 py-2 text-sm disabled:opacity-50"
+      >
+        {buying ? "Starting checkout…" : "Renew — $15 a year"}
       </button>
       {error && <p className="text-red-600 text-sm mt-2">{error}</p>}
     </div>
@@ -731,6 +870,21 @@ function DealsPageInner() {
               <p className="text-stone-500 text-sm mt-1">{adminPreview === "ok" ? "Admin preview · owner view" : book.email}</p>
             </div>
 
+            {/* Plan status (annual owners + grandfathered lifetime rows) */}
+            {isDealsOwner && book.subscription && (
+              <SubscriptionCard
+                subscription={book.subscription}
+                token={adminPreview === "ok" ? null : token}
+              />
+            )}
+
+            {/* Renewal card (lapsed annual owners) */}
+            {book.access.expired && (
+              <div className="mb-6">
+                <RenewCard email={book.email} accessUntil={book.access.accessUntil} />
+              </div>
+            )}
+
             {/* Guides index */}
             {book.minis.length > 0 && (
               <div className="bg-white rounded-3xl border border-stone-100 shadow-sm p-5 mb-6">
@@ -951,10 +1105,10 @@ function DealsPageInner() {
             href="#get-the-book"
             className="inline-block bg-green-700 text-white text-sm font-bold px-5 py-2.5 rounded-full"
           >
-            $15 once — yours for life
+            $15 a year — cancel anytime
           </a>
         </div>
-        <p className="text-xs text-gray-400 mt-2">No subscription. No renewals.</p>
+        <p className="text-xs text-gray-400 mt-2">New deals every Monday. Every guide included.</p>
       </div>
 
       {/* Preview */}
@@ -1003,7 +1157,7 @@ function DealsPageInner() {
         <h2 className="font-bold text-xl text-stone-900 text-center mb-5">How it works</h2>
         <ol className="space-y-3">
           {[
-            { n: "1", t: "Buy the book", d: "$15, one time. It never expires and never renews." },
+            { n: "1", t: "Buy the book", d: "$15 a year. New deals land every Monday, and every guide is included." },
             { n: "2", t: "Get your personal link", d: "We email it to you. It works on any phone, no app to install." },
             { n: "3", t: "Save money", d: "Tap a deal to shop it online, or show a QR code at a local business." },
           ].map((s) => (
@@ -1024,7 +1178,7 @@ function DealsPageInner() {
       <section id="get-the-book" className="max-w-md mx-auto px-4 pb-8 scroll-mt-6">
         <div className="bg-white rounded-3xl shadow-sm border border-stone-100 p-6">
           <h2 className="text-xl font-bold text-stone-900 mb-1">Get the Book</h2>
-          <p className="text-sm text-gray-500 mb-5">$15 once, yours for life.</p>
+          <p className="text-sm text-gray-500 mb-5">$15 a year. Renews yearly, cancel anytime.</p>
           {formError && <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg p-3 mb-4 text-sm">{formError}</div>}
           {linkSent && <div className="bg-green-50 border border-green-200 text-green-700 rounded-lg p-3 mb-4 text-sm">{linkSent}</div>}
           {emailFromLink ? (
@@ -1058,7 +1212,7 @@ function DealsPageInner() {
             disabled={buying || !email.includes("@")}
             className="w-full py-3 rounded-xl bg-green-700 text-white font-bold disabled:opacity-50 mb-3"
           >
-            {buying ? "Starting checkout…" : `Get the Book — ${cents(priceCents)}, yours for life`}
+            {buying ? "Starting checkout…" : `Get the Book — ${cents(priceCents)} a year`}
           </button>
           <div className="bg-green-50 border border-green-200 rounded-xl p-3.5 mb-3">
             <p className="text-[13px] font-bold text-green-900 mb-0.5">🛡️ The One-Deal Promise</p>

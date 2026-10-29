@@ -8,8 +8,10 @@ import {
 
 export const dynamic = "force-dynamic";
 
-// Start Stripe Checkout for a coupon book purchase. The webhook fulfills it
-// (creates the purchase row + emails the magic link) on checkout.session.completed.
+// Start Stripe Checkout for a coupon book purchase: a $15/year subscription
+// (annual billing since 2026-10-29; one-time buyers from before the switch
+// are lifetime and never see this flow). The webhook fulfills it (creates
+// the purchase row + emails the magic link) on checkout.session.completed.
 export async function POST(req: NextRequest) {
   const { email, src } = await req.json();
   const normalizedEmail = email?.trim().toLowerCase();
@@ -32,7 +34,7 @@ export async function POST(req: NextRequest) {
   let session;
   try {
     session = await stripe.checkout.sessions.create({
-      mode: "payment",
+      mode: "subscription",
       payment_method_types: ["card"],
       expires_at: Math.floor(Date.now() / 1000) + 60 * 60, // 1 hour
       line_items: [
@@ -40,9 +42,10 @@ export async function POST(req: NextRequest) {
           price_data: {
             currency: "usd",
             unit_amount: amountCents,
+            recurring: { interval: "year" },
             product_data: {
-              name: `${workspace.name} Coupon Book`,
-              description: `One-time purchase — yours for life`,
+              name: `${workspace.name} Deals Book`,
+              description: `$15 a year — new deals every Monday, every guide included`,
             },
           },
           quantity: 1,
@@ -56,6 +59,15 @@ export async function POST(req: NextRequest) {
         kind: COUPON_BOOK_STRIPE_KIND,
         email: normalizedEmail,
         ...(attribution ? { src: attribution } : {}),
+      },
+      // The subscription carries the same routing metadata so lifecycle
+      // events stay attributable even without the session.
+      subscription_data: {
+        metadata: {
+          workspaceId: workspace.id,
+          kind: COUPON_BOOK_STRIPE_KIND,
+          email: normalizedEmail,
+        },
       },
     });
   } catch (err) {

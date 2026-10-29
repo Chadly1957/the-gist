@@ -785,6 +785,15 @@ model CouponBookPurchase {
   // Lifetime access: one-time $15 buyers are grandfathered in free if the book
   // ever moves to a subscription. All one-time purchases get this.
   isLifetime      Boolean            @default(true)
+  // Annual billing for NEW purchases (2026-10-29 switch): a $15/year Stripe
+  // subscription, or a prepaid gift year. Non-lifetime rows carry access
+  // through accessUntil (the paid-through date); lifetime rows ignore these
+  // fields entirely. subscriptionStatus is Stripe's status string; it stays
+  // null for rows with no Stripe subscription (lifetime rows, gift years).
+  stripeSubscriptionId String?        @unique
+  subscriptionStatus   String?
+  accessUntil          DateTime?
+  cancelAtPeriodEnd    Boolean        @default(false)
   // Weekly deals digest: buyers get the fresh book in their inbox every week
   // unless they opt out (footer link in each digest).
   digestOptOut    Boolean            @default(false)

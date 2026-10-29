@@ -53,8 +53,9 @@ function GiftFormInner() {
           <p className="text-4xl mb-3">🎁</p>
           <h1 className="text-3xl font-extrabold text-stone-900 tracking-tight">Gift the Gist Deals Book</h1>
           <p className="text-gray-600 mt-3">
-            Give someone every deal worth knowing about. {cents(COUPON_BOOK_PRICE_CENTS)} once, theirs for life.
-            They get the book by email, you get the receipt.
+            Give someone every deal worth knowing about. {cents(COUPON_BOOK_PRICE_CENTS)} covers their
+            first year. They get the book by email, you get the receipt. When the year ends,
+            they can renew or let it lapse, their call.
           </p>
         </div>
 
@@ -130,7 +131,8 @@ function GiftFormInner() {
             {buying ? "Starting checkout…" : `Send the gift — ${cents(COUPON_BOOK_PRICE_CENTS)}`}
           </button>
           <p className="text-xs text-gray-400 mt-3 text-center">
-            One-time purchase. No subscription, no renewals. The One-Deal Promise applies.
+            One payment covers their first year. No charge to them, ever, unless they choose to
+            renew. The One-Deal Promise applies.
           </p>
         </div>
       </div>

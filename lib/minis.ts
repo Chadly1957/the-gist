@@ -1,13 +1,17 @@
 import { basePrisma } from "@/lib/db-base";
 import { getWorkspace } from "@/lib/workspace";
+import { couponBookAccessWhere } from "@/lib/coupon-book";
 import type { Block, GuideSpotlightItem } from "@/lib/template-renderer";
 
 // Deals Mini: $5 one-off guides. Internal name "Mini" only; customer-facing
 // copy always uses the guide title (e.g. "Date Night Guide"), never "Mini".
 export const MINI_PRICE_CENTS = 500;
 // Option B upgrade math (Chad, 2026-10-27): flat $5 off, no stacking. Any
-// Mini owner without Deals pays $10 to upgrade, no matter how many Minis
-// they own. There is no free-upgrade case.
+// Mini owner without Deals pays this to upgrade, no matter how many Minis
+// they own. There is no free-upgrade case. Since the annual switch
+// (2026-10-29) this is the FIRST-YEAR price of the $15/year book: the $5
+// guide credit is a $5-off-once Stripe coupon on the upgrade checkout, and
+// renewals bill the full $15.
 export const UPGRADE_PRICE_CENTS = 1000;
 export const MINI_STRIPE_KIND = "deals_mini";
 export const MINI_UPGRADE_STRIPE_KIND = "coupon_book_upgrade";
@@ -43,7 +47,7 @@ export async function getMiniAccessProfile(
 ): Promise<MiniAccessProfile> {
   const normalized = email.trim().toLowerCase();
   const deals = await basePrisma.couponBookPurchase.findFirst({
-    where: { workspaceId, email: normalized, active: true },
+    where: { workspaceId, email: normalized, active: true, ...couponBookAccessWhere() },
     select: { id: true },
   });
   const purchases = await basePrisma.miniPurchase.findMany({
