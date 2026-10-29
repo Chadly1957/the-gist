@@ -441,49 +441,93 @@ function MiniGuideSection({
   const ideas = guide.content.filter((b) => b.type === "idea");
   const tips = guide.content.filter((b) => b.type === "tip");
   return (
-    <section id={`guide-${guide.slug}`} className="mb-6 scroll-mt-6">
-      <h2 className="font-bold text-lg text-stone-900 mb-1 px-1">{guide.title}</h2>
-      <p className="text-sm text-gray-500 mb-3 px-1">{guide.question}</p>
-      <div className="space-y-4">
-        {options.map((o, i) => (
-          <div key={i} className="bg-white rounded-3xl border border-stone-100 shadow-sm p-5">
-            <p className="font-bold text-stone-900">{o.name}</p>
-            {o.description && <p className="text-gray-600 text-sm mt-1">{o.description}</p>}
-            {o.whyItFits && (
-              <p className="text-gray-600 text-sm mt-1">
-                <span className="font-semibold text-stone-900">Why it fits: </span>
-                {o.whyItFits}
-              </p>
-            )}
-            {o.dealRef && <p className="text-xs text-green-700 font-semibold mt-2">{o.dealRef}</p>}
-            {o.link && (
-              <a
-                href={o.link}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-block mt-3 text-xs font-semibold text-green-700 bg-green-50 hover:bg-green-100 rounded-full px-3 py-1"
-              >
-                View details
-              </a>
-            )}
+    <section id={`guide-${guide.slug}`} className="mb-8 scroll-mt-6">
+      <div className="px-1 mb-4">
+        <p className="text-xs font-bold uppercase tracking-widest text-green-700 mb-1">Guide</p>
+        <h2 className="font-extrabold text-2xl text-stone-900 tracking-tight">{guide.title}</h2>
+        <p className="text-sm text-gray-500 mt-1">{guide.question}</p>
+      </div>
+
+      {options.length > 0 && (
+        <>
+          <h3 className="font-bold text-stone-900 px-1 mb-2">
+            Options{" "}
+            <span className="text-sm font-semibold text-gray-400">({options.length})</span>
+          </h3>
+          <div className="space-y-3 mb-5">
+            {options.map((o, i) => (
+              <div key={i} className="bg-white rounded-3xl border border-stone-100 shadow-sm p-5">
+                <div className="flex items-start gap-3">
+                  <span className="flex-none w-7 h-7 rounded-full bg-green-700 text-white text-xs font-bold flex items-center justify-center mt-0.5">
+                    {i + 1}
+                  </span>
+                  <div className="min-w-0">
+                    <p className="font-bold text-stone-900 leading-snug">{o.name}</p>
+                    {o.description && <p className="text-gray-600 text-sm mt-1">{o.description}</p>}
+                    {o.whyItFits && (
+                      <p className="text-sm mt-2 bg-green-50 border border-green-100 rounded-2xl px-3 py-2 text-green-900">
+                        <span className="font-semibold">Why it fits: </span>
+                        {o.whyItFits}
+                      </p>
+                    )}
+                    {o.dealRef && (
+                      <p className="inline-block text-xs text-green-800 font-semibold bg-green-100 rounded-full px-2.5 py-1 mt-2.5">
+                        {o.dealRef}
+                      </p>
+                    )}
+                    {o.link && (
+                      <div>
+                        <a
+                          href={o.link}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-block mt-3 text-xs font-semibold text-green-700 bg-green-50 hover:bg-green-100 rounded-full px-3 py-1.5"
+                        >
+                          View details
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
-        ))}
-        {ideas.length > 0 && (
-          <div className="bg-white rounded-3xl border border-stone-100 shadow-sm p-5">
-            <p className="font-bold text-stone-900 mb-2">Ideas</p>
-            <ul className="space-y-2">
+        </>
+      )}
+
+      {ideas.length > 0 && (
+        <>
+          <h3 className="font-bold text-stone-900 px-1 mb-2">
+            Ideas <span className="text-sm font-semibold text-gray-400">({ideas.length})</span>
+          </h3>
+          <div className="bg-white rounded-3xl border border-stone-100 shadow-sm p-5 mb-5">
+            <ul className="space-y-2.5">
               {ideas.map((d, i) => (
-                <li key={i} className="text-sm text-gray-700">• {d.text}</li>
+                <li key={i} className="flex gap-2.5 text-sm text-gray-700">
+                  <span className="flex-none w-1.5 h-1.5 rounded-full bg-green-600 mt-2" />
+                  <span>{d.text}</span>
+                </li>
               ))}
             </ul>
           </div>
-        )}
-        {tips.map((t, i) => (
-          <div key={i} className="bg-amber-50 border border-amber-100 rounded-3xl p-5">
-            <p className="text-sm text-amber-900">{t.text}</p>
+        </>
+      )}
+
+      {tips.length > 0 && (
+        <>
+          <h3 className="font-bold text-stone-900 px-1 mb-2">
+            Tips <span className="text-sm font-semibold text-gray-400">({tips.length})</span>
+          </h3>
+          <div className="space-y-2.5">
+            {tips.map((t, i) => (
+              <div key={i} className="bg-amber-50 border border-amber-100 rounded-3xl px-5 py-4">
+                <p className="text-sm text-amber-900">{t.text}</p>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
+        </>
+      )}
+
       {showUpgrade && (
         <div className="mt-4">
           <UpgradeCard email={email} priceCents={upgradePriceCents} />

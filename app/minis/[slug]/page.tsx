@@ -138,26 +138,58 @@ function MiniPageInner({ slug }: { slug: string }) {
                 </div>
               )}
               <div className="text-center mb-8">
+                <p className="text-xs font-bold uppercase tracking-widest text-green-700 mb-3">
+                  A Gist Deals guide
+                </p>
                 <h1 className="text-4xl font-extrabold text-stone-900 tracking-tight">{teaser.title}</h1>
-                <p className="text-gray-600 mt-2">{teaser.question}</p>
+                <p className="text-lg text-gray-600 mt-3">{teaser.question}</p>
+                <div className="flex flex-wrap justify-center gap-2 mt-5">
+                  <span className="text-xs font-semibold bg-white border border-stone-200 rounded-full px-3 py-1 text-stone-700">
+                    {teaser.optionCount} {teaser.optionCount === 1 ? "option" : "options"}
+                  </span>
+                  <span className="text-xs font-semibold bg-white border border-stone-200 rounded-full px-3 py-1 text-stone-700">
+                    {teaser.ideaCount} {teaser.ideaCount === 1 ? "idea" : "ideas"}
+                  </span>
+                  {teaser.tipCount > 0 && (
+                    <span className="text-xs font-semibold bg-white border border-stone-200 rounded-full px-3 py-1 text-stone-700">
+                      {teaser.tipCount} {teaser.tipCount === 1 ? "tip" : "tips"}
+                    </span>
+                  )}
+                  <span className="text-xs font-semibold bg-green-700 rounded-full px-3 py-1 text-white">
+                    $5, one time
+                  </span>
+                </div>
               </div>
 
               <section className="bg-white rounded-3xl border border-stone-100 shadow-sm p-6 mb-6">
                 <h2 className="font-bold text-lg text-stone-900 mb-3">What&apos;s inside</h2>
                 {teaser.optionNames.length > 0 && (
-                  <ul className="space-y-1 mb-3">
-                    {teaser.optionNames.map((name) => (
-                      <li key={name} className="text-sm text-gray-700">• {name}</li>
+                  <div className="space-y-2.5">
+                    {teaser.optionNames.map((name, i) => (
+                      <div key={name} className="flex items-center gap-3 bg-[#faf8f4] rounded-2xl px-4 py-3">
+                        <span className="flex-none w-7 h-7 rounded-full bg-green-700 text-white text-xs font-bold flex items-center justify-center">
+                          {i + 1}
+                        </span>
+                        <span className="font-semibold text-stone-900 text-sm">{name}</span>
+                      </div>
                     ))}
-                  </ul>
+                  </div>
                 )}
-                <p className="text-sm text-gray-500">
-                  {teaser.optionCount} options · {teaser.ideaCount} ideas
-                  {teaser.tipCount > 0 ? ` · ${teaser.tipCount} tips` : ""}
+                <p className="text-sm text-gray-500 mt-4">
+                  Each pick comes with why it fits and any deal that applies, plus{" "}
+                  {teaser.ideaCount} {teaser.ideaCount === 1 ? "idea" : "ideas"}
+                  {teaser.tipCount > 0
+                    ? ` and ${teaser.tipCount} ${teaser.tipCount === 1 ? "tip" : "tips"}`
+                    : ""}{" "}
+                  inside the guide.
                 </p>
               </section>
 
               <section className="bg-white rounded-3xl border border-stone-100 shadow-sm p-6">
+                <h2 className="font-bold text-lg text-stone-900 mb-1">Get this guide</h2>
+                <p className="text-sm text-gray-500 mb-4">
+                  Enter your email and we will check whether you already have it.
+                </p>
                 <label className="block text-sm font-semibold mb-1" htmlFor="mini-email">
                   Email
                 </label>
