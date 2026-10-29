@@ -94,6 +94,7 @@ interface MiniGuideBlock {
   whyItFits?: string;
   link?: string;
   dealRef?: string;
+  tag?: string;
   text?: string;
 }
 
@@ -440,6 +441,21 @@ function MiniGuideSection({
   const options = guide.content.filter((b) => b.type === "option");
   const ideas = guide.content.filter((b) => b.type === "idea");
   const tips = guide.content.filter((b) => b.type === "tip");
+  // Options can carry one group tag each (Splurge, Casual, Budget, ...).
+  // When tags actually split the list, offer filter chips in the mockup
+  // pattern: All + one chip per distinct tag, filtering the cards in place
+  // so readers can take one group at face value or mix and match.
+  const [activeTag, setActiveTag] = useState<string | null>(null);
+  const tags: string[] = [];
+  for (const o of options) {
+    const t = o.tag?.trim();
+    if (t && tags.indexOf(t) === -1) tags.push(t);
+  }
+  const showChips =
+    tags.length >= 2 || (tags.length === 1 && options.some((o) => !o.tag?.trim()));
+  const visibleOptions = activeTag
+    ? options.filter((o) => o.tag?.trim() === activeTag)
+    : options;
   return (
     <section id={`guide-${guide.slug}`} className="mb-8 scroll-mt-6">
       <div className="px-1 mb-4">
@@ -454,14 +470,40 @@ function MiniGuideSection({
             Options{" "}
             <span className="text-sm font-semibold text-gray-400">({options.length})</span>
           </h3>
+          {showChips && (
+            <div className="flex flex-wrap gap-2 px-1 mb-3">
+              {[null, ...tags].map((t) => {
+                const isActive = activeTag === t;
+                return (
+                  <button
+                    key={t ?? "all"}
+                    type="button"
+                    onClick={() => setActiveTag(t)}
+                    className={`text-xs font-semibold rounded-full px-3 py-1.5 border transition-colors ${
+                      isActive
+                        ? "bg-green-700 text-white border-green-700"
+                        : "bg-white text-stone-700 border-stone-200 hover:border-green-400"
+                    }`}
+                  >
+                    {t ?? "All"}
+                  </button>
+                );
+              })}
+            </div>
+          )}
           <div className="space-y-3 mb-5">
-            {options.map((o, i) => (
+            {visibleOptions.map((o, i) => (
               <div key={i} className="bg-white rounded-3xl border border-stone-100 shadow-sm p-5">
                 <div className="flex items-start gap-3">
                   <span className="flex-none w-7 h-7 rounded-full bg-green-700 text-white text-xs font-bold flex items-center justify-center mt-0.5">
                     {i + 1}
                   </span>
                   <div className="min-w-0">
+                    {o.tag && (
+                      <p className="text-[11px] font-bold uppercase tracking-widest text-green-700 mb-1">
+                        {o.tag}
+                      </p>
+                    )}
                     <p className="font-bold text-stone-900 leading-snug">{o.name}</p>
                     {o.description && <p className="text-gray-600 text-sm mt-1">{o.description}</p>}
                     {o.whyItFits && (

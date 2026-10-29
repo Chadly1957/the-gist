@@ -14,6 +14,7 @@ interface OptionBlock {
   whyItFits?: string;
   link?: string;
   dealRef?: string;
+  tag?: string;
 }
 type TextBlock = { type: "idea" | "tip"; text: string };
 type Block = OptionBlock | TextBlock;
@@ -36,6 +37,7 @@ interface OptionForm {
   whyItFits: string;
   link: string;
   dealRef: string;
+  tag: string;
 }
 
 interface FormState {
@@ -48,7 +50,7 @@ interface FormState {
   tips: string[];
 }
 
-const EMPTY_OPTION: OptionForm = { name: "", description: "", whyItFits: "", link: "", dealRef: "" };
+const EMPTY_OPTION: OptionForm = { name: "", description: "", whyItFits: "", link: "", dealRef: "", tag: "" };
 const EMPTY_FORM: FormState = {
   title: "",
   slug: "",
@@ -79,6 +81,7 @@ function formFromMini(m: MiniRow): FormState {
         whyItFits: b.whyItFits || "",
         link: b.link || "",
         dealRef: b.dealRef || "",
+        tag: b.tag || "",
       });
     } else if (b.type === "idea") ideas.push(b.text || "");
     else if (b.type === "tip") tips.push(b.text || "");
@@ -102,6 +105,7 @@ function serialize(form: FormState): Block[] {
     if (o.whyItFits.trim()) block.whyItFits = o.whyItFits.trim();
     if (o.link.trim()) block.link = o.link.trim();
     if (o.dealRef.trim()) block.dealRef = o.dealRef.trim();
+    if (o.tag.trim()) block.tag = o.tag.trim();
     blocks.push(block);
   }
   for (const t of form.ideas) if (t.trim()) blocks.push({ type: "idea", text: t.trim() });
@@ -346,7 +350,8 @@ export default function MinisPage() {
             </div>
             <p className="text-xs text-gray-400 mb-3">
               Option names are the teaser: non-buyers see the names and counts only. Descriptions,
-              why-it-fits, links, and deal notes are the paid content.
+              why-it-fits, links, deal notes, and tags are the paid content. Tags group the options
+              inside the guide (Splurge, Casual, Budget, and so on) and power its filter chips.
             </p>
             <div className="space-y-4">
               {form.options.map((o, i) => (
@@ -360,9 +365,13 @@ export default function MinisPage() {
                     </span>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <label className={labelCls}>
+                    <label className={`${labelCls} md:col-span-2`}>
                       <span>Name</span>
                       <input value={o.name} onChange={(e) => setForm((f) => ({ ...f, options: f.options.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)) }))} className={inputCls} placeholder="Downtown dinner and a walk" />
+                    </label>
+                    <label className={labelCls}>
+                      <span>Tag (optional, groups this option)</span>
+                      <input value={o.tag} onChange={(e) => setForm((f) => ({ ...f, options: f.options.map((x, j) => (j === i ? { ...x, tag: e.target.value } : x)) }))} className={inputCls} placeholder="e.g. Splurge, Casual, Late Night, Budget" />
                     </label>
                     <label className={labelCls}>
                       <span>Deal note (optional, shown to owners)</span>

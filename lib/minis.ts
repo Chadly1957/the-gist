@@ -18,6 +18,10 @@ export type MiniBlock =
       whyItFits?: string;
       link?: string;
       dealRef?: string;
+      // Group label for the guide view's filter chips (e.g. "Splurge",
+      // "Rainy-Night Friendly"). Optional; untagged options always show
+      // under "All" and never get a chip of their own.
+      tag?: string;
     }
   | { type: "idea"; text: string }
   | { type: "tip"; text: string };
@@ -92,6 +96,7 @@ const DATE_NIGHT_CONTENT: MiniBlock[] = [
     description:
       "Pick a sit-down spot downtown, then walk the main strip while you decide on dessert.",
     whyItFits: "Easy to plan, easy to bail on if the night runs long.",
+    tag: "Casual",
   },
   {
     type: "option",
@@ -99,6 +104,7 @@ const DATE_NIGHT_CONTENT: MiniBlock[] = [
     description:
       "Keep it low-key: counter-service food, then wherever music is playing that night.",
     whyItFits: "Good when you want the night to feel fun without feeling formal.",
+    tag: "Late Night",
   },
   {
     type: "option",
@@ -106,6 +112,7 @@ const DATE_NIGHT_CONTENT: MiniBlock[] = [
     description:
       "Cook one thing together that feels a little special, then a movie you both actually pick.",
     whyItFits: "Cheapest option on the list, and sometimes the one you remember.",
+    tag: "Budget",
   },
   {
     type: "idea",
@@ -179,6 +186,8 @@ export function sanitizeMiniBlocks(input: unknown): { blocks?: MiniBlock[]; erro
       if (whyItFits) block.whyItFits = whyItFits;
       const dealRef = cleanText(b.dealRef, 200);
       if (dealRef) block.dealRef = dealRef;
+      const tag = cleanText(b.tag, 40);
+      if (tag) block.tag = tag;
       const link = cleanText(b.link, 2048);
       if (link) {
         try {
