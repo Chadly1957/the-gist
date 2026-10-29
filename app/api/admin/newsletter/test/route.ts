@@ -7,6 +7,7 @@ import { getAdminSession } from "@/lib/auth";
 import { getEmailClient, htmlToText } from "@/lib/email";
 import { renderTemplate, Block, SpotlightItem, PresentingSponsorItem, InArticleAdItem, EventItem, getDealsBlockCopy, DEALS_BUYER_COPY, resolveDealsPlaceholders } from "@/lib/template-renderer";
 import { resolveProductSpotlightItems } from "@/lib/products";
+import { resolveGuideSpotlightItems } from "@/lib/minis";
 import { getActiveBoardPosts } from "@/lib/board";
 import { fetchWeatherSnapshot, WeatherSnapshot } from "@/lib/weather";
 import { blurbToHtml } from "@/lib/url";
@@ -151,6 +152,10 @@ export async function POST(req: NextRequest) {
   // workspace. Missing/inactive selections render empty; never blocks a send.
   const productSpotlights = await resolveProductSpotlightItems(blocks, appUrl);
 
+  // Same for guide_spotlight blocks: only active guides in this workspace
+  // resolve. Missing/inactive selections render empty; never blocks a send.
+  const guideSpotlights = await resolveGuideSpotlightItems(blocks, appUrl);
+
   // Gist Board, same as the real send: live posts above the spotlight block,
   // or the invite section when the board is empty.
   let boardItems: Awaited<ReturnType<typeof getActiveBoardPosts>> = [];
@@ -178,7 +183,8 @@ export async function POST(req: NextRequest) {
       undefined,
       weatherData,
       theme,
-      productSpotlights
+      productSpotlights,
+      guideSpotlights
     )
       .replace(/\{\{UNSUBSCRIBE_URL\}\}/g, `${appUrl}/unsubscribe`)
       .replace(/\{\{PROFILE_URL\}\}/g, `${appUrl}/profile?r=preview`)

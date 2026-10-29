@@ -6,6 +6,7 @@ import { prisma } from "@/lib/db";
 import { getAdminSession } from "@/lib/auth";
 import { renderTemplate, Block, SpotlightItem, PresentingSponsorItem, PresentingPartnerItem, InArticleAdItem, EventItem, PollData, WordyData, getDealsBlockCopy, DEALS_BUYER_COPY, resolveDealsPlaceholders } from "@/lib/template-renderer";
 import { resolveProductSpotlightItems } from "@/lib/products";
+import { resolveGuideSpotlightItems } from "@/lib/minis";
 import { getActiveBoardPosts } from "@/lib/board";
 import { fetchWeatherSnapshot, WeatherSnapshot } from "@/lib/weather";
 import { getEmailClient, htmlToText } from "@/lib/email";
@@ -246,6 +247,10 @@ export async function POST(req: NextRequest) {
   // workspace. Missing/inactive selections render empty; never blocks a send.
   const productSpotlights = await resolveProductSpotlightItems(blocks, appUrl);
 
+  // Same for guide_spotlight blocks: only active guides in this workspace
+  // resolve. Missing/inactive selections render empty; never blocks a send.
+  const guideSpotlights = await resolveGuideSpotlightItems(blocks, appUrl);
+
   // Gist Board: live approved posts ride along automatically, directly
   // above the Community Partners spotlight block (or at the end when the
   // template has no spotlight block). No editor change needed: the block
@@ -278,7 +283,8 @@ export async function POST(req: NextRequest) {
     wordyData,
     weatherData,
     theme,
-    productSpotlights
+    productSpotlights,
+    guideSpotlights
   )
     .replace(
       /\{\{UNSUBSCRIBE_URL\}\}/g,
@@ -328,7 +334,8 @@ export async function POST(req: NextRequest) {
       wordyData,
       weatherData,
       theme,
-      productSpotlights
+      productSpotlights,
+      guideSpotlights
     )
       .replace(/\{\{UNSUBSCRIBE_URL\}\}/g, `${appUrl}/unsubscribe`)
       .replace(/\{\{PROFILE_URL\}\}/g, `${appUrl}/profile`)

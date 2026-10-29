@@ -1,4 +1,6 @@
 import { basePrisma } from "@/lib/db-base";
+import { getWorkspace } from "@/lib/workspace";
+import type { Block, GuideSpotlightItem } from "@/lib/template-renderer";
 
 // Deals Mini: $5 one-off guides. Internal name "Mini" only; customer-facing
 // copy always uses the guide title (e.g. "Date Night Guide"), never "Mini".
@@ -214,4 +216,46 @@ export function sanitizeMiniBlocks(input: unknown): { blocks?: MiniBlock[]; erro
 
 export function countMiniOptions(blocks: MiniBlock[]): number {
   return blocks.filter((b) => b.type === "option").length;
+}
+
+// --- Newsletter guide_spotlight resolver -----------------------------------
+// Resolve the guides selected in a template's guide_spotlight blocks into
+// render-ready items, keyed by Mini id. Only ACTIVE Minis in the current
+// workspace resolve; a missing or inactive selection is simply absent from
+// the map and its block renders empty. Wrapped so a data problem can never
+// block a send: on any error the blocks just render empty. Mirrors
+// resolveProductSpotlightItems in lib/products.ts.
+export async function resolveGuideSpotlightItems(
+  blocks: Block[],
+  appUrl: string
+): Promise<Map<string, GuideSpotlightItem>> {
+  const items = new Map<string, GuideSpotlightItem>();
+  const ids = Array.from(
+    new Set(
+      blocks
+        .filter((b) => b.type === "guide_spotlight")
+        .map((b) => String(b.content.miniId || ""))
+        .filter(Boolean)
+    )
+  );
+  if (ids.length === 0) return items;
+  try {
+    const workspace = await getWorkspace();
+    const minis = await basePrisma.mini.findMany({
+      where: { id: { in: ids }, workspaceId: workspace.id, active: true },
+      select: { id: true, title: true, question: true, slug: true, priceCents: true },
+    });
+    for (const m of minis) {
+      items.set(m.id, {
+        title: m.title,
+        question: m.question,
+        priceCents: m.priceCents,
+        url: `${appUrl}/minis/${m.slug}`,
+      });
+    }
+  } catch {
+    // Mini lookup unavailable: guide blocks render empty.
+    return new Map();
+  }
+  return items;
 }

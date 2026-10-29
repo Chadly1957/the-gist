@@ -2,7 +2,7 @@
 
 export interface Block {
   id: string;
-  type: "header" | "text" | "image" | "articles" | "divider" | "footer" | "button" | "spotlight" | "presenting_sponsor" | "presenting_logo_bar" | "presenting_spotlight" | "events" | "referral" | "poll" | "wordy" | "match" | "games" | "tip_jar" | "deals_signup" | "weather" | "product_spotlight" | "board";
+  type: "header" | "text" | "image" | "articles" | "divider" | "footer" | "button" | "spotlight" | "presenting_sponsor" | "presenting_logo_bar" | "presenting_spotlight" | "events" | "referral" | "poll" | "wordy" | "match" | "games" | "tip_jar" | "deals_signup" | "weather" | "product_spotlight" | "board" | "guide_spotlight";
   content: Record<string, unknown>;
 }
 
@@ -114,6 +114,16 @@ export interface ProductSpotlightItem {
   // Units left for capped products (cap minus paid orders, resolved at
   // send time); null when the product has no quantity cap.
   remaining?: number | null;
+}
+
+// A single Deals guide chosen in the template editor for a guide_spotlight
+// block. Resolved server-side at send time (see resolveGuideSpotlightItems
+// in lib/minis.ts); url is the guide's public buy page on the workspace site.
+export interface GuideSpotlightItem {
+  title: string;
+  question: string;
+  priceCents: number;
+  url: string;
 }
 
 export interface InArticleAdItem {
@@ -458,6 +468,35 @@ function renderProductSpotlight(
           </div>
           ${remainingHtml}
           ${ctaHtml}
+        </div>
+      </div>
+    </div>`;
+}
+
+// Manually selected Deals guide card. Missing/inactive guides never reach
+// here (the resolver omits them and the block renders empty). Guides are
+// never sold out, so the CTA always renders.
+function renderGuideSpotlight(
+  content: Record<string, unknown>,
+  item: GuideSpotlightItem,
+  tracking?: TrackingConfig
+): string {
+  const price =
+    item.priceCents % 100 === 0
+      ? `$${item.priceCents / 100}`
+      : `$${(item.priceCents / 100).toFixed(2)}`;
+  const ctaLabel = String(content.buttonLabel || "Get the Guide");
+  const ctaUrl = trackedUrl(tracking, item.url, "guide_spotlight", item.title);
+  return `
+    <div style="padding:20px 40px;">
+      <div style="border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;">
+        <div style="padding:16px;">
+          <div style="font-size:18px;font-weight:700;color:#111827;margin:0 0 6px;font-family:Georgia,serif;line-height:1.3;">${item.title}</div>
+          <div style="font-size:14px;color:#4b5563;line-height:1.6;margin:0 0 10px;font-family:sans-serif;">${item.question}</div>
+          <div style="font-size:15px;font-weight:700;color:#111827;font-family:sans-serif;margin:0 0 14px;">
+            ${price}, one time · Free with The Gist Deals
+          </div>
+          <a href="${ctaUrl}" style="display:inline-block;background:#166534;color:#ffffff;padding:10px 20px;border-radius:4px;text-decoration:none;font-size:13px;font-family:sans-serif;font-weight:600;">${ctaLabel}</a>
         </div>
       </div>
     </div>`;
@@ -849,7 +888,8 @@ export function renderTemplate(
   wordyData?: WordyData,
   weatherData?: WeatherSnapshot,
   theme: ThemeColors = DEFAULT_THEME,
-  productSpotlights?: Map<string, ProductSpotlightItem>
+  productSpotlights?: Map<string, ProductSpotlightItem>,
+  guideSpotlights?: Map<string, GuideSpotlightItem>
 ): string {
   const { spotlights = [], presentingSponsor = null, presentingPartners = [], presentingSpotlight = [], inArticleAds = [], boardItems = [] } = sponsors;
 
@@ -901,6 +941,10 @@ export function renderTemplate(
         case "product_spotlight": {
           const item = productSpotlights?.get(String(block.content.productId || ""));
           return item ? renderProductSpotlight(block.content, item, tracking) : "";
+        }
+        case "guide_spotlight": {
+          const item = guideSpotlights?.get(String(block.content.miniId || ""));
+          return item ? renderGuideSpotlight(block.content, item, tracking) : "";
         }
         default:
           return "";

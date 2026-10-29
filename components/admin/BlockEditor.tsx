@@ -8,7 +8,7 @@ import UrlInput from "@/components/UrlInput";
 
 export interface Block {
   id: string;
-  type: "header" | "text" | "image" | "articles" | "divider" | "button" | "footer" | "spotlight" | "presenting_sponsor" | "presenting_logo_bar" | "presenting_spotlight" | "events" | "referral" | "poll" | "wordy" | "match" | "games" | "tip_jar" | "deals_signup" | "weather" | "product_spotlight" | "board";
+  type: "header" | "text" | "image" | "articles" | "divider" | "button" | "footer" | "spotlight" | "presenting_sponsor" | "presenting_logo_bar" | "presenting_spotlight" | "events" | "referral" | "poll" | "wordy" | "match" | "games" | "tip_jar" | "deals_signup" | "weather" | "product_spotlight" | "board" | "guide_spotlight";
   content: Record<string, string>;
 }
 
@@ -17,6 +17,13 @@ export interface AdminProductOption {
   name: string;
   priceCents: number;
   status: string;
+}
+
+export interface AdminMiniOption {
+  id: string;
+  title: string;
+  priceCents: number;
+  active: boolean;
 }
 
 interface BlockEditorProps {
@@ -48,6 +55,7 @@ const BLOCK_TYPES: { type: Block["type"]; label: string; icon: string }[] = [
   { type: "deals_signup", label: "Gist Deals Signup", icon: "🎟️" },
   { type: "weather", label: "Weather Snapshot", icon: "🌤️" },
   { type: "product_spotlight", label: "Product Spotlight", icon: "🛍️" },
+  { type: "guide_spotlight", label: "Guide Spotlight", icon: "📖" },
 ];
 
 export default function BlockEditor({ blocks, onChange }: BlockEditorProps) {
@@ -72,6 +80,24 @@ export default function BlockEditor({ blocks, onChange }: BlockEditorProps) {
       cancelled = true;
     };
   }, [hasProductBlock]);
+
+  // Guides for the guide_spotlight picker, loaded lazily only when a
+  // template actually uses the block.
+  const [minis, setMinis] = useState<AdminMiniOption[]>([]);
+  const hasGuideBlock = blocks.some((b) => b.type === "guide_spotlight");
+  useEffect(() => {
+    if (!hasGuideBlock) return;
+    let cancelled = false;
+    workspaceFetch("/api/admin/minis")
+      .then((r) => r.json())
+      .then((data) => {
+        if (!cancelled) setMinis(data.minis ?? []);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [hasGuideBlock]);
 
   function addBlock(type: Block["type"]) {
     const defaults: Record<Block["type"], Record<string, string>> = {
@@ -123,6 +149,7 @@ export default function BlockEditor({ blocks, onChange }: BlockEditorProps) {
         longitude: "",
       },
       product_spotlight: { productId: "", buttonLabel: "Shop Now" },
+      guide_spotlight: { miniId: "", buttonLabel: "Get the Guide" },
     };
     const newBlock: Block = { id: generateId(), type, content: { ...defaults[type], blockId: "" } };
     if (type === "poll") newBlock.content.blockId = newBlock.id;
@@ -242,7 +269,7 @@ export default function BlockEditor({ blocks, onChange }: BlockEditorProps) {
 
           {/* Block preview */}
           <div className="px-4 py-3">
-            <BlockPreview block={block} products={products} />
+            <BlockPreview block={block} products={products} minis={minis} />
           </div>
 
           {/* Inline editor */}
@@ -251,6 +278,7 @@ export default function BlockEditor({ blocks, onChange }: BlockEditorProps) {
               <BlockFields
                 block={block}
                 products={products}
+                minis={minis}
                 onChange={(content) => updateBlock(block.id, content)}
               />
             </div>
@@ -282,7 +310,7 @@ export default function BlockEditor({ blocks, onChange }: BlockEditorProps) {
   );
 }
 
-function BlockPreview({ block, products = [] }: { block: Block; products?: AdminProductOption[] }) {
+function BlockPreview({ block, products = [], minis = [] }: { block: Block; products?: AdminProductOption[]; minis?: AdminMiniOption[] }) {
   switch (block.type) {
     case "header":
       return (
@@ -507,6 +535,24 @@ function BlockPreview({ block, products = [] }: { block: Block; products?: Admin
           </div>
         </div>
       );
+    case "guide_spotlight": {
+      const selected = minis.find((m) => m.id === block.content.miniId);
+      return (
+        <div className="flex items-center gap-3 py-2">
+          <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center">
+            <span className="text-sm">📖</span>
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-gray-800">{selected ? selected.title : "Guide Spotlight"}</p>
+            <p className="text-xs text-gray-400">
+              {selected
+                ? "Featured in the email with the question it answers, its price, and a button to its guide page"
+                : "Pick a guide to feature. Hidden in the email if no active guide is selected."}
+            </p>
+          </div>
+        </div>
+      );
+    }
     case "product_spotlight": {
       const selected = products.find((p) => p.id === block.content.productId);
       return (
@@ -654,10 +700,12 @@ function ImageBlockFields({
 function BlockFields({
   block,
   products = [],
+  minis = [],
   onChange,
 }: {
   block: Block;
   products?: AdminProductOption[];
+  minis?: AdminMiniOption[];
   onChange: (content: Record<string, string>) => void;
 }) {
   const c = block.content;
@@ -830,6 +878,38 @@ function BlockFields({
           <p className="text-xs text-gray-400">The snapshot is fetched when the newsletter is sent — current conditions plus the next ~6 hours. Leave the location fields blank to use this workspace's location (set on the Workspaces page). No API key needed.</p>
         </div>
       );
+    case "guide_spotlight": {
+      const activeMinis = minis.filter((m) => m.active);
+      const selectedId = c.miniId || "";
+      const selectedIsActive = activeMinis.some((m) => m.id === selectedId);
+      return (
+        <div className="space-y-3">
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">Guide</label>
+            <select
+              value={selectedId}
+              onChange={(e) => onChange({ ...c, miniId: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
+            >
+              <option value="">Select a guide…</option>
+              {selectedId && !selectedIsActive && (
+                <option value={selectedId}>Selected guide (not active)</option>
+              )}
+              {activeMinis.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.title} — ${(m.priceCents / 100).toFixed(2)}
+                </option>
+              ))}
+            </select>
+            {activeMinis.length === 0 && (
+              <p className="text-xs text-gray-400 mt-1">No active guides in this workspace yet. Create one on the Minis page and set it active.</p>
+            )}
+          </div>
+          {field("buttonLabel", "Button Label", { placeholder: "Get the Guide" })}
+          <p className="text-xs text-gray-400">The email shows the guide&apos;s title, the question it answers, and its price with a button to its guide page. If the guide is deactivated or deleted, the block is hidden.</p>
+        </div>
+      );
+    }
     case "product_spotlight": {
       const activeProducts = products.filter((p) => p.status === "active");
       const selectedId = c.productId || "";
