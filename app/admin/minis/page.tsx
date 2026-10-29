@@ -477,6 +477,10 @@ export default function MinisPage() {
                     <a href={workspacePath(`/minis/${m.slug}`)} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">
                       View teaser page
                     </a>
+                    {" · "}
+                    <a href={workspacePath(`/deals?preview=${m.slug}#guide-${m.slug}`)} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">
+                      View in portal (owner view)
+                    </a>
                   </p>
                 </div>
                 <div className="flex gap-2 shrink-0">

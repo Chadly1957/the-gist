@@ -582,6 +582,10 @@ function MiniGuideSection({
 function DealsPageInner() {
   const searchParams = useSearchParams();
   const token = searchParams.get("token");
+  // Admin owner-view preview: set by the "View in portal (owner view)" link
+  // in /admin/minis. The value is a guide slug to scroll to. It unlocks
+  // nothing by itself; see the preview effect below.
+  const previewParam = searchParams.get("preview");
   // Attribution: which signup touchpoint sent this buyer (thank-you page vs
   // welcome email). Passed through to Stripe metadata at checkout.
   const srcParam = searchParams.get("src");
@@ -598,6 +602,7 @@ function DealsPageInner() {
   const [linkSent, setLinkSent] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [preview, setPreview] = useState<OutboundLink | null>(null);
+  const [adminPreview, setAdminPreview] = useState<"idle" | "loading" | "ok" | "failed">("idle");
 
   const priceCents = COUPON_BOOK_PRICE_CENTS;
 
@@ -611,6 +616,29 @@ function DealsPageInner() {
       })
       .catch((e) => setBookError(e instanceof Error ? e.message : "Could not open your book."));
   }, [token]);
+
+  // Admin owner-view preview: ask the admin-session-gated preview endpoint
+  // for the owner payload. A non-admin gets a 401, adminPreview lands on
+  // "failed", and the page falls through to the normal buy view, exactly as
+  // if the parameter were not there.
+  useEffect(() => {
+    if (token || !previewParam) return;
+    setAdminPreview("loading");
+    workspaceFetch(`/api/admin/minis/preview?guide=${encodeURIComponent(previewParam)}`)
+      .then(async (r) => {
+        if (!r.ok) throw new Error("not an admin");
+        const data = await r.json();
+        setBook(data);
+        setAdminPreview("ok");
+      })
+      .catch(() => setAdminPreview("failed"));
+  }, [token, previewParam]);
+
+  // Land on the guide the admin clicked, once its section has rendered.
+  useEffect(() => {
+    if (adminPreview !== "ok" || !previewParam) return;
+    document.getElementById(`guide-${previewParam}`)?.scrollIntoView({ block: "start" });
+  }, [adminPreview, previewParam]);
 
   async function buy() {
     setBuying(true);
@@ -647,8 +675,15 @@ function DealsPageInner() {
     }
   }
 
+  // Admin owner-view preview in flight: show the same loading screen as the
+  // token flow instead of flashing the buy view. A failed preview request
+  // (not an admin session) falls through to the normal buy view below.
+  if (!token && previewParam && adminPreview !== "ok" && adminPreview !== "failed") {
+    return <div className="min-h-screen flex items-center justify-center"><p className="text-gray-500">Opening your book…</p></div>;
+  }
+
   // Logged-in book view: Local Member Wallet.
-  if (token) {
+  if (token || adminPreview === "ok") {
     if (bookError) {
       return (
         <div className="min-h-screen flex items-center justify-center p-6">
@@ -674,6 +709,15 @@ function DealsPageInner() {
         <SiteHeader />
         <div className="min-h-screen bg-[#faf8f4] p-4 pb-10">
           <div className="max-w-2xl mx-auto">
+            {adminPreview === "ok" && (
+              <div className="bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 mb-4">
+                <p className="text-sm text-amber-900">
+                  <strong>Admin preview.</strong> This is the owner view of the portal, with full
+                  guide content. Per-buyer details (buyer email, coupon QR codes) are not part of
+                  a preview.
+                </p>
+              </div>
+            )}
             {/* Header */}
             <div className="bg-white rounded-3xl p-6 mb-4 text-center shadow-sm border border-stone-100">
               {book.dealsEmailHeaderUrl ? (
@@ -684,7 +728,7 @@ function DealsPageInner() {
                 <img src={book.dealsLogoUrl} alt="The Gist Deals" className="mx-auto h-16 w-auto mb-3" />
               ) : null}
               <h1 className="text-2xl font-bold text-stone-900">{isDealsOwner ? "My Gist Deals Book" : "My Guides"}</h1>
-              <p className="text-stone-500 text-sm mt-1">{book.email}</p>
+              <p className="text-stone-500 text-sm mt-1">{adminPreview === "ok" ? "Admin preview · owner view" : book.email}</p>
             </div>
 
             {/* Guides index */}
