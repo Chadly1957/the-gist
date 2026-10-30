@@ -108,6 +108,11 @@ export interface ProductSpotlightItem {
   description?: string | null;
   priceCents: number;
   compareAtCents?: number | null;
+  // Optional short note rendered right after the price in smaller muted
+  // text (a guide's "one time · Free with The Gist Deals", the Deals
+  // book's "a year · cancel anytime"). Absent for products, whose price
+  // line renders exactly as before.
+  priceNote?: string | null;
   imageUrl?: string | null;
   url: string;
   soldOut: boolean;
@@ -464,7 +469,7 @@ function renderProductSpotlight(
           <div style="font-size:18px;font-weight:700;color:#111827;margin:0 0 6px;font-family:Georgia,serif;line-height:1.3;">${item.name}</div>
           ${shortBlurb ? `<div style="font-size:14px;color:#4b5563;line-height:1.6;margin:0 0 10px;font-family:sans-serif;">${shortBlurb}</div>` : ""}
           <div style="font-size:16px;font-weight:700;color:#111827;font-family:sans-serif;margin:0 0 14px;">
-            ${money(item.priceCents)}${item.compareAtCents && item.compareAtCents > item.priceCents ? ` <span style="color:#9ca3af;text-decoration:line-through;font-weight:400;">${money(item.compareAtCents)}</span>` : ""}
+            ${money(item.priceCents)}${item.priceNote ? ` <span style="font-size:13px;color:#6b7280;font-weight:400;">${item.priceNote}</span>` : ""}${item.compareAtCents && item.compareAtCents > item.priceCents ? ` <span style="color:#9ca3af;text-decoration:line-through;font-weight:400;">${money(item.compareAtCents)}</span>` : ""}
           </div>
           ${remainingHtml}
           ${ctaHtml}
@@ -939,7 +944,18 @@ export function renderTemplate(
         case "weather":
           return renderWeather(block.content, weatherData);
         case "product_spotlight": {
-          const item = productSpotlights?.get(String(block.content.productId || ""));
+          // featureType picks the map key: a guide resolves under
+          // `guide:<miniId>`, the Deals book under "deals", and anything
+          // else (including legacy blocks with no featureType) is a
+          // product keyed by productId, exactly as before.
+          const featureType = String(block.content.featureType || "product");
+          const key =
+            featureType === "guide"
+              ? `guide:${String(block.content.miniId || "")}`
+              : featureType === "deals"
+                ? "deals"
+                : String(block.content.productId || "");
+          const item = productSpotlights?.get(key);
           return item ? renderProductSpotlight(block.content, item, tracking) : "";
         }
         case "guide_spotlight": {
