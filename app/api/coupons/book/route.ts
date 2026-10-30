@@ -50,7 +50,10 @@ export async function GET(req: NextRequest) {
       where: { workspaceId: workspace.id, email },
       include: { mini: true },
     });
-    const seen = new Map<string, { id: string; slug: string; title: string; question: string; content: unknown }>();
+    const seen = new Map<
+      string,
+      { id: string; slug: string; title: string; question: string; content: unknown; imageUrl: string | null }
+    >();
     for (const row of owned) {
       if (row.mini.active) {
         seen.set(row.mini.id, {
@@ -59,6 +62,7 @@ export async function GET(req: NextRequest) {
           title: row.mini.title,
           question: row.mini.question,
           content: row.mini.content,
+          imageUrl: row.mini.imageUrl,
         });
       }
     }
@@ -187,7 +191,7 @@ export async function GET(req: NextRequest) {
   const allMinis = await basePrisma.mini.findMany({
     where: { workspaceId: workspace.id, active: true },
     orderBy: { createdAt: "asc" },
-    select: { id: true, slug: true, title: true, question: true, content: true },
+    select: { id: true, slug: true, title: true, question: true, content: true, imageUrl: true },
   });
 
   return NextResponse.json({

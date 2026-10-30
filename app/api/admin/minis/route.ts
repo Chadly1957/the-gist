@@ -5,6 +5,7 @@ import { getWorkspace } from "@/lib/workspace";
 import {
   MINI_PRICE_CENTS,
   MINI_SLUG_RE,
+  cleanMiniImageUrl,
   countMiniOptions,
   sanitizeMiniBlocks,
   type MiniBlock,
@@ -26,13 +27,21 @@ interface MiniBody {
   question?: string;
   content?: unknown;
   active?: boolean;
+  imageUrl?: string | null;
 }
 
 // Shared create/update validation. Returns either the cleaned fields or an
 // error message. The price is never taken from the client: Minis are $5,
 // set from MINI_PRICE_CENTS (Phase 1 pricing decision).
 function validateMiniBody(body: MiniBody): {
-  data?: { title: string; slug: string; question: string; content: MiniBlock[]; active: boolean };
+  data?: {
+    title: string;
+    slug: string;
+    question: string;
+    content: MiniBlock[];
+    active: boolean;
+    imageUrl: string | null;
+  };
   error?: string;
 } {
   const title = typeof body.title === "string" ? body.title.trim().slice(0, 120) : "";
@@ -45,6 +54,8 @@ function validateMiniBody(body: MiniBody): {
   }
   const { blocks, error } = sanitizeMiniBlocks(body.content ?? []);
   if (error || !blocks) return { error: error || "Invalid guide content." };
+  const image = cleanMiniImageUrl(body.imageUrl);
+  if (image.error) return { error: image.error };
   const active = body.active === true;
   if (active && countMiniOptions(blocks) === 0) {
     return { error: "An active guide needs at least one option. Add an option or save it inactive." };
@@ -56,6 +67,7 @@ function validateMiniBody(body: MiniBody): {
       question,
       content: blocks,
       active,
+      imageUrl: image.imageUrl ?? null,
     },
   };
 }
@@ -111,6 +123,7 @@ export async function POST(req: NextRequest) {
       question: data.question,
       content: data.content,
       priceCents: MINI_PRICE_CENTS,
+      imageUrl: data.imageUrl,
       active: data.active,
     },
   });

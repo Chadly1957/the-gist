@@ -8,6 +8,7 @@ import SiteHeader from "@/components/SiteHeader";
 interface Teaser {
   title: string;
   question: string;
+  imageUrl: string | null;
   optionNames: string[];
   optionCount: number;
   ideaCount: number;
@@ -136,6 +137,13 @@ function MiniPageInner({ slug }: { slug: string }) {
                 <div className="bg-amber-50 border border-amber-100 rounded-2xl px-4 py-3 mb-4 text-sm text-amber-900">
                   Checkout was cancelled. Nothing was charged.
                 </div>
+              )}
+              {teaser.imageUrl && (
+                <img
+                  src={teaser.imageUrl}
+                  alt={teaser.title}
+                  className="w-full aspect-[16/9] object-cover rounded-3xl mb-8"
+                />
               )}
               <div className="text-center mb-8">
                 <p className="text-xs font-bold uppercase tracking-widest text-green-700 mb-3">

@@ -1003,6 +1003,7 @@ model Mini {
   question    String
   content     Json
   priceCents  Int      @default(500)
+  imageUrl    String?
   active      Boolean  @default(true)
   createdAt   DateTime @default(now())
   purchases   MiniPurchase[]

@@ -2,7 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAdminSession } from "@/lib/auth";
 import { basePrisma } from "@/lib/db-base";
 import { getWorkspace } from "@/lib/workspace";
-import { MINI_SLUG_RE, countMiniOptions, sanitizeMiniBlocks, type MiniBlock } from "@/lib/minis";
+import {
+  MINI_SLUG_RE,
+  cleanMiniImageUrl,
+  countMiniOptions,
+  sanitizeMiniBlocks,
+  type MiniBlock,
+} from "@/lib/minis";
 
 export const dynamic = "force-dynamic";
 
@@ -63,6 +69,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (error || !blocks) return NextResponse.json({ error: error || "Invalid guide content." }, { status: 400 });
     nextContent = blocks;
     data.content = nextContent;
+  }
+
+  if (body.imageUrl !== undefined) {
+    const image = cleanMiniImageUrl(body.imageUrl);
+    if (image.error) return NextResponse.json({ error: image.error }, { status: 400 });
+    data.imageUrl = image.imageUrl ?? null;
   }
 
   if (typeof body.active === "boolean") data.active = body.active;

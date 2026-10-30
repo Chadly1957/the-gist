@@ -118,7 +118,7 @@ export async function resolveProductSpotlightItems(
       // workspace scoping matches; only ACTIVE Minis resolve.
       const minis = await prisma.mini.findMany({
         where: { id: { in: miniIds }, active: true },
-        select: { id: true, title: true, question: true, slug: true, priceCents: true },
+        select: { id: true, title: true, question: true, slug: true, priceCents: true, imageUrl: true },
       });
       for (const m of minis) {
         items.set(`guide:${m.id}`, {
@@ -126,7 +126,7 @@ export async function resolveProductSpotlightItems(
           tagline: m.question,
           priceCents: m.priceCents,
           priceNote: "one time · Free with The Gist Deals",
-          imageUrl: null,
+          imageUrl: m.imageUrl,
           url: `${appUrl}/minis/${m.slug}`,
           soldOut: false,
           remaining: null,
