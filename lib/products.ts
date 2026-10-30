@@ -6,6 +6,7 @@
 import type { PrismaClient } from "@prisma/client";
 import type Stripe from "stripe";
 import { prisma } from "./db";
+import { COUPON_BOOK_PRICE_CENTS } from "./coupon-book";
 import type { Block, ProductSpotlightItem } from "./template-renderer";
 
 // Shipping address as stored on a ProductOrder (column names match the
@@ -44,54 +45,108 @@ export function shippingFromSession(session: Stripe.Checkout.Session): ProductSh
   };
 }
 
-// Resolve the products selected in a template's product_spotlight blocks
-// into render-ready items, keyed by product ID. Only ACTIVE products in the
-// current workspace resolve (the shared prisma client is workspace-scoped);
-// a missing or inactive selection is simply absent from the map and its
-// block renders empty. Sold out follows the public product pages: paid
-// orders at or past the quantity cap. Wrapped so a data problem can never
-// block a send — on any error the blocks just render empty.
+// Resolve the selections in a template's product_spotlight blocks into
+// render-ready items. A block features one of three things, picked by its
+// featureType content field (absent means "product", so every saved
+// template resolves exactly as before):
+//   - "product": an ACTIVE product in the current workspace, keyed by
+//     product ID. Sold out follows the public product pages: paid orders
+//     at or past the quantity cap.
+//   - "guide": an ACTIVE Deals guide (Mini) in the current workspace,
+//     keyed `guide:<miniId>`, rendered through the same card with a
+//     price note.
+//   - "deals": The Gist Deals book, keyed "deals", priced from the shared
+//     coupon-book constant.
+// A missing or inactive selection is simply absent from the map and its
+// block renders empty. Wrapped so a data problem can never block a send —
+// on any error the blocks just render empty.
 export async function resolveProductSpotlightItems(
   blocks: Block[],
   appUrl: string
 ): Promise<Map<string, ProductSpotlightItem>> {
   const items = new Map<string, ProductSpotlightItem>();
+  const spotlightBlocks = blocks.filter((b) => b.type === "product_spotlight");
+  const featureTypeOf = (b: Block) => String(b.content.featureType || "product");
   const ids = Array.from(
     new Set(
-      blocks
-        .filter((b) => b.type === "product_spotlight")
+      spotlightBlocks
+        .filter((b) => featureTypeOf(b) === "product")
         .map((b) => String(b.content.productId || ""))
         .filter(Boolean)
     )
   );
-  if (ids.length === 0) return items;
+  const miniIds = Array.from(
+    new Set(
+      spotlightBlocks
+        .filter((b) => featureTypeOf(b) === "guide")
+        .map((b) => String(b.content.miniId || ""))
+        .filter(Boolean)
+    )
+  );
+  const wantsDeals = spotlightBlocks.some((b) => featureTypeOf(b) === "deals");
+  if (ids.length === 0 && miniIds.length === 0 && !wantsDeals) return items;
   try {
-    const products = await prisma.product.findMany({
-      where: { id: { in: ids }, status: "active" },
-    });
-    if (products.length === 0) return items;
-    const paidCounts = await prisma.productOrder.groupBy({
-      by: ["productId"],
-      where: { status: "paid", productId: { in: ids } },
-      _count: { _all: true },
-    });
-    const paidById = new Map(paidCounts.map((c) => [c.productId, c._count._all]));
-    for (const p of products) {
-      const paid = paidById.get(p.id) ?? 0;
-      items.set(p.id, {
-        name: p.name,
-        tagline: p.tagline,
-        description: p.description,
-        priceCents: p.priceCents,
-        compareAtCents: p.compareAtCents,
-        imageUrl: p.imageUrl,
-        url: `${appUrl}/products/${p.slug}`,
-        soldOut: p.quantity !== null && paid >= p.quantity,
-        remaining: p.quantity !== null ? Math.max(0, p.quantity - paid) : null,
+    if (ids.length > 0) {
+      const products = await prisma.product.findMany({
+        where: { id: { in: ids }, status: "active" },
+      });
+      if (products.length > 0) {
+        const paidCounts = await prisma.productOrder.groupBy({
+          by: ["productId"],
+          where: { status: "paid", productId: { in: ids } },
+          _count: { _all: true },
+        });
+        const paidById = new Map(paidCounts.map((c) => [c.productId, c._count._all]));
+        for (const p of products) {
+          const paid = paidById.get(p.id) ?? 0;
+          items.set(p.id, {
+            name: p.name,
+            tagline: p.tagline,
+            description: p.description,
+            priceCents: p.priceCents,
+            compareAtCents: p.compareAtCents,
+            imageUrl: p.imageUrl,
+            url: `${appUrl}/products/${p.slug}`,
+            soldOut: p.quantity !== null && paid >= p.quantity,
+            remaining: p.quantity !== null ? Math.max(0, p.quantity - paid) : null,
+          });
+        }
+      }
+    }
+    if (miniIds.length > 0) {
+      // Same scoped prisma client as the product query above, so the
+      // workspace scoping matches; only ACTIVE Minis resolve.
+      const minis = await prisma.mini.findMany({
+        where: { id: { in: miniIds }, active: true },
+        select: { id: true, title: true, question: true, slug: true, priceCents: true },
+      });
+      for (const m of minis) {
+        items.set(`guide:${m.id}`, {
+          name: m.title,
+          tagline: m.question,
+          priceCents: m.priceCents,
+          priceNote: "one time · Free with The Gist Deals",
+          imageUrl: null,
+          url: `${appUrl}/minis/${m.slug}`,
+          soldOut: false,
+          remaining: null,
+        });
+      }
+    }
+    if (wantsDeals) {
+      items.set("deals", {
+        name: "The Gist Deals",
+        tagline: "Every deal worth knowing about, in one little book on your phone.",
+        priceCents: COUPON_BOOK_PRICE_CENTS,
+        priceNote: "a year · cancel anytime",
+        imageUrl: null,
+        url: `${appUrl}/deals`,
+        soldOut: false,
+        remaining: null,
       });
     }
   } catch {
-    // Product tables unavailable — product blocks render empty.
+    // Spotlight data unavailable — spotlight blocks render empty.
     return new Map();
   }
   return items;

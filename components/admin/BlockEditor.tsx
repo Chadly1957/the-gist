@@ -81,10 +81,15 @@ export default function BlockEditor({ blocks, onChange }: BlockEditorProps) {
     };
   }, [hasProductBlock]);
 
-  // Guides for the guide_spotlight picker, loaded lazily only when a
-  // template actually uses the block.
+  // Guides for the guide_spotlight picker (and for product_spotlight
+  // blocks featuring a guide), loaded lazily only when a template
+  // actually uses one.
   const [minis, setMinis] = useState<AdminMiniOption[]>([]);
-  const hasGuideBlock = blocks.some((b) => b.type === "guide_spotlight");
+  const hasGuideBlock = blocks.some(
+    (b) =>
+      b.type === "guide_spotlight" ||
+      (b.type === "product_spotlight" && String(b.content.featureType || "product") === "guide")
+  );
   useEffect(() => {
     if (!hasGuideBlock) return;
     let cancelled = false;
@@ -148,7 +153,7 @@ export default function BlockEditor({ blocks, onChange }: BlockEditorProps) {
         latitude: "",
         longitude: "",
       },
-      product_spotlight: { productId: "", buttonLabel: "Shop Now" },
+      product_spotlight: { productId: "", featureType: "product", miniId: "", buttonLabel: "Shop Now" },
       guide_spotlight: { miniId: "", buttonLabel: "Get the Guide" },
     };
     const newBlock: Block = { id: generateId(), type, content: { ...defaults[type], blockId: "" } };
@@ -554,19 +559,37 @@ function BlockPreview({ block, products = [], minis = [] }: { block: Block; prod
       );
     }
     case "product_spotlight": {
-      const selected = products.find((p) => p.id === block.content.productId);
+      const featureType = String(block.content.featureType || "product");
+      const guide = featureType === "guide" ? minis.find((m) => m.id === block.content.miniId) : undefined;
+      const product = featureType === "product" ? products.find((p) => p.id === block.content.productId) : undefined;
+      const title =
+        featureType === "deals"
+          ? "The Gist Deals"
+          : featureType === "guide"
+            ? guide
+              ? guide.title
+              : "Product Spotlight"
+            : product
+              ? product.name
+              : "Product Spotlight";
+      const subtitle =
+        featureType === "deals"
+          ? "Featured in the email with its price and a button to the Deals book page"
+          : featureType === "guide"
+            ? guide
+              ? "Featured in the email with the question it answers, its price, and a button to its guide page"
+              : "Pick a guide to feature. Hidden in the email if no active guide is selected."
+            : product
+              ? "Featured in the email with image, price, a button to its product page, and how many are left when the product has a cap"
+              : "Pick a product to feature. Hidden in the email if no active product is selected.";
       return (
         <div className="flex items-center gap-3 py-2">
           <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center">
             <span className="text-sm">🛍️</span>
           </div>
           <div>
-            <p className="text-sm font-semibold text-gray-800">{selected ? selected.name : "Product Spotlight"}</p>
-            <p className="text-xs text-gray-400">
-              {selected
-                ? "Featured in the email with image, price, a button to its product page, and how many are left when the product has a cap"
-                : "Pick a product to feature. Hidden in the email if no active product is selected."}
-            </p>
+            <p className="text-sm font-semibold text-gray-800">{title}</p>
+            <p className="text-xs text-gray-400">{subtitle}</p>
           </div>
         </div>
       );
@@ -911,34 +934,102 @@ function BlockFields({
       );
     }
     case "product_spotlight": {
+      const featureType = String(c.featureType || "product");
+      const featureDefaultLabels: Record<string, string> = {
+        product: "Shop Now",
+        guide: "Get the Guide",
+        deals: "Get the Book",
+      };
+      // Switching what the block features swaps in that feature's default
+      // button label, but only while the label is untouched or still one
+      // of the defaults — a label Chad typed himself is never overwritten.
+      const handleFeatureChange = (next: string) => {
+        const current = String(c.buttonLabel || "");
+        const nextContent: Record<string, string> = { ...c, featureType: next };
+        if (!current || Object.values(featureDefaultLabels).includes(current)) {
+          nextContent.buttonLabel = featureDefaultLabels[next];
+        }
+        onChange(nextContent);
+      };
       const activeProducts = products.filter((p) => p.status === "active");
       const selectedId = c.productId || "";
       const selectedIsActive = activeProducts.some((p) => p.id === selectedId);
+      const activeMinis = minis.filter((m) => m.active);
+      const selectedMiniId = c.miniId || "";
+      const selectedMiniIsActive = activeMinis.some((m) => m.id === selectedMiniId);
       return (
         <div className="space-y-3">
           <div>
-            <label className="block text-xs font-semibold text-gray-600 mb-1">Product</label>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">Feature</label>
             <select
-              value={selectedId}
-              onChange={(e) => onChange({ ...c, productId: e.target.value })}
+              value={featureType}
+              onChange={(e) => handleFeatureChange(e.target.value)}
               className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
             >
-              <option value="">Select a product…</option>
-              {selectedId && !selectedIsActive && (
-                <option value={selectedId}>Selected product (not active)</option>
-              )}
-              {activeProducts.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name} — ${(p.priceCents / 100).toFixed(2)}
-                </option>
-              ))}
+              <option value="product">Product</option>
+              <option value="guide">Guide</option>
+              <option value="deals">The Gist Deals</option>
             </select>
-            {activeProducts.length === 0 && (
-              <p className="text-xs text-gray-400 mt-1">No active products in this workspace yet. Create one on the Products page and set it active.</p>
-            )}
           </div>
-          {field("buttonLabel", "Button Label", { placeholder: "Shop Now" })}
-          <p className="text-xs text-gray-400">The email shows the product&apos;s image, name, tagline, and price with a button to its product page. When the product has a quantity cap, the email also shows how many are left, counted from paid orders at send time. If the product sells out, the button becomes a SOLD OUT note. If it is archived or deleted, the block is hidden.</p>
+          {featureType === "product" && (
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1">Product</label>
+              <select
+                value={selectedId}
+                onChange={(e) => onChange({ ...c, productId: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
+              >
+                <option value="">Select a product…</option>
+                {selectedId && !selectedIsActive && (
+                  <option value={selectedId}>Selected product (not active)</option>
+                )}
+                {activeProducts.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name} — ${(p.priceCents / 100).toFixed(2)}
+                  </option>
+                ))}
+              </select>
+              {activeProducts.length === 0 && (
+                <p className="text-xs text-gray-400 mt-1">No active products in this workspace yet. Create one on the Products page and set it active.</p>
+              )}
+            </div>
+          )}
+          {featureType === "guide" && (
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1">Guide</label>
+              <select
+                value={selectedMiniId}
+                onChange={(e) => onChange({ ...c, miniId: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
+              >
+                <option value="">Select a guide…</option>
+                {selectedMiniId && !selectedMiniIsActive && (
+                  <option value={selectedMiniId}>Selected guide (not active)</option>
+                )}
+                {activeMinis.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.title} — ${(m.priceCents / 100).toFixed(2)}
+                  </option>
+                ))}
+              </select>
+              {activeMinis.length === 0 && (
+                <p className="text-xs text-gray-400 mt-1">No active guides in this workspace yet. Create one on the Minis page and set it active.</p>
+              )}
+            </div>
+          )}
+          {featureType === "deals" && (
+            <p className="text-xs text-gray-400">Features The Gist Deals book with a link to /deals.</p>
+          )}
+          {field("buttonLabel", "Button Label", { placeholder: featureDefaultLabels[featureType] })}
+          {featureType === "product" && (
+            <p className="text-xs text-gray-400">The email shows the product&apos;s image, name, tagline, and price with a button to its product page. When the product has a quantity cap, the email also shows how many are left, counted from paid orders at send time. If the product sells out, the button becomes a SOLD OUT note. If it is archived or deleted, the block is hidden.</p>
+          )}
+          {featureType === "guide" && (
+            <p className="text-xs text-gray-400">The email shows the guide&apos;s title, the question it answers, and its price with a note that it is free with The Gist Deals, plus a button to its guide page. If the guide is deactivated or deleted, the block is hidden.</p>
+          )}
+          {featureType === "deals" && (
+            <p className="text-xs text-gray-400">The email shows the Deals book&apos;s name, tagline, and yearly price with a button to /deals.</p>
+          )}
         </div>
       );
     }
