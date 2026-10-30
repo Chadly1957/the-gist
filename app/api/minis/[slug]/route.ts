@@ -16,7 +16,7 @@ export async function GET(
   await ensureSeedMinis(workspace.id, workspace.slug);
   const mini = await basePrisma.mini.findFirst({
     where: { workspaceId: workspace.id, slug: params.slug, active: true },
-    select: { title: true, question: true, content: true },
+    select: { title: true, question: true, content: true, imageUrl: true },
   });
   if (!mini) {
     return NextResponse.json({ error: "That guide is not available." }, { status: 404 });

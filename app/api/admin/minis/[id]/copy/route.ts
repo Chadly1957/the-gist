@@ -56,6 +56,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       question: source.question,
       content: (source.content ?? []) as never,
       priceCents: source.priceCents,
+      imageUrl: source.imageUrl,
       active: false,
     },
   });

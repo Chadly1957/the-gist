@@ -73,6 +73,7 @@ export function miniTeaser(mini: {
   title: string;
   question: string;
   content: unknown;
+  imageUrl?: string | null;
 }) {
   const blocks = (Array.isArray(mini.content) ? mini.content : []) as Array<
     Record<string, unknown>
@@ -83,6 +84,7 @@ export function miniTeaser(mini: {
   return {
     title: mini.title,
     question: mini.question,
+    imageUrl: mini.imageUrl ?? null,
     optionNames: options
       .map((o) => o.name)
       .filter((n): n is string => typeof n === "string"),
@@ -222,6 +224,24 @@ export function countMiniOptions(blocks: MiniBlock[]): number {
   return blocks.filter((b) => b.type === "option").length;
 }
 
+// Cover image URL for a guide, cleaned the same way option links are in
+// sanitizeMiniBlocks: empty/missing clears to null; a non-empty value must
+// be a valid http(s) URL. Shared by the admin create/update routes.
+export function cleanMiniImageUrl(value: unknown): { imageUrl?: string | null; error?: string } {
+  if (value === undefined) return {};
+  if (value === null) return { imageUrl: null };
+  if (typeof value !== "string") return { error: "Cover image must be an image URL." };
+  const trimmed = value.trim().slice(0, 2048);
+  if (!trimmed) return { imageUrl: null };
+  try {
+    const url = new URL(trimmed);
+    if (url.protocol !== "https:" && url.protocol !== "http:") throw new Error("scheme");
+  } catch {
+    return { error: "Cover image is not a valid http(s) URL." };
+  }
+  return { imageUrl: trimmed };
+}
+
 // --- Newsletter guide_spotlight resolver -----------------------------------
 // Resolve the guides selected in a template's guide_spotlight blocks into
 // render-ready items, keyed by Mini id. Only ACTIVE Minis in the current
@@ -247,13 +267,14 @@ export async function resolveGuideSpotlightItems(
     const workspace = await getWorkspace();
     const minis = await basePrisma.mini.findMany({
       where: { id: { in: ids }, workspaceId: workspace.id, active: true },
-      select: { id: true, title: true, question: true, slug: true, priceCents: true },
+      select: { id: true, title: true, question: true, slug: true, priceCents: true, imageUrl: true },
     });
     for (const m of minis) {
       items.set(m.id, {
         title: m.title,
         question: m.question,
         priceCents: m.priceCents,
+        imageUrl: m.imageUrl,
         url: `${appUrl}/minis/${m.slug}`,
       });
     }

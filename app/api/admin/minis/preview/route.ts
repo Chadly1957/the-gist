@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
   const workspace = await getWorkspace();
   await ensureSeedMinis(workspace.id, workspace.slug);
 
-  const guideSelect = { id: true, slug: true, title: true, question: true, content: true } as const;
+  const guideSelect = { id: true, slug: true, title: true, question: true, content: true, imageUrl: true } as const;
   const minis = await basePrisma.mini.findMany({
     where: { workspaceId: workspace.id, active: true },
     orderBy: { createdAt: "asc" },

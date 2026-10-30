@@ -24,6 +24,7 @@ interface GuideCard {
   question: string;
   slug: string;
   priceCents: number;
+  imageUrl: string | null;
 }
 
 const money = (cents: number) => `$${(cents / 100).toFixed(2)}`;
@@ -99,10 +100,14 @@ export default function ProductsPage() {
             ))}
             {guides.map((g) => (
               <Link key={g.id} href={`/minis/${g.slug}`} className="border rounded-2xl overflow-hidden hover:shadow-lg transition-shadow block">
-                <div className="w-full h-48 bg-green-800 flex flex-col items-center justify-center px-6 text-center">
-                  <div className="text-[11px] font-bold tracking-[0.2em] uppercase text-green-200">A Gist Deals Guide</div>
-                  <div className="mt-2 text-2xl font-bold text-white" style={{ fontFamily: "Georgia, serif" }}>{g.title}</div>
-                </div>
+                {g.imageUrl ? (
+                  <img src={g.imageUrl} alt={g.title} className="w-full h-48 object-cover" />
+                ) : (
+                  <div className="w-full h-48 bg-green-800 flex flex-col items-center justify-center px-6 text-center">
+                    <div className="text-[11px] font-bold tracking-[0.2em] uppercase text-green-200">A Gist Deals Guide</div>
+                    <div className="mt-2 text-2xl font-bold text-white" style={{ fontFamily: "Georgia, serif" }}>{g.title}</div>
+                  </div>
+                )}
                 <div className="p-4">
                   <div className="font-bold text-lg text-gray-900">{g.title}</div>
                   <div className="text-sm text-gray-500 mt-1">{g.question}</div>

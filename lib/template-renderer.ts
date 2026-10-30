@@ -128,6 +128,9 @@ export interface GuideSpotlightItem {
   title: string;
   question: string;
   priceCents: number;
+  // Optional cover image (the guide's overall image), rendered as the
+  // card's top image when set; absent/null renders exactly as before.
+  imageUrl?: string | null;
   url: string;
 }
 
@@ -492,9 +495,14 @@ function renderGuideSpotlight(
       : `$${(item.priceCents / 100).toFixed(2)}`;
   const ctaLabel = String(content.buttonLabel || "Get the Guide");
   const ctaUrl = trackedUrl(tracking, item.url, "guide_spotlight", item.title);
+  // Spliced onto the card's opening tag line so a guide with no cover
+  // image renders byte-identical HTML to before this field existed.
+  const imageHtml = item.imageUrl
+    ? `<img src="${item.imageUrl}" alt="${item.title}" style="width:100%;height:200px;object-fit:cover;display:block;" />`
+    : "";
   return `
     <div style="padding:20px 40px;">
-      <div style="border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;">
+      <div style="border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;">${imageHtml}
         <div style="padding:16px;">
           <div style="font-size:18px;font-weight:700;color:#111827;margin:0 0 6px;font-family:Georgia,serif;line-height:1.3;">${item.title}</div>
           <div style="font-size:14px;color:#4b5563;line-height:1.6;margin:0 0 10px;font-family:sans-serif;">${item.question}</div>

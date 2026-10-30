@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { workspaceFetch, workspacePath } from "@/lib/workspace-client";
 
 // Admin editor for the $5 guides (internal name: Minis). Customer-facing
@@ -26,6 +26,7 @@ interface MiniRow {
   question: string;
   content: Block[];
   priceCents: number;
+  imageUrl: string | null;
   active: boolean;
   createdAt: string;
   purchaseCount: number;
@@ -44,6 +45,7 @@ interface FormState {
   title: string;
   slug: string;
   question: string;
+  imageUrl: string;
   active: boolean;
   options: OptionForm[];
   ideas: string[];
@@ -55,6 +57,7 @@ const EMPTY_FORM: FormState = {
   title: "",
   slug: "",
   question: "",
+  imageUrl: "",
   active: false,
   options: [{ ...EMPTY_OPTION }],
   ideas: [""],
@@ -90,6 +93,7 @@ function formFromMini(m: MiniRow): FormState {
     title: m.title,
     slug: m.slug,
     question: m.question,
+    imageUrl: m.imageUrl || "",
     active: m.active,
     options: options.length ? options : [{ ...EMPTY_OPTION }],
     ideas: ideas.length ? ideas : [""],
@@ -127,6 +131,8 @@ export default function MinisPage() {
   const [currentWorkspaceId, setCurrentWorkspaceId] = useState("");
   const [copyTargets, setCopyTargets] = useState<Record<string, string>>({});
   const [copyingId, setCopyingId] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const coverInput = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -160,6 +166,32 @@ export default function MinisPage() {
 
   const otherWorkspaces = workspaces.filter((w) => w.id !== currentWorkspaceId);
 
+  // Cover image upload, mirroring the Products admin hero image: POST the
+  // file to /api/admin/upload (R2) and keep the returned URL in the form.
+  const uploadImage = async (file: File): Promise<string | null> => {
+    const fd = new FormData();
+    fd.append("file", file);
+    const res = await workspaceFetch("/api/admin/upload", { method: "POST", body: fd });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Upload failed.");
+    return data.url as string;
+  };
+
+  const onCoverPick = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    setError("");
+    try {
+      const url = await uploadImage(file);
+      if (url) setForm((f) => ({ ...f, imageUrl: url }));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Upload failed.");
+    }
+    setUploading(false);
+    e.target.value = "";
+  };
+
   function openNew() {
     setEditingId(null);
     setForm(EMPTY_FORM);
@@ -188,6 +220,7 @@ export default function MinisPage() {
         title: form.title,
         slug: form.slug,
         question: form.question,
+        imageUrl: form.imageUrl.trim() || null,
         active: form.active,
         content: serialize(form),
       };
@@ -335,6 +368,22 @@ export default function MinisPage() {
                 </span>
               </span>
             </label>
+            <div className="md:col-span-2">
+              <span className="text-sm font-medium">Cover image</span>
+              <div className="mt-1 flex items-center gap-3">
+                {form.imageUrl && <img src={form.imageUrl} alt="" className="w-20 h-20 object-cover rounded-lg border" />}
+                <button type="button" onClick={() => coverInput.current?.click()} disabled={uploading} className="px-3 py-2 border rounded-lg text-sm bg-white hover:bg-gray-100 disabled:opacity-50">
+                  {uploading ? "Uploading..." : form.imageUrl ? "Replace cover image" : "Upload cover image"}
+                </button>
+                {form.imageUrl && <button type="button" onClick={() => setForm({ ...form, imageUrl: "" })} className="text-sm text-red-600">Remove</button>}
+                <input ref={coverInput} type="file" accept="image/*" className="hidden" onChange={onCoverPick} />
+              </div>
+              <input value={form.imageUrl} onChange={(e) => setForm({ ...form, imageUrl: e.target.value })} className="mt-2 w-full border rounded-lg px-3 py-2 text-sm bg-white" placeholder="...or paste an image URL" />
+              <span className="block text-xs text-gray-400 mt-1">
+                Optional. Shows on the guide&apos;s page, in the Deals portal, on the shop card,
+                and in newsletter spotlights. Leave empty for no cover image.
+              </span>
+            </div>
           </div>
 
           <div>

@@ -103,6 +103,7 @@ interface MiniGuide {
   slug: string;
   title: string;
   question: string;
+  imageUrl?: string | null;
   content: MiniGuideBlock[];
 }
 
@@ -597,6 +598,13 @@ function MiniGuideSection({
     : options;
   return (
     <section id={`guide-${guide.slug}`} className="mb-8 scroll-mt-6">
+      {guide.imageUrl && (
+        <img
+          src={guide.imageUrl}
+          alt={guide.title}
+          className="w-full aspect-[16/9] object-cover rounded-3xl mb-4"
+        />
+      )}
       <div className="px-1 mb-4">
         <p className="text-xs font-bold uppercase tracking-widest text-green-700 mb-1">Guide</p>
         <h2 className="font-extrabold text-2xl text-stone-900 tracking-tight">{guide.title}</h2>
