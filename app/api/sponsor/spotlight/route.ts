@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { isPartnerCategory } from "@/lib/partner-categories";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
-  const { token, businessName, description, ctaUrl, ctaLabel, logoUrl } = await req.json();
+  const { token, businessName, description, ctaUrl, ctaLabel, logoUrl, category } = await req.json();
 
   if (!token) return NextResponse.json({ error: "Token required." }, { status: 401 });
 
@@ -19,6 +20,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Description must be 300 characters or less." }, { status: 400 });
   }
 
+  if (category !== undefined && category !== null && !isPartnerCategory(category)) {
+    return NextResponse.json({ error: "That category is not on the list." }, { status: 400 });
+  }
+
   const listing = await prisma.spotlightListing.create({
     data: {
       sponsorId: profile.id,
@@ -27,6 +32,7 @@ export async function POST(req: NextRequest) {
       ctaUrl: ctaUrl.trim(),
       ctaLabel: ctaLabel?.trim() || "Visit Website",
       logoUrl: logoUrl?.trim() || null,
+      category: isPartnerCategory(category) ? category : null,
     },
   });
 
@@ -34,7 +40,7 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
-  const { token, id, businessName, description, ctaUrl, ctaLabel, logoUrl } = await req.json();
+  const { token, id, businessName, description, ctaUrl, ctaLabel, logoUrl, category } = await req.json();
 
   if (!token || !id) return NextResponse.json({ error: "Token and listing ID required." }, { status: 400 });
 
@@ -50,6 +56,9 @@ export async function PATCH(req: NextRequest) {
   if (description.length > 300) {
     return NextResponse.json({ error: "Description must be 300 characters or less." }, { status: 400 });
   }
+  if (category !== undefined && category !== null && !isPartnerCategory(category)) {
+    return NextResponse.json({ error: "That category is not on the list." }, { status: 400 });
+  }
 
   const updated = await prisma.spotlightListing.update({
     where: { id },
@@ -59,6 +68,12 @@ export async function PATCH(req: NextRequest) {
       ctaUrl: ctaUrl.trim(),
       ctaLabel: ctaLabel?.trim() || "Visit Website",
       logoUrl: logoUrl?.trim() || null,
+      // Category changes only when the caller sends the field, so flows
+      // that do not know about it (like the signup logo attach) can never
+      // wipe an existing category.
+      ...(category !== undefined
+        ? { category: isPartnerCategory(category) ? category : null }
+        : {}),
     },
   });
 

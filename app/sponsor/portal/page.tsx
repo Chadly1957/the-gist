@@ -11,6 +11,7 @@ import UrlInput from "@/components/UrlInput";
 import WeekBookingFlow, { WeekTier, WeekBookingPrefill } from "@/components/sponsor/WeekBookingFlow";
 import BoardBoostPrompt from "@/components/BoardBoostPrompt";
 import SiteHeader from "@/components/SiteHeader";
+import { PARTNER_CATEGORIES } from "@/lib/partner-categories";
 
 interface Spotlight {
   id: string;
@@ -19,6 +20,7 @@ interface Spotlight {
   description: string;
   ctaLabel: string;
   ctaUrl: string;
+  category: string | null;
   status: string;
   createdAt: string;
 }
@@ -175,7 +177,7 @@ function PortalContent() {
 
   // Spotlight form
   const [editingSpotlight, setEditingSpotlight] = useState<Spotlight | null>(null);
-  const [sForm, setSForm] = useState({ businessName: "", logoUrl: "", description: "", ctaLabel: "Visit Website", ctaUrl: "" });
+  const [sForm, setSForm] = useState({ businessName: "", logoUrl: "", description: "", ctaLabel: "Visit Website", ctaUrl: "", category: "" });
   const [sUploading, setSUploading] = useState(false);
   const [sSubmitting, setSSubmitting] = useState(false);
   const [sError, setSError] = useState("");
@@ -861,7 +863,7 @@ function PortalContent() {
                       <div className="flex flex-col items-end gap-1.5 shrink-0">
                         <StatusBadge status={s.status} />
                         <button
-                          onClick={() => { setEditingSpotlight(s); setSForm({ businessName: s.businessName, logoUrl: s.logoUrl || "", description: s.description, ctaLabel: s.ctaLabel, ctaUrl: s.ctaUrl }); setSError(""); setSSuccess(false); setView("spotlight"); }}
+                          onClick={() => { setEditingSpotlight(s); setSForm({ businessName: s.businessName, logoUrl: s.logoUrl || "", description: s.description, ctaLabel: s.ctaLabel, ctaUrl: s.ctaUrl, category: s.category || "" }); setSError(""); setSSuccess(false); setView("spotlight"); }}
                           className="text-xs text-green-700 hover:underline"
                         >
                           Edit
@@ -985,6 +987,18 @@ function PortalContent() {
                   <textarea value={sForm.description} onChange={(e) => setSForm((f) => ({ ...f, description: e.target.value }))} required rows={3} maxLength={300}
                     placeholder="1-2 sentences about what you do and why readers should visit."
                     className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none" />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Directory Category</label>
+                  <select value={sForm.category} onChange={(e) => setSForm((f) => ({ ...f, category: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white">
+                    <option value="">No category yet</option>
+                    {PARTNER_CATEGORIES.map((c) => (
+                      <option key={c.slug} value={c.slug}>{c.label}</option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-gray-400 mt-1">Where your business appears in the Community Partners directory.</p>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

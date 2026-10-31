@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getAdminSession } from "@/lib/auth";
+import { isPartnerCategory } from "@/lib/partner-categories";
 
 export const dynamic = "force-dynamic";
 
@@ -9,7 +10,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await req.json();
-  const { status, businessName, logoUrl, description, ctaLabel, ctaUrl } = body;
+  const { status, businessName, logoUrl, description, ctaLabel, ctaUrl, category } = body;
 
   const data: Record<string, unknown> = {};
   if (status) {
@@ -21,6 +22,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (description !== undefined) data.description = description;
   if (ctaLabel !== undefined) data.ctaLabel = ctaLabel;
   if (ctaUrl !== undefined) data.ctaUrl = ctaUrl;
+  if (category !== undefined) data.category = isPartnerCategory(category) ? category : null;
 
   const updated = await prisma.spotlightListing.update({
     where: { id: params.id },
