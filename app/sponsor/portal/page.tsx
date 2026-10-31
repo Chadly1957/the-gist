@@ -709,8 +709,8 @@ function PortalContent() {
                   </svg>
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-gray-800">Book a Week</p>
-                  <p className="text-xs text-gray-400">Presenting $150 · Standard $75</p>
+                  <p className="text-sm font-semibold text-gray-800">Book a Campaign</p>
+                  <p className="text-xs text-gray-400">7-Issue Featured Campaign · 7 days, Mon to Sun</p>
                 </div>
               </button>
               <button
