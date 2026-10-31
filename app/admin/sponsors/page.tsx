@@ -868,8 +868,8 @@ function AdminSponsorsContent() {
                   <label className="text-xs text-gray-600">Tier
                     <select value={placeForm.tier} onChange={(e) => setPlace("tier", e.target.value)}
                       className="mt-1 w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm">
-                      <option value="standard">Standard ($75/wk)</option>
-                      <option value="presenting">Presenting ($150/wk)</option>
+                      <option value="standard">Featured Campaign (price by city)</option>
+                      <option value="presenting">Presenting, legacy ($150/wk)</option>
                     </select>
                   </label>
                   {placeMode === "week" ? (

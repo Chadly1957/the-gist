@@ -1,14 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import Stripe from "stripe";
-import { formatWeekRange } from "@/lib/sponsor-weeks";
+import { formatWeekRange, WEEK_TIERS, isValidTier } from "@/lib/sponsor-weeks";
 
 export const dynamic = "force-dynamic";
-
-const TIER_LABELS: Record<string, string> = {
-  presenting: "Presenting Sponsor",
-  standard: "Standard Sponsor",
-};
 
 // Payment history for the portal. Receipt URLs are fetched from Stripe on
 // demand so no extra columns are needed; a failure just yields null.
@@ -47,7 +42,7 @@ export async function GET(req: NextRequest) {
       id: b.id,
       paidAt: b.paidAt ? b.paidAt.toISOString() : null,
       weekLabel: formatWeekRange(b.week.weekStart),
-      tierLabel: TIER_LABELS[b.tier] ?? b.tier,
+      tierLabel: isValidTier(b.tier) ? WEEK_TIERS[b.tier].label : b.tier,
       amountCents: b.amountCents,
       receiptUrl,
     });
