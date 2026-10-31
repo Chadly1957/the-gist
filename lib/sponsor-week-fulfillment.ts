@@ -1,6 +1,6 @@
 import { basePrisma } from "./db-base";
 import { withWorkspace } from "./workspace";
-import { buildWeekProjectionRows, type WeekTier } from "./sponsor-weeks";
+import { buildWeekProjectionRows, WEEK_TIERS, isValidTier, type WeekTier } from "./sponsor-weeks";
 import { sendOwnerBookingNotification, sendWeekBookingConfirmation } from "./sponsor-week-email";
 import { alertBookingFailureOnce, type BookingForAlert } from "./sponsor-booking-alerts";
 
@@ -102,7 +102,7 @@ export async function fulfillPaidWeekBooking(workspaceId: string, booking: Fulfi
     const liveAppUrl = await getWorkspaceUrl();
     const liveAdminUrl = `${liveAppUrl}/admin/sponsors?tab=weekly&highlight=${booking.id}`;
     const portalUrl = `${liveAppUrl}/sponsor/portal?token=${booking.sponsor.magicToken}`;
-    const tierLabel = booking.tier === "presenting" ? "Presenting Sponsor" : "Standard Sponsor";
+    const tierLabel = isValidTier(booking.tier) ? WEEK_TIERS[booking.tier].label : booking.tier;
     const { formatWeekRange } = await import("@/lib/sponsor-weeks");
     const weekLabel = formatWeekRange(booking.week.weekStart);
 

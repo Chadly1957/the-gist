@@ -321,7 +321,7 @@ export async function sendCommunityBoardConfirmation(args: {
       </p>
       ${button(a, args.portalUrl, "Open My Sponsor Portal")}
       <p style="color: #9ca3af; font-size: 12px;">
-        When you are ready for top-of-email placement, check out the paid weekly packages on the sponsor page.
+        When you are ready for guaranteed placement in the newsletter, check out the 7-Issue Featured Campaign on the sponsor page.
       </p>
     `);
 

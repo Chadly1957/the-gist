@@ -259,21 +259,21 @@ function CityLandingPage() {
               <div className="space-y-3">
                 {[
                   {
-                    name: "Community Board",
+                    name: "Business Directory",
                     price: "Free",
-                    desc: "Rotating listing with logo, description, and link in every issue.",
+                    desc: "Your listing in the public directory, event submissions, and rotating Spotlight eligibility.",
                     accent: "bg-green-800 border-green-700",
                   },
                   {
-                    name: "Standard Sponsor",
-                    price: "$75/week",
-                    desc: "Logo and write-up mid-email, running in every issue all week. Two slots per week.",
+                    name: "7-Issue Featured Campaign",
+                    price: "$150 · $99",
+                    desc: "One featured promotion in 7 consecutive daily issues. $150 in Decatur, $99 in Effingham, $229 for both.",
                     accent: "bg-green-800 border-green-700",
                   },
                   {
-                    name: "Presenting Sponsor",
-                    price: "$150/week",
-                    desc: "Top of every issue all week, plus full standard placement. Exclusive: one per week.",
+                    name: "Presenting Partnership",
+                    price: "$333/mo",
+                    desc: "Logo in every issue, 10+ features a month, and an exclusive category. Limited to 4 per city.",
                     accent: "bg-green-800 border-green-600",
                   },
                 ].map((tier) => (

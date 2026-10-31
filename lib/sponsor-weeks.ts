@@ -1,12 +1,43 @@
 import { basePrisma } from "./db-base";
 
-// Week-based sponsor packages: one presenting slot and two standard slots
-// per calendar week (Monday-Friday).
+// Sponsor campaign packages (October 2026 restructure): one buyer-facing
+// product, the 7-Issue Featured Campaign, sold per market with a both-cities
+// bundle. A campaign runs Monday-Sunday (7 consecutive daily issues) in the
+// in-article featured placement, 2 slots per city per week. The legacy
+// weekly Presenting Sponsor tier is retired from sale (presenting placement
+// is partnership-only now); its config stays so historical bookings,
+// availability math for old rows, and admin tools keep working.
 export const WEEK_TIERS = {
-  presenting: { priceCents: 15000, slots: 1, label: "Presenting Sponsor", adType: "presenting" },
-  standard: { priceCents: 7500, slots: 2, label: "Standard Sponsor", adType: "in_article" },
+  presenting: { priceCents: 15000, slots: 1, label: "Presenting Sponsor", adType: "presenting", sellable: false },
+  standard: { priceCents: 15000, slots: 2, label: "7-Issue Featured Campaign", adType: "in_article", sellable: true },
 } as const;
 export type WeekTier = keyof typeof WEEK_TIERS;
+
+// Campaign price by workspace slug. Any other workspace falls back to the
+// Decatur price until it gets its own market pricing.
+export const CAMPAIGN_PRICE_CENTS_BY_SLUG: Record<string, number> = {
+  decatur: 15000,
+  effingham: 9900,
+};
+export function campaignPriceCents(workspaceSlug: string): number {
+  return CAMPAIGN_PRICE_CENTS_BY_SLUG[workspaceSlug] ?? WEEK_TIERS.standard.priceCents;
+}
+
+// Both-cities bundle: one checkout covering the same week in both markets.
+// The discount vs buying separately (150 + 99 = 249) is split across the two
+// bookings proportionally so per-city revenue stays honest and sums exactly.
+export const CAMPAIGN_BUNDLE_PRICE_CENTS = 22900;
+export const CAMPAIGN_BUNDLE_SLUGS = ["decatur", "effingham"] as const;
+export function bundleShareCents(workspaceSlug: string): number {
+  const total = CAMPAIGN_BUNDLE_SLUGS.reduce((sum, slug) => sum + campaignPriceCents(slug), 0);
+  const idx = CAMPAIGN_BUNDLE_SLUGS.indexOf(workspaceSlug as (typeof CAMPAIGN_BUNDLE_SLUGS)[number]);
+  if (idx < 0) return CAMPAIGN_BUNDLE_PRICE_CENTS;
+  if (idx === CAMPAIGN_BUNDLE_SLUGS.length - 1) {
+    // Last market takes the remainder so shares always sum to the bundle price.
+    return CAMPAIGN_BUNDLE_PRICE_CENTS - CAMPAIGN_BUNDLE_SLUGS.slice(0, -1).reduce((sum, slug) => sum + bundleShareCents(slug), 0);
+  }
+  return Math.round((CAMPAIGN_BUNDLE_PRICE_CENTS * campaignPriceCents(workspaceSlug)) / total);
+}
 
 export const HOLD_MINUTES = 10;
 // Bookings that occupy a slot: the buyer is mid-checkout, has paid, or the
@@ -81,12 +112,17 @@ export function isValidTier(tier: string): tier is WeekTier {
   return tier === "presenting" || tier === "standard";
 }
 
+/** Tiers a buyer may purchase right now (legacy tiers validate but do not sell). */
+export function isSellableTier(tier: string): tier is WeekTier {
+  return isValidTier(tier) && WEEK_TIERS[tier].sellable;
+}
+
 export function formatWeekRange(weekStart: string): string {
   const fmt = (s: string) => {
     const [y, m, d] = s.split("-").map(Number);
     return new Date(y, m - 1, d).toLocaleDateString("en-US", { month: "short", day: "numeric" });
   };
-  return `${fmt(weekStart)} - ${fmt(addDaysISO(weekStart, 4))}`;
+  return `${fmt(weekStart)} - ${fmt(addDaysISO(weekStart, 6))}`;
 }
 
 export type WeekState = "available" | "one_left" | "sold";
@@ -151,8 +187,8 @@ export async function countTaken(
 export async function getWeeksAvailability(workspaceId: string): Promise<WeekAvailability[]> {
   const now = new Date();
   const weeks = await bookableSponsorWeeks(workspaceId);
-  // All Mon-Fri issue dates across the upcoming weeks.
-  const issueDates = weeks.flatMap((w) => [0, 1, 2, 3, 4].map((o) => addDaysISO(w, o)));
+  // All issue dates across the upcoming weeks (campaigns run Mon-Sun).
+  const issueDates = weeks.flatMap((w) => [0, 1, 2, 3, 4, 5, 6].map((o) => addDaysISO(w, o)));
   const [holds, bookings, dayRows] = await Promise.all([
     basePrisma.sponsorHold.findMany({
       where: { workspaceId, week: { weekStart: { in: weeks } }, expiresAt: { gt: now } },
@@ -181,7 +217,7 @@ export async function getWeeksAvailability(workspaceId: string): Promise<WeekAva
     const key = `${r.week.weekStart}:${r.tier}`;
     takenByWeekTier.set(key, (takenByWeekTier.get(key) ?? 0) + 1);
   }
-  // A public weekly package needs one free slot on EVERY weekday Mon-Fri.
+  // A campaign package needs one free slot on EVERY day Mon-Sun.
   // Fold day-level fills in as: weeklyTaken + max over the week's days of
   // standalone day usage, so a single-day admin fill shows real scarcity.
   const dayUsageByDate = new Map<string, Map<string, number>>();
@@ -197,7 +233,7 @@ export async function getWeeksAvailability(workspaceId: string): Promise<WeekAva
     tiers: (Object.keys(WEEK_TIERS) as WeekTier[]).map((tier) => {
       const weeklyTaken = takenByWeekTier.get(`${weekStart}:${tier}`) ?? 0;
       let maxDay = 0;
-      for (let o = 0; o < 5; o++) {
+      for (let o = 0; o < 7; o++) {
         const m = dayUsageByDate.get(addDaysISO(weekStart, o));
         if (m) maxDay = Math.max(maxDay, m.get(tier) ?? 0);
       }
@@ -210,10 +246,11 @@ export async function getWeeksAvailability(workspaceId: string): Promise<WeekAva
 }
 
 /**
- * Project a paid week booking into 5 day-based AdBooking rows (Mon-Fri) so
- * the existing send pipeline, analytics, and portal keep working unchanged.
- * Copy handling: buyer's own copy goes live immediately; when Chad writes the
- * copy the rows wait in pending_review until he finalizes them.
+ * Project a paid campaign booking into 7 day-based AdBooking rows (Mon-Sun)
+ * so the existing send pipeline, analytics, and portal keep working
+ * unchanged. Copy handling: buyer's own copy goes live immediately; when
+ * Chad writes the copy the rows wait in pending_review until he finalizes
+ * them.
  */
 export interface WeekBookingProjectionInput {
   id: string;
@@ -231,12 +268,12 @@ export interface WeekBookingProjectionInput {
   isComp?: boolean;
 }
 
-/** Build the 5 Mon-Fri AdBooking rows for a paid week booking (pure). */
+/** Build the 7 Mon-Sun AdBooking rows for a paid campaign booking (pure). */
 export function buildWeekProjectionRows(booking: WeekBookingProjectionInput) {
   const adType = WEEK_TIERS[booking.tier].adType;
   const copy = booking.finalAdCopy ?? booking.aboutText;
   const approved = !booking.chadWritesCopy;
-  return [0, 1, 2, 3, 4].map((offset) => ({
+  return [0, 1, 2, 3, 4, 5, 6].map((offset) => ({
     workspaceId: booking.workspaceId,
     sponsorId: booking.sponsorId,
     type: adType,

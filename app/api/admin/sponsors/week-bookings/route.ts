@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { basePrisma } from "@/lib/db-base";
 import { getAdminSession } from "@/lib/auth";
-import { DEFAULT_WORKSPACE_ID } from "@/lib/workspace-constants";
+import { getWorkspace } from "@/lib/workspace";
 import {
   WEEK_TIERS,
+  campaignPriceCents,
   isValidTier,
   withWeekLock,
   countTaken,
@@ -74,7 +75,9 @@ export async function POST(req: NextRequest) {
   const session = await getAdminSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const workspaceId = DEFAULT_WORKSPACE_ID;
+  // The admin UI is workspace-aware; placements must land in the city the
+  // admin is actually working in (this previously hardcoded Decatur).
+  const { id: workspaceId, slug: workspaceSlug } = await getWorkspace();
   const {
     sponsorId,
     tier,
@@ -104,7 +107,7 @@ export async function POST(req: NextRequest) {
 
   const comp = isComp === true;
   const status = comp ? "comped" : "paid";
-  const amountCents = comp ? 0 : WEEK_TIERS[tier as WeekTier].priceCents;
+  const amountCents = comp ? 0 : tier === "standard" ? campaignPriceCents(workspaceSlug) : WEEK_TIERS[tier as WeekTier].priceCents;
   const adType = WEEK_TIERS[tier as WeekTier].adType;
 
   try {
@@ -164,7 +167,7 @@ export async function POST(req: NextRequest) {
         },
         include: { week: { select: { weekStart: true } } },
       });
-      // Project the 5 Mon-Fri day rows immediately. Comp rows are unpaid
+      // Project the 7 Mon-Sun day rows immediately. Comp rows are unpaid
       // but flagged isComp so admin can tell them apart from truly unpaid.
       const rows = buildWeekProjectionRows({
         id: created.id,

@@ -56,6 +56,40 @@ async function fulfillWeekBooking(workspaceId: string, session: Stripe.Checkout.
   await fulfillPaidWeekBooking(workspaceId, booking);
 }
 
+async function fulfillBundleWeekBookings(session: Stripe.Checkout.Session) {
+  // One session paid for one campaign booking per bundle market. Fulfill
+  // each in its own workspace; fulfillPaidWeekBooking is idempotent.
+  const bookings = await basePrisma.sponsorWeekBooking.findMany({
+    where: { stripeSessionId: session.id },
+    include: { week: { select: { weekStart: true } }, sponsor: { select: { magicToken: true } } },
+  });
+  if (bookings.length === 0) {
+    if (session.payment_status === "paid") {
+      console.error(`Sponsor bundle payment captured but no booking rows for session ${session.id}`);
+      await alertBookingFailureOnce(
+        session.metadata?.workspaceId || "decatur",
+        {
+          id: session.id,
+          businessName: session.customer_details?.name || "Unknown business",
+          tier: "standard",
+          weekStart: session.metadata?.weekStart || "",
+          amountCents: session.amount_total ?? 0,
+          contactName: session.customer_details?.name || "",
+          email: session.customer_details?.email || "",
+          fulfillmentAlertSentAt: null,
+        },
+        `Stripe reports payment captured for bundle checkout session ${session.id}, but no matching sponsor week bookings exist in any city. No ads were placed.`,
+        "https://www.thegistdecatur.com/admin/sponsors?tab=weekly",
+      );
+    }
+    return;
+  }
+  const { fulfillPaidWeekBooking } = await import("@/lib/sponsor-week-fulfillment");
+  for (const booking of bookings) {
+    await fulfillPaidWeekBooking(booking.workspaceId, booking);
+  }
+}
+
 async function fulfillCouponBookPurchase(stripe: Stripe, workspaceId: string, session: Stripe.Checkout.Session) {
   const email = (session.customer_details?.email || session.metadata?.email || "").trim().toLowerCase();
   if (!email || !email.includes("@")) {
@@ -577,6 +611,8 @@ export async function POST(req: NextRequest) {
     const approvedAt = new Date();
     if (session.metadata?.kind === "sponsor_week") {
       await fulfillWeekBooking(workspaceId, session);
+    } else if (session.metadata?.kind === "sponsor_week_bundle") {
+      await fulfillBundleWeekBookings(session);
     } else if (session.metadata?.kind === "coupon_book") {
       await fulfillCouponBookPurchase(stripe, workspaceId, session);
     } else if (session.metadata?.kind === "coupon_book_gift") {
@@ -602,8 +638,14 @@ export async function POST(req: NextRequest) {
   }
 
   if (event.type === "checkout.session.expired") {
+    // Bundle sessions hold bookings in two workspaces under one session id;
+    // the metadata workspace is only the buyer's starting city, so bundle
+    // cleanup must not filter by it.
+    const isBundle = session.metadata?.kind === "sponsor_week_bundle";
     await basePrisma.sponsorWeekBooking.deleteMany({
-      where: { workspaceId, stripeSessionId: sessionId, status: "pending_payment" },
+      where: isBundle
+        ? { stripeSessionId: sessionId, status: "pending_payment" }
+        : { workspaceId, stripeSessionId: sessionId, status: "pending_payment" },
     });
     await basePrisma.adBooking.deleteMany({
       where: { workspaceId, stripeSessionId: sessionId, status: "pending_payment" },

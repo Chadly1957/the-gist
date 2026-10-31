@@ -6,8 +6,13 @@ import { normalizeUrl } from "@/lib/url";
 import { optInSponsorToNewsletter } from "@/lib/sponsor-newsletter-optin";
 import {
   WEEK_TIERS,
+  CAMPAIGN_BUNDLE_PRICE_CENTS,
+  CAMPAIGN_BUNDLE_SLUGS,
+  bundleShareCents,
+  campaignPriceCents,
   countTaken,
   formatWeekRange,
+  isSellableTier,
   isValidTier,
   mondayOf,
   bookableSponsorWeeks,
@@ -21,6 +26,7 @@ export const dynamic = "force-dynamic";
 export async function POST(req: NextRequest) {
   const {
     holdToken,
+    bundleHoldTokens,
     businessName,
     contactName,
     email,
@@ -33,7 +39,7 @@ export async function POST(req: NextRequest) {
     returnTo,
   } = await req.json();
 
-  if (!holdToken) return NextResponse.json({ error: "Your reservation expired. Please pick a week again." }, { status: 400 });
+  if (!holdToken && !bundleHoldTokens) return NextResponse.json({ error: "Your reservation expired. Please pick a week again." }, { status: 400 });
 
   const trimmedBusiness = businessName?.trim();
   const trimmedContact = contactName?.trim();
@@ -76,6 +82,167 @@ export async function POST(req: NextRequest) {
   }
   const backToPortal = returnTo === "portal" && portalProfile;
 
+  // Both-cities bundle: one Stripe session, one booking per market. Holds
+  // for both markets were created together by /api/sponsor/bundle-holds.
+  if (bundleHoldTokens) {
+    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+    const appUrl = await getWorkspaceUrl();
+    const bundleWorkspaces = await basePrisma.workspace.findMany({
+      where: { slug: { in: [...CAMPAIGN_BUNDLE_SLUGS] } },
+    });
+    if (bundleWorkspaces.length !== CAMPAIGN_BUNDLE_SLUGS.length) {
+      return NextResponse.json({ error: "Bundle is not available right now." }, { status: 503 });
+    }
+    const ordered = CAMPAIGN_BUNDLE_SLUGS.map((slug) => bundleWorkspaces.find((w) => w.slug === slug)!);
+
+    // Validate every hold before creating anything.
+    const holds: { ws: (typeof ordered)[number]; holdToken: string; weekId: string }[] = [];
+    let bundleWeekStart: string | null = null;
+    for (const ws of ordered) {
+      const token = (bundleHoldTokens as Record<string, unknown>)[ws.slug];
+      if (typeof token !== "string" || !token) {
+        return NextResponse.json({ error: "Your reservation expired. Please pick a week again." }, { status: 400 });
+      }
+      const hold = await basePrisma.sponsorHold.findFirst({
+        where: { workspaceId: ws.id, holdToken: token, expiresAt: { gt: new Date() } },
+        include: { week: { select: { id: true, weekStart: true } } },
+      });
+      if (
+        !hold ||
+        hold.tier !== "standard" ||
+        mondayOf(hold.week.weekStart) !== hold.week.weekStart ||
+        !(await bookableSponsorWeeks(ws.id)).includes(hold.week.weekStart)
+      ) {
+        return NextResponse.json({ error: "Your reservation expired. Please pick a week again." }, { status: 400 });
+      }
+      if (bundleWeekStart && bundleWeekStart !== hold.week.weekStart) {
+        return NextResponse.json({ error: "Your reservation expired. Please pick a week again." }, { status: 400 });
+      }
+      bundleWeekStart = hold.week.weekStart;
+      holds.push({ ws, holdToken: token, weekId: hold.week.id });
+    }
+    const weekStart = bundleWeekStart!;
+    const tierLabel = WEEK_TIERS.standard.label;
+
+    let session;
+    try {
+      session = await stripe.checkout.sessions.create({
+        mode: "payment",
+        payment_method_types: ["card"],
+        expires_at: Math.floor(Date.now() / 1000) + 60 * 60, // 1 hour
+        line_items: [
+          {
+            price_data: {
+              currency: "usd",
+              unit_amount: CAMPAIGN_BUNDLE_PRICE_CENTS,
+              product_data: {
+                name: `${ordered.map((w) => w.name).join(" + ")} - ${tierLabel}`,
+                description: `Both cities, week of ${formatWeekRange(weekStart)}`,
+              },
+            },
+            quantity: 1,
+          },
+        ],
+        customer_email: normalizedEmail,
+        success_url: backToPortal
+          ? `${appUrl}/sponsor/portal?token=${portalToken}&booking=success`
+          : `${appUrl}/sponsor/success?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: backToPortal
+          ? `${appUrl}/sponsor/portal?token=${portalToken}&booking=cancelled`
+          : `${appUrl}/sponsor/apply?cancelled=1`,
+        metadata: { workspaceId, kind: "sponsor_week_bundle", tier: "standard", weekStart, bundleSlugs: CAMPAIGN_BUNDLE_SLUGS.join(",") },
+      });
+    } catch (err) {
+      console.error("bundle week-checkout stripe error:", err);
+      return NextResponse.json({ error: "Could not start checkout. Please try again." }, { status: 502 });
+    }
+
+    const createdBookingIds: string[] = [];
+    try {
+      for (const { ws, holdToken, weekId } of holds) {
+        const bookingId = await withWeekLock(ws.id, weekStart, async (tx) => {
+          const liveHold = await tx.sponsorHold.findFirst({
+            where: { workspaceId: ws.id, holdToken, expiresAt: { gt: new Date() } },
+          });
+          if (!liveHold) throw new Error("Hold expired during checkout.");
+          const taken = await countTaken(tx, ws.id, weekId, "standard", liveHold.id);
+          if (taken >= WEEK_TIERS.standard.slots) throw new Error("That slot just sold.");
+
+          let profile =
+            portalProfile && ws.id === workspaceId
+              ? { id: portalProfile.id }
+              : await tx.sponsorProfile.findFirst({
+                  where: {
+                    workspaceId: ws.id,
+                    email: normalizedEmail,
+                    businessName: { equals: trimmedBusiness, mode: "insensitive" },
+                  },
+                  orderBy: { createdAt: "asc" },
+                });
+          if (!profile) {
+            profile = await tx.sponsorProfile.create({
+              data: {
+                workspaceId: ws.id,
+                businessName: trimmedBusiness,
+                contactName: trimmedContact,
+                email: normalizedEmail,
+                website: normalizedWebsite,
+              },
+            });
+          }
+
+          const booking = await tx.sponsorWeekBooking.create({
+            data: {
+              workspaceId: ws.id,
+              weekId,
+              sponsorId: profile.id,
+              tier: "standard",
+              status: "pending_payment",
+              amountCents: bundleShareCents(ws.slug),
+              stripeSessionId: session.id,
+              businessName: trimmedBusiness,
+              contactName: trimmedContact,
+              email: normalizedEmail,
+              website: normalizedWebsite,
+              logoUrl,
+              aboutText: trimmedAbout,
+              chadWritesCopy: chadWritesCopy !== false,
+            },
+          });
+          await tx.sponsorHold.delete({ where: { id_workspaceId: { id: liveHold.id, workspaceId: ws.id } } });
+          return booking.id;
+        });
+        createdBookingIds.push(bookingId);
+      }
+    } catch (err) {
+      console.error("bundle week-checkout reservation error:", err);
+      // Roll back any booking already created so a failed bundle never
+      // leaves a half-booked pair behind an expired session.
+      if (createdBookingIds.length > 0) {
+        await basePrisma.sponsorWeekBooking.deleteMany({ where: { id: { in: createdBookingIds } } });
+      }
+      try {
+        await stripe.checkout.sessions.expire(session.id);
+      } catch {
+        /* already completed or expired */
+      }
+      const soldOut = err instanceof Error && err.message === "That slot just sold.";
+      return NextResponse.json(
+        { error: soldOut ? "That slot just sold in one of the cities. Please pick another week." : "Could not reserve your slots. Please try again." },
+        { status: soldOut ? 409 : 500 }
+      );
+    }
+
+    if (subscribeNewsletter === true) {
+      try {
+        await optInSponsorToNewsletter(normalizedEmail, trimmedContact);
+      } catch (err) {
+        console.error("sponsor newsletter opt-in error:", err);
+      }
+    }
+    return NextResponse.json({ url: session.url });
+  }
+
   // Look up the hold outside the lock; re-verify inside it.
   const hold = await basePrisma.sponsorHold.findFirst({
     where: { workspaceId, holdToken, expiresAt: { gt: new Date() } },
@@ -85,7 +252,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Your reservation expired. Please pick a week again." }, { status: 400 });
   }
   const tier = hold.tier as WeekTier;
-  const amountCents = WEEK_TIERS[tier].priceCents;
+  if (!isSellableTier(tier)) {
+    return NextResponse.json({ error: "That package is no longer on sale. The 7-Issue Featured Campaign is the current offer." }, { status: 400 });
+  }
+  // Campaign pricing is per market; legacy tiers keep their flat price.
+  const amountCents = tier === "standard" ? campaignPriceCents(workspace.slug) : WEEK_TIERS[tier].priceCents;
 
   const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
   const appUrl = await getWorkspaceUrl();
