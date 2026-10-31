@@ -8,6 +8,7 @@ import { useSearchParams } from "next/navigation";
 import SponsorPreview from "@/components/SponsorPreview";
 import UrlInput from "@/components/UrlInput";
 import MultiDateCalendar from "@/components/MultiDateCalendar";
+import { PARTNER_CATEGORIES } from "@/lib/partner-categories";
 
 interface Spotlight {
   id: string;
@@ -17,6 +18,7 @@ interface Spotlight {
   description: string;
   ctaLabel: string;
   ctaUrl: string;
+  category: string | null;
   status: string;
   shownCount: number;
   lastShownAt: string | null;
@@ -423,7 +425,7 @@ function AdminSponsorsContent() {
 
   // Edit forms
   const [editingSpotlightId, setEditingSpotlightId] = useState<string | null>(null);
-  const [spotlightForm, setSpotlightForm] = useState({ businessName: "", logoUrl: "", description: "", ctaLabel: "", ctaUrl: "" });
+  const [spotlightForm, setSpotlightForm] = useState({ businessName: "", logoUrl: "", description: "", ctaLabel: "", ctaUrl: "", category: "" });
   const [editingBookingId, setEditingBookingId] = useState<string | null>(null);
   const [bookingForm, setBookingForm] = useState({ type: "in_article", date: "", headline: "", body: "", ctaUrl: "", ctaLabel: "", imageUrl: "", presentingBlurb: "", isComp: false });
   const [bookingAutoFilled, setBookingAutoFilled] = useState(false);
@@ -703,6 +705,7 @@ function AdminSponsorsContent() {
       description: s.description,
       ctaLabel: s.ctaLabel,
       ctaUrl: s.ctaUrl,
+      category: s.category || "",
     });
   }
 
@@ -1094,6 +1097,17 @@ function AdminSponsorsContent() {
                             <textarea value={spotlightForm.description} rows={2} maxLength={300}
                               onChange={(e) => setSpotlightForm((f) => ({ ...f, description: e.target.value }))}
                               className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none" />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-gray-600 mb-1">Directory Category</label>
+                            <select value={spotlightForm.category}
+                              onChange={(e) => setSpotlightForm((f) => ({ ...f, category: e.target.value }))}
+                              className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white">
+                              <option value="">No category yet</option>
+                              {PARTNER_CATEGORIES.map((c) => (
+                                <option key={c.slug} value={c.slug}>{c.label}</option>
+                              ))}
+                            </select>
                           </div>
                           <div className="grid grid-cols-2 gap-3">
                             <div>

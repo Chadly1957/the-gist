@@ -4,12 +4,13 @@ import { prisma } from "@/lib/db";
 import { normalizeUrl } from "@/lib/url";
 import { sendCommunityBoardConfirmation } from "@/lib/sponsor-week-email";
 import { optInSponsorToNewsletter } from "@/lib/sponsor-newsletter-optin";
+import { isPartnerCategory } from "@/lib/partner-categories";
 
 export const dynamic = "force-dynamic";
 
 // Free Community Board signup: instant acceptance, immediately in rotation.
 export async function POST(req: NextRequest) {
-  const { businessName, contactName, email, website, description, subscribeNewsletter } = await req.json();
+  const { businessName, contactName, email, website, description, subscribeNewsletter, category } = await req.json();
 
   const trimmedBusiness = businessName?.trim();
   const trimmedContact = contactName?.trim();
@@ -33,6 +34,10 @@ export async function POST(req: NextRequest) {
   if (trimmedDescription.length > 140) {
     return NextResponse.json({ error: "Keep your description to 140 characters or less." }, { status: 400 });
   }
+  // Directory category: optional at the API, required by the signup form.
+  // Anything unrecognized is stored as null rather than rejected, so an old
+  // client can never lose a signup over it.
+  const validCategory = isPartnerCategory(category) ? category : null;
 
   // One email can own several businesses: match the exact business so each
   // business keeps its own profile (and portal). Same business reusing the
@@ -62,6 +67,7 @@ export async function POST(req: NextRequest) {
       description: trimmedDescription,
       ctaUrl: normalizedWebsite,
       ctaLabel: "Visit Website",
+      category: validCategory,
       status: "active",
       approvedAt: new Date(),
     },

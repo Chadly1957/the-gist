@@ -286,6 +286,7 @@ model SpotlightListing {
   ctaLabel           String                    @default("Visit Website")
   ctaUrl             String
   status             String                    @default("pending")
+  category           String?
   lastShownAt        DateTime?
   shownCount         Int                       @default(0)
   upgradeNudgeSentAt DateTime?

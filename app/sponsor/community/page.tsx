@@ -8,12 +8,13 @@ import { WorkspaceAnchor } from "@/components/workspace/WorkspaceLink";
 import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
 import { workspaceFetch } from "@/lib/workspace-client";
 import { normalizeUrl } from "@/lib/url";
+import { PARTNER_CATEGORIES } from "@/lib/partner-categories";
 
 const MAX_DESC = 140;
 
 function CommunityContent() {
   const { workspace } = useWorkspace();
-  const [form, setForm] = useState({ businessName: "", contactName: "", email: "", website: "", description: "", subscribeNewsletter: false });
+  const [form, setForm] = useState({ businessName: "", contactName: "", email: "", website: "", description: "", category: "", subscribeNewsletter: false });
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -146,6 +147,17 @@ function CommunityContent() {
             <label className="block text-xs font-semibold text-gray-600 mb-1">Website or Link *</label>
             <input type="text" value={form.website} onChange={(e) => update("website", e.target.value)} onBlur={(e) => update("website", normalizeUrl(e.target.value))} required placeholder="decaturcoffee.com"
               className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">Directory Category *</label>
+            <select value={form.category} onChange={(e) => update("category", e.target.value)} required
+              className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white">
+              <option value="" disabled>Choose where your listing belongs…</option>
+              {PARTNER_CATEGORIES.map((c) => (
+                <option key={c.slug} value={c.slug}>{c.label}</option>
+              ))}
+            </select>
+            <p className="text-xs text-gray-400 mt-1">This is how neighbors find you in the Community Partners directory.</p>
           </div>
           <div>
             <div className="flex items-center justify-between mb-1">
