@@ -6,6 +6,7 @@ import { workspaceFetch } from "@/lib/workspace-client";
 import { useEffect, useRef, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import SponsorPreview from "@/components/SponsorPreview";
+import SponsorNurture from "@/components/admin/SponsorNurture";
 import UrlInput from "@/components/UrlInput";
 import MultiDateCalendar from "@/components/MultiDateCalendar";
 import { PARTNER_CATEGORIES } from "@/lib/partner-categories";
@@ -232,7 +233,7 @@ function BookingsCalendar({
 
 function AdminSponsorsContent() {
   const searchParams = useSearchParams();
-  const validTabs = ["weekly", "spotlights", "bookings", "profiles", "pricing"] as const;
+  const validTabs = ["weekly", "spotlights", "bookings", "profiles", "nurture", "pricing"] as const;
   const initialTab = validTabs.includes(searchParams.get("tab") as (typeof validTabs)[number])
     ? (searchParams.get("tab") as (typeof validTabs)[number])
     : "weekly";
@@ -800,6 +801,7 @@ function AdminSponsorsContent() {
           { id: "spotlights", label: "Spotlights" },
           { id: "bookings", label: "Bookings" },
           { id: "profiles", label: "Profiles" },
+          { id: "nurture", label: "Nurture" },
           { id: "pricing", label: "Pricing" },
         ] as const).map((t) => (
           <button key={t.id} onClick={() => setTab(t.id)}
@@ -1811,6 +1813,9 @@ function AdminSponsorsContent() {
               </div>
             </div>
           )}
+
+          {/* NURTURE EMAILS */}
+          {tab === "nurture" && <SponsorNurture />}
         </>
       )}
     </div>
