@@ -167,7 +167,7 @@ export async function POST(req: NextRequest) {
         },
         include: { week: { select: { weekStart: true } } },
       });
-      // Project the 5 Mon-Fri day rows immediately. Comp rows are unpaid
+      // Project the 7 Mon-Sun day rows immediately. Comp rows are unpaid
       // but flagged isComp so admin can tell them apart from truly unpaid.
       const rows = buildWeekProjectionRows({
         id: created.id,
