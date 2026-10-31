@@ -96,6 +96,23 @@ export async function POST(req: NextRequest) {
       { status: 409 }
     );
   }
+  // Program cap: at most 4 Presenting Partners per city (the public
+  // sponsorship page promises limited positions; this keeps it true).
+  const PARTNER_CAP_PER_CITY = 4;
+  for (const wsId of workspaceIds) {
+    const count = await basePrisma.presentingPartnership.count({
+      where: {
+        status: { in: ["pending_payment", "active", "past_due"] },
+        workspaceIds: { has: wsId },
+      },
+    });
+    if (count >= PARTNER_CAP_PER_CITY) {
+      return NextResponse.json(
+        { error: `${wsId} already has ${PARTNER_CAP_PER_CITY} Presenting Partners. The program is capped at ${PARTNER_CAP_PER_CITY} per city.` },
+        { status: 409 }
+      );
+    }
+  }
 
   const { monthlyCents, label } = TIER_PRICING[tier];
   const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);

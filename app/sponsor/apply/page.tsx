@@ -7,17 +7,20 @@ import SiteHeader from "@/components/SiteHeader";
 
 function ApplyContent() {
   const searchParams = useSearchParams();
-  const tierParam = searchParams.get("tier");
-  const tier: WeekTier = tierParam === "presenting" ? "presenting" : "standard";
+  // The weekly Presenting Sponsor tier is retired: every paid booking is
+  // the 7-Issue Featured Campaign now. Old ?tier=presenting links land here
+  // too and simply book the campaign.
   const cancelled = searchParams.get("cancelled") === "1";
   const rebookToken = searchParams.get("rebook");
+  const initialMarket = searchParams.get("market") === "both" ? "both" : undefined;
 
   return (
     <WeekBookingFlow
-      tier={tier}
+      tier="standard"
       cancelled={cancelled}
       rebookToken={rebookToken}
       backHref="/sponsor"
+      initialMarket={initialMarket}
     />
   );
 }

@@ -65,7 +65,7 @@ function SuccessContent() {
           <p><span className="font-semibold text-gray-900">What happens next:</span></p>
           <p>1. A confirmation email is on its way to you.</p>
           <p>2. Chad writes your ad copy (or yours goes live as-is).</p>
-          <p>3. Your ad runs in every issue that week, Monday to Friday.</p>
+          <p>3. Your ad runs in every issue that week, Monday to Sunday.</p>
           <p>4. You&apos;ll get a results report the following Monday.</p>
         </div>
         <Link href="/sponsor" className="block w-full bg-green-700 hover:bg-green-800 text-white text-sm font-semibold py-3 rounded-xl transition-colors">

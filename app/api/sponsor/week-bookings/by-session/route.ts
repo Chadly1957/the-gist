@@ -1,7 +1,7 @@
 import { getWorkspace } from "@/lib/workspace";
 import { NextRequest, NextResponse } from "next/server";
 import { basePrisma } from "@/lib/db-base";
-import { formatWeekRange } from "@/lib/sponsor-weeks";
+import { formatWeekRange, WEEK_TIERS, isValidTier } from "@/lib/sponsor-weeks";
 
 export const dynamic = "force-dynamic";
 
@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
     found: true,
     paid: booking.status === "paid" || booking.status === "completed",
     businessName: booking.businessName,
-    tierLabel: booking.tier === "presenting" ? "Presenting Sponsor" : "Standard Sponsor",
+    tierLabel: isValidTier(booking.tier) ? WEEK_TIERS[booking.tier].label : booking.tier,
     weekLabel: formatWeekRange(booking.week.weekStart),
   });
 }

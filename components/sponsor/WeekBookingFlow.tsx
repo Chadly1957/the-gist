@@ -45,20 +45,24 @@ interface WeekBookingFlowProps {
   /** Public flow shows a back link; portal uses onBack instead. */
   backHref?: string;
   onBack?: () => void;
+  /** Start in both-cities bundle mode (landing page / apply link). */
+  initialMarket?: "single" | "both";
 }
 
-const TIER_META: Record<WeekTier, { label: string; price: string; blurb: string }> = {
+const TIER_META: Record<WeekTier, { label: string; blurb: string }> = {
   presenting: {
     label: "Presenting Sponsor",
-    price: "$150/week",
     blurb: "Top of the email. Your logo, a short write-up, and link. Exclusive: only one per week.",
   },
   standard: {
-    label: "Standard Sponsor",
-    price: "$75/week",
-    blurb: "Mid-email placement. Your logo and a short write-up. Two slots per week.",
+    label: "7-Issue Featured Campaign",
+    blurb: "One clearly labeled featured promotion in each of 7 consecutive daily issues. Your logo or image, message, and button, with tracked clicks and a results summary.",
   },
 };
+
+function money(cents: number): string {
+  return `$${Math.round(cents / 100)}`;
+}
 
 export default function WeekBookingFlow({
   tier,
@@ -69,8 +73,22 @@ export default function WeekBookingFlow({
   suggestedWeek,
   backHref,
   onBack,
+  initialMarket,
 }: WeekBookingFlowProps) {
-  const meta = TIER_META[tier];
+  const meta = TIER_META[tier === "presenting" ? "standard" : tier];
+  // Legacy presenting bookings rebook as the campaign (the weekly
+  // presenting tier is retired); every internal use goes through this.
+  const bookingTier: WeekTier = tier === "presenting" ? "standard" : tier;
+  // The campaign can run in this city only, or as a both-cities bundle for
+  // the same week. Presenting (legacy) bookings never bundle.
+  const bundleAvailable = bookingTier === "standard";
+  const [market, setMarket] = useState<"single" | "both">(bundleAvailable && initialMarket === "both" ? "both" : "single");
+  const [singlePriceCents, setSinglePriceCents] = useState<number | null>(null);
+  const [bundlePriceCents, setBundlePriceCents] = useState<number | null>(null);
+  const [bundleStandaloneCents, setBundleStandaloneCents] = useState<number | null>(null);
+  const [bundleHoldTokens, setBundleHoldTokens] = useState<Record<string, string> | null>(null);
+  const priceCents = market === "both" ? bundlePriceCents : singlePriceCents;
+  const priceLabel = priceCents != null ? money(priceCents) : "";
 
   const [step, setStep] = useState<Step>("week");
   const [weeks, setWeeks] = useState<WeekAvailability[]>([]);
@@ -113,10 +131,18 @@ export default function WeekBookingFlow({
     setWeeksLoading(true);
     setWeeksError("");
     try {
-      const res = await workspaceFetch("/api/sponsor/weeks");
+      const res = await workspaceFetch(market === "both" ? "/api/sponsor/bundle-weeks" : "/api/sponsor/weeks");
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Could not load weeks.");
       setWeeks(data.weeks);
+      if (data.tiers?.[bookingTier]?.priceCents != null) {
+        if (market === "both") setBundlePriceCents(data.tiers[bookingTier].priceCents);
+        else setSinglePriceCents(data.tiers[bookingTier].priceCents);
+      }
+      if (data.bundle) {
+        setBundlePriceCents(data.bundle.priceCents);
+        setBundleStandaloneCents(data.bundle.standaloneTotalCents);
+      }
     } catch {
       setWeeksError("Could not load availability. Please refresh and try again.");
     } finally {
@@ -127,7 +153,39 @@ export default function WeekBookingFlow({
   useEffect(() => {
     loadWeeks();
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [market]);
+
+  // Learn the single-city price up front so the market toggle can show both
+  // prices before the buyer picks a mode.
+  useEffect(() => {
+    if (!bundleAvailable) return;
+    (async () => {
+      try {
+        const res = await workspaceFetch("/api/sponsor/weeks");
+        const data = await res.json();
+        if (res.ok && data.tiers?.[bookingTier]?.priceCents != null) setSinglePriceCents(data.tiers[bookingTier].priceCents);
+      } catch {
+        /* toggle falls back to text-only labels */
+      }
+      try {
+        const res = await workspaceFetch("/api/sponsor/bundle-weeks");
+        const data = await res.json();
+        if (res.ok && data.bundle) {
+          setBundlePriceCents(data.bundle.priceCents);
+          setBundleStandaloneCents(data.bundle.standaloneTotalCents);
+        }
+      } catch {
+        /* bundle toggle hides itself if unavailable */
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  function switchMarket(next: "single" | "both") {
+    if (next === market || step !== "week") return;
+    setMarket(next);
+    setWeeks([]);
+  }
 
   // Portal prefill from the sponsor profile
   useEffect(() => {
@@ -188,6 +246,18 @@ export default function WeekBookingFlow({
   }, [step, expiresAt]);
 
   async function handleHoldExpired() {
+    if (bundleHoldTokens) {
+      try {
+        await workspaceFetch("/api/sponsor/bundle-holds", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ holdTokens: Object.values(bundleHoldTokens) }),
+        });
+      } catch {
+        /* best effort */
+      }
+      setBundleHoldTokens(null);
+    }
     if (holdToken) {
       try {
         await workspaceFetch("/api/sponsor/week-holds", {
@@ -209,14 +279,32 @@ export default function WeekBookingFlow({
     setHolding(true);
     setHoldError("");
     try {
+      if (market === "both") {
+        const res = await workspaceFetch("/api/sponsor/bundle-holds", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ weekStart: week.weekStart }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Could not reserve that week.");
+        setBundleHoldTokens(data.holds);
+        setHoldToken("");
+        setHeldWeekLabel(week.label);
+        setExpiresAt(new Date(data.expiresAt).getTime());
+        setSecondsLeft(Math.round((new Date(data.expiresAt).getTime() - Date.now()) / 1000));
+        setStep("business");
+        window.scrollTo(0, 0);
+        return;
+      }
       const res = await workspaceFetch("/api/sponsor/week-holds", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tier, weekStart: week.weekStart }),
+        body: JSON.stringify({ tier: bookingTier, weekStart: week.weekStart }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Could not reserve that week.");
       setHoldToken(data.holdToken);
+      setBundleHoldTokens(null);
       setHeldWeekLabel(week.label);
       setExpiresAt(new Date(data.expiresAt).getTime());
       setSecondsLeft(Math.round((new Date(data.expiresAt).getTime() - Date.now()) / 1000));
@@ -235,7 +323,7 @@ export default function WeekBookingFlow({
     if (suggestedTried.current || weeksLoading || weeks.length === 0 || !suggestedWeek) return;
     suggestedTried.current = true;
     const week = weeks.find((w) => w.weekStart === suggestedWeek);
-    const t = week?.tiers.find((x) => x.tier === tier);
+    const t = week?.tiers.find((x) => x.tier === bookingTier);
     if (week && t && t.state !== "sold") {
       pickWeek(week);
     }
@@ -251,7 +339,9 @@ export default function WeekBookingFlow({
     setFormError("");
     const fd = new FormData();
     fd.append("file", file);
-    fd.append("holdToken", holdToken);
+    // Uploads validate against a live hold in this workspace: in bundle
+    // mode, send this city's bundle hold token.
+    fd.append("holdToken", holdToken || bundleHoldTokens?.[workspace.slug] || Object.values(bundleHoldTokens ?? {})[0] || "");
     try {
       const res = await workspaceFetch("/api/sponsor/week-upload", { method: "POST", body: fd });
       const data = await res.json();
@@ -273,7 +363,6 @@ export default function WeekBookingFlow({
     setFormError("");
     try {
       const body: Record<string, unknown> = {
-        holdToken,
         businessName: form.businessName,
         contactName: form.contactName,
         email: form.email,
@@ -283,6 +372,8 @@ export default function WeekBookingFlow({
         chadWritesCopy: form.chadWritesCopy,
         subscribeNewsletter: form.subscribeNewsletter,
       };
+      if (bundleHoldTokens) body.bundleHoldTokens = bundleHoldTokens;
+      else body.holdToken = holdToken;
       if (portalToken) {
         body.portalToken = portalToken;
         body.returnTo = "portal";
@@ -341,8 +432,42 @@ export default function WeekBookingFlow({
           <>
             <h1 className="text-2xl font-bold text-gray-900 mb-1">{meta.label}</h1>
             <p className="text-sm text-gray-500 mb-0.5">{meta.blurb}</p>
+            {bundleAvailable && (
+              <div className="flex gap-2 mt-4 mb-1">
+                <button
+                  type="button"
+                  onClick={() => switchMarket("single")}
+                  className={`flex-1 px-3 py-2 rounded-xl border text-xs font-semibold transition-colors ${
+                    market === "single"
+                      ? "border-green-600 bg-green-50 text-green-800"
+                      : "border-gray-200 text-gray-600 hover:border-green-400"
+                  }`}
+                >
+                  Just {workspace.area}
+                  {singlePriceCents != null ? ` · ${money(singlePriceCents)}` : ""}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => switchMarket("both")}
+                  disabled={bundlePriceCents == null}
+                  className={`flex-1 px-3 py-2 rounded-xl border text-xs font-semibold transition-colors disabled:opacity-40 ${
+                    market === "both"
+                      ? "border-green-600 bg-green-50 text-green-800"
+                      : "border-gray-200 text-gray-600 hover:border-green-400"
+                  }`}
+                >
+                  Both cities
+                  {bundlePriceCents != null ? ` · ${money(bundlePriceCents)}` : ""}
+                  {bundlePriceCents != null && bundleStandaloneCents != null && bundleStandaloneCents > bundlePriceCents
+                    ? ` (save ${money(bundleStandaloneCents - bundlePriceCents)})`
+                    : ""}
+                </button>
+              </div>
+            )}
             <p className="text-xs text-green-600 font-medium mb-1">Step 1 of 3: Pick your week</p>
-            <p className="text-sm font-semibold text-gray-900 mb-4">{meta.price} · runs Monday to Friday</p>
+            <p className="text-sm font-semibold text-gray-900 mb-4">
+              {priceLabel ? `${priceLabel} · ` : ""}7 issues, Monday to Sunday{market === "both" ? " · runs in both cities the same week" : ""}
+            </p>
 
             {weeksLoading && <p className="text-sm text-gray-500 py-8 text-center">Loading weeks…</p>}
             {weeksError && <p className="text-sm text-red-600 py-4">{weeksError}</p>}
@@ -350,7 +475,7 @@ export default function WeekBookingFlow({
             {!weeksLoading && !weeksError && (
               <div className="space-y-2">
                 {weeks.map((week) => {
-                  const t = week.tiers.find((x) => x.tier === tier)!;
+                  const t = week.tiers.find((x) => x.tier === bookingTier)!;
                   const sold = t.state === "sold";
                   return (
                     <button
@@ -393,7 +518,7 @@ export default function WeekBookingFlow({
           <>
             <h1 className="text-2xl font-bold text-gray-900 mb-1">About your business</h1>
             <p className="text-sm text-gray-500 mb-0.5">
-              {meta.label} · {heldWeekLabel} · {meta.price}
+              {meta.label} · {heldWeekLabel} · {priceLabel}{market === "both" ? " · both cities" : ""}
             </p>
             <p className="text-xs text-green-600 font-medium mb-1">Step 2 of 3 — Your info</p>
             <p className={`text-xs font-semibold mb-5 ${secondsLeft < 120 ? "text-red-600" : "text-gray-500"}`}>
@@ -483,7 +608,7 @@ export default function WeekBookingFlow({
 
               <button type="submit" disabled={submitting || uploading || !form.logoUrl}
                 className="w-full bg-green-700 hover:bg-green-800 disabled:opacity-50 text-white font-semibold py-3 rounded-xl text-sm transition-colors">
-                {submitting ? "Starting secure checkout…" : `Continue to payment — ${meta.price}`}
+                {submitting ? "Starting secure checkout…" : `Continue to payment${priceLabel ? ` — ${priceLabel}` : ""}`}
               </button>
               <button type="button" onClick={backToWeeks} className="w-full text-xs text-gray-400 hover:text-gray-600 py-1">
                 ← Pick a different week

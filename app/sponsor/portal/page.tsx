@@ -161,7 +161,7 @@ function ctr(clicks: number, impressions: number): string {
 
 const BOOK_TIER_META: Record<WeekTier, { label: string; price: string; blurb: string }> = {
   presenting: { label: "Presenting Sponsor", price: "$150/week", blurb: "Top of the email · 1 slot per week" },
-  standard: { label: "Standard Sponsor", price: "$75/week", blurb: "Mid-email placement · 2 slots per week" },
+  standard: { label: "7-Issue Featured Campaign", price: "7 issues · Monday to Sunday", blurb: "Featured placement in every issue · 2 slots per week · price by city at checkout" },
 };
 
 function PortalContent() {
@@ -788,7 +788,7 @@ function PortalContent() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-0.5 flex-wrap">
                             <p className="text-sm font-semibold text-gray-800">{w.weekLabel}</p>
-                            <span className="text-xs text-gray-400">{w.tier === "presenting" ? "Presenting Sponsor" : "Standard Sponsor"}</span>
+                            <span className="text-xs text-gray-400">{w.tier === "presenting" ? "Presenting Sponsor" : "7-Issue Featured Campaign"}</span>
                           </div>
                           <p className="text-xs text-gray-400" title={w.aboutText}>{truncateWords(w.aboutText, 90)}</p>
                         </div>
@@ -821,7 +821,7 @@ function PortalContent() {
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-0.5 flex-wrap">
                               <p className="text-sm font-semibold text-gray-800">{w.weekLabel}</p>
-                              <span className="text-xs text-gray-400">{w.tier === "presenting" ? "Presenting Sponsor" : "Standard Sponsor"}</span>
+                              <span className="text-xs text-gray-400">{w.tier === "presenting" ? "Presenting Sponsor" : "7-Issue Featured Campaign"}</span>
                             </div>
                             {(s.sends > 0 || s.clicks > 0) ? (
                               <p className="text-xs text-green-700 font-medium">
@@ -1043,13 +1043,13 @@ function PortalContent() {
         {/* BOOK A WEEK */}
         {view === "booking" && (
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-1">Book a Week</h1>
+            <h1 className="text-2xl font-bold text-gray-900 mb-1">Book a Campaign</h1>
             <p className="text-sm text-gray-500 mb-6">Your details are pre-filled from your profile. Pick a week and check out — under a minute.</p>
 
             <div className="mb-5">
-              <label className="block text-xs font-semibold text-gray-600 mb-2">Package</label>
-              <div className="grid grid-cols-2 gap-2">
-                {(["standard", "presenting"] as WeekTier[]).map((t) => (
+              <label className="block text-xs font-semibold text-gray-600 mb-2">Campaign</label>
+              <div className="grid grid-cols-1 gap-2">
+                {(["standard"] as WeekTier[]).map((t) => (
                   <button key={t} type="button" onClick={() => setBookTier(t)}
                     className={`p-3 rounded-xl border text-left transition-colors ${bookTier === t ? "border-green-500 bg-green-50" : "border-gray-200 hover:border-gray-300 bg-white"}`}>
                     <p className="text-sm font-semibold text-gray-800">{BOOK_TIER_META[t].label}</p>
@@ -1076,7 +1076,7 @@ function PortalContent() {
           <div>
             <h1 className="text-2xl font-bold text-gray-900 mb-1">Edit Your Ad</h1>
             <p className="text-sm text-gray-500 mb-6">
-              {editingWeek.tier === "presenting" ? "Presenting Sponsor" : "Standard Sponsor"} · {editingWeek.weekLabel}
+              {editingWeek.tier === "presenting" ? "Presenting Sponsor" : "7-Issue Featured Campaign"} · {editingWeek.weekLabel}
               {editingWeek.chadWritesCopy && !editingWeek.finalAdCopy && (
                 <span className="block mt-1 text-xs text-amber-700">Chad is writing your ad copy — you can update the logo, description, and website below.</span>
               )}

@@ -3,7 +3,7 @@ import { withWorkspace, getWorkspace, getWorkspaceUrl } from "@/lib/workspace";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import Stripe from "stripe";
-import { addDaysISO, formatWeekRange, upcomingSponsorWeeks } from "@/lib/sponsor-weeks";
+import { addDaysISO, formatWeekRange, upcomingSponsorWeeks, WEEK_TIERS, isValidTier } from "@/lib/sponsor-weeks";
 import { getWeekBookingStats } from "@/lib/sponsor-week-stats";
 import { alertBookingFailureOnce, toAlertShape } from "@/lib/sponsor-booking-alerts";
 import {
@@ -42,7 +42,7 @@ async function runWorkspace() {
       weekStart: booking.week.weekStart,
     });
 
-    const tierLabel = booking.tier === "presenting" ? "Presenting Sponsor" : "Standard Sponsor";
+    const tierLabel = isValidTier(booking.tier) ? WEEK_TIERS[booking.tier].label : booking.tier;
     try {
       await sendWeekResults({
         to: booking.email,
@@ -86,7 +86,7 @@ async function runWorkspace() {
       ? `${appUrl}/sponsor/portal?token=${booking.sponsor.magicToken}&bookWeek=${suggestedWeek}`
       : `${appUrl}/sponsor/portal?token=${booking.sponsor.magicToken}`;
 
-    const tierLabel = booking.tier === "presenting" ? "Presenting Sponsor" : "Standard Sponsor";
+    const tierLabel = isValidTier(booking.tier) ? WEEK_TIERS[booking.tier].label : booking.tier;
     try {
       await sendRenewalNudge({
         to: booking.email,

@@ -6,7 +6,7 @@ import {
   WEEK_TIERS,
   bookableSponsorWeeks,
   countTaken,
-  isValidTier,
+  isSellableTier,
   mondayOf,
   withWeekLock,
   type WeekTier,
@@ -18,8 +18,8 @@ export const dynamic = "force-dynamic";
 export async function POST(req: NextRequest) {
   const { tier, weekStart } = await req.json();
 
-  if (!isValidTier(tier)) {
-    return NextResponse.json({ error: "Pick a valid package." }, { status: 400 });
+  if (!isSellableTier(tier)) {
+    return NextResponse.json({ error: "That package is not on sale. The 7-Issue Featured Campaign is the current offer." }, { status: 400 });
   }
 
   const workspace = await getWorkspace();
