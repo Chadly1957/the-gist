@@ -37,7 +37,7 @@ export async function GET() {
         return match.tiers.find((t) => t.tier === "standard");
       });
       const sold = states.some((s) => !s || s.state === "sold");
-      const oneLeft = !sold && states.some((s) => s.state === "one_left");
+      const oneLeft = !sold && states.some((s) => s?.state === "one_left");
       return {
         weekStart: w.weekStart,
         label: formatWeekRange(w.weekStart),
