@@ -38,6 +38,8 @@ model Workspace {
   sponsorWeekRows             SponsorWeek[]
   sponsorHoldRows             SponsorHold[]
   sponsorWeekBookingRows      SponsorWeekBooking[]
+  sponsorEmailTemplateRows    SponsorEmailTemplate[]
+  sponsorEmailCampaignRows    SponsorEmailCampaign[]
   sponsorDayConfigRows        SponsorDayConfig[]
   gameSponsorEventRows        GameSponsorEvent[]
   eventRows                   Event[]
@@ -257,6 +259,7 @@ model SponsorProfile {
   logoUrl       String?
   magicToken    String               @unique @default(cuid())
   active        Boolean              @default(true)
+  nurtureOptOut Boolean              @default(false)
   notes         String?
   createdAt     DateTime             @default(now())
   spotlights    SpotlightListing[]
@@ -271,6 +274,44 @@ model SponsorProfile {
   // One person can own several businesses: email alone is not unique.
   // Find-or-create flows match on email + business name.
   @@index([workspaceId, email])
+  @@index([workspaceId])
+}
+
+// Sponsor nurture emails (Admin > Sponsors > Nurture): reusable base
+// templates plus per-send campaigns built from them, emailed to free
+// businesses to nurture them toward paid sponsorship. Blocks are stored
+// as a JSON string (same pattern as the newsletter Template model).
+model SponsorEmailTemplate {
+  workspaceId String    @default("decatur")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  id          String    @id @default(cuid())
+  name        String
+  subject     String    @default("")
+  blocks      String    @default("[]")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([id, workspaceId])
+  @@index([workspaceId])
+}
+
+model SponsorEmailCampaign {
+  workspaceId    String    @default("decatur")
+  workspace      Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  id             String    @id @default(cuid())
+  templateId     String?
+  name           String
+  subject        String    @default("")
+  blocks         String    @default("[]")
+  audience       String    @default("free") // free | all | past
+  status         String    @default("draft") // draft | sending | sent
+  sentAt         DateTime?
+  recipientCount Int       @default(0)
+  failedCount    Int       @default(0)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@unique([id, workspaceId])
   @@index([workspaceId])
 }
 

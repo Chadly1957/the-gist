@@ -18,7 +18,6 @@ function CityLandingPage() {
   // to the id. New workspaces get generated cuid ids, so id alone misses.
   const brand = workspace.slug || workspace.id;
   const [email, setEmail] = useState("");
-  const [firstName, setFirstName] = useState("");
   // Keep the just-subscribed email around after the form clears so the
   // Deals upsell can carry it through to /deals (no re-typing).
   const [subscribedEmail, setSubscribedEmail] = useState("");
@@ -57,7 +56,6 @@ function CityLandingPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           email,
-          firstName,
           utmSource: params.get("utm_source"),
           utmMedium: params.get("utm_medium"),
           utmCampaign: params.get("utm_campaign"),
@@ -70,7 +68,6 @@ function CityLandingPage() {
         setMessage(data.message || "You're in! Welcome to " + workspace.name + ".");
         setSubscribedEmail(email);
         setEmail("");
-        setFirstName("");
         // Meta Pixel signup event, same as /join, so the pixel counts
         // homepage signups too. Guarded so a blocked pixel can never
         // break the signup itself.
@@ -130,13 +127,6 @@ function CityLandingPage() {
                 </>
               ) : (
                 <form onSubmit={handleSubmit} className="max-w-md space-y-3 w-full">
-                  <input
-                    type="text"
-                    placeholder="First name (optional)"
-                    value={firstName}
-                    onChange={(e) => setFirstName(e.target.value)}
-                    className="w-full px-4 py-3.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent placeholder:text-gray-400"
-                  />
                   <div className="flex flex-col sm:flex-row gap-2">
                     <input
                       type="email"
