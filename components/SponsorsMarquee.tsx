@@ -1,5 +1,6 @@
 "use client";
 import { WorkspaceAnchor } from "@/components/workspace/WorkspaceLink";
+import Link from "@/components/workspace/WorkspaceLink";
 
 import { workspaceFetch } from "@/lib/workspace-client";
 
@@ -71,6 +72,11 @@ export default function SponsorsMarquee() {
             </WorkspaceAnchor>
           ))}
         </div>
+      </div>
+      <div className="max-w-6xl mx-auto px-6 mt-6 text-center">
+        <Link href="/partners" className="text-sm font-semibold text-green-700 hover:underline">
+          See all our Community Partners →
+        </Link>
       </div>
     </section>
   );
