@@ -15,6 +15,8 @@ interface StoryBody {
   headerImageUrl?: string | null;
   body?: string;
   excerpt?: string | null;
+  seoTitle?: string | null;
+  seoDescription?: string | null;
   status?: string;
 }
 
@@ -60,6 +62,8 @@ export async function POST(req: NextRequest) {
       headerImageUrl: body.headerImageUrl?.trim() || null,
       body: bodyHtml,
       excerpt,
+      seoTitle: body.seoTitle?.trim() || null,
+      seoDescription: body.seoDescription?.trim() || null,
       status,
       publishedAt: status === "published" ? new Date() : null,
     },

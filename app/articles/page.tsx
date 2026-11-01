@@ -1,9 +1,28 @@
+import type { Metadata } from "next";
 import { prisma } from "@/lib/db";
-import { getWorkspace } from "@/lib/workspace";
+import { getWorkspace, getWorkspaceUrl } from "@/lib/workspace";
 import Link from "@/components/workspace/WorkspaceLink";
 import SiteHeader from "@/components/SiteHeader";
 
 export const dynamic = "force-dynamic";
+
+// The index used to inherit the generic site title/description from the
+// root layout. It gets its own search-facing metadata (and canonical) so
+// the page can rank as this city's article hub.
+export async function generateMetadata(): Promise<Metadata> {
+  const workspace = await getWorkspace();
+  const base = (await getWorkspaceUrl()).replace(/\/$/, "");
+  const url = `${base}/articles`;
+  const title = `${workspace.area} News & Community Stories | ${workspace.name}`;
+  const description = `Original stories, explainers, and community news from ${workspace.name}, written for ${workspace.area} readers.`;
+  return {
+    title,
+    description,
+    alternates: { canonical: url },
+    openGraph: { title, description, url, type: "website" },
+    twitter: { card: "summary", title, description },
+  };
+}
 
 // Public index of original articles for this workspace: a full browsing
 // page for readers (and the page the newsletter's source scraper reads
@@ -24,9 +43,25 @@ export default async function ArticlesIndexPage() {
     },
   });
   const tz = workspace.timezone || "America/Chicago";
+  const base = (await getWorkspaceUrl()).replace(/\/$/, "");
+
+  // ItemList structured data for the hub page: every published article,
+  // newest first, generated from the same rows the page renders.
+  const itemListJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "ItemList",
+    name: `${workspace.name} Articles`,
+    itemListElement: stories.map((s, i) => ({
+      "@type": "ListItem",
+      position: i + 1,
+      url: `${base}/articles/${s.slug}`,
+      name: s.headline,
+    })),
+  };
 
   return (
     <div className="min-h-screen bg-white flex flex-col">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(itemListJsonLd) }} />
       <SiteHeader />
       <main className="flex-1">
         <div className="max-w-5xl mx-auto px-4 py-10">
@@ -43,7 +78,7 @@ export default async function ArticlesIndexPage() {
                 <article key={s.id} className="border rounded-2xl overflow-hidden hover:shadow-lg transition-shadow">
                   <Link href={`/articles/${s.slug}`} className="flex flex-col sm:flex-row">
                     {s.headerImageUrl ? (
-                      <img src={s.headerImageUrl} alt="" className="w-full sm:w-64 h-48 sm:h-auto object-cover shrink-0" />
+                      <img src={s.headerImageUrl} alt={s.headline} className="w-full sm:w-64 h-48 sm:h-auto object-cover shrink-0" />
                     ) : (
                       <div className="w-full sm:w-64 h-48 sm:h-auto bg-gray-100 shrink-0" />
                     )}
