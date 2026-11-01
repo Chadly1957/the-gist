@@ -59,6 +59,15 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const text = typeof body.excerpt === "string" ? body.excerpt.trim() : "";
     data.excerpt = text || deriveExcerpt((data.body as string) || existing.body);
   }
+  // Optional SEO overrides: sending the field at all updates it, and an
+  // emptied value clears back to the automatic fallback (null).
+  if (body.seoTitle !== undefined) {
+    data.seoTitle = typeof body.seoTitle === "string" && body.seoTitle.trim() ? body.seoTitle.trim() : null;
+  }
+  if (body.seoDescription !== undefined) {
+    data.seoDescription =
+      typeof body.seoDescription === "string" && body.seoDescription.trim() ? body.seoDescription.trim() : null;
+  }
   if (typeof body.status === "string") {
     if (!VALID_STATUS.includes(body.status)) return NextResponse.json({ error: "Invalid status." }, { status: 400 });
     data.status = body.status;

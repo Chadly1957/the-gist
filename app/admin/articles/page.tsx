@@ -15,6 +15,9 @@ interface Story {
   headerImageUrl: string | null;
   body: string;
   excerpt: string | null;
+  seoTitle: string | null;
+  seoDescription: string | null;
+  viewCount: number;
   status: string;
   publishedAt: string | null;
   updatedAt: string;
@@ -27,6 +30,8 @@ const EMPTY_FORM = {
   headerImageUrl: "",
   body: "",
   excerpt: "",
+  seoTitle: "",
+  seoDescription: "",
   status: "draft",
 };
 
@@ -114,6 +119,8 @@ export default function ArticlesPage() {
       headerImageUrl: s.headerImageUrl || "",
       body: s.body,
       excerpt: s.excerpt || "",
+      seoTitle: s.seoTitle || "",
+      seoDescription: s.seoDescription || "",
       status: s.status,
     });
     setSlugTouched(true);
@@ -134,6 +141,8 @@ export default function ArticlesPage() {
       headerImageUrl: form.headerImageUrl || null,
       body: form.body,
       excerpt: form.excerpt,
+      seoTitle: form.seoTitle,
+      seoDescription: form.seoDescription,
       status: form.status,
     };
     try {
@@ -263,6 +272,32 @@ export default function ArticlesPage() {
             />
           </label>
 
+          <details className="border rounded-lg bg-white px-4 py-3">
+            <summary className="text-sm font-medium cursor-pointer">Search &amp; social (optional)</summary>
+            <div className="mt-3 space-y-4">
+              <label className="block">
+                <span className="text-sm font-medium">Search title</span>
+                <input
+                  value={form.seoTitle}
+                  onChange={(e) => setForm({ ...form, seoTitle: e.target.value })}
+                  className="mt-1 w-full border rounded-lg px-3 py-2"
+                  placeholder="Blank = the headline is used"
+                />
+                <span className="text-xs text-gray-400">Only changes what Google and social shares show, not the headline on the page.</span>
+              </label>
+              <label className="block">
+                <span className="text-sm font-medium">Search description</span>
+                <textarea
+                  value={form.seoDescription}
+                  onChange={(e) => setForm({ ...form, seoDescription: e.target.value })}
+                  className="mt-1 w-full border rounded-lg px-3 py-2"
+                  rows={2}
+                  placeholder="Blank = the excerpt (or the article's opening lines) is used"
+                />
+              </label>
+            </div>
+          </details>
+
           <div className="flex items-end gap-4 flex-wrap">
             <label className="block">
               <span className="text-sm font-medium">Status</span>
@@ -293,6 +328,7 @@ export default function ArticlesPage() {
                 <div className="text-sm text-gray-500 truncate">
                   by {s.author} · /articles/{s.slug}
                   {s.publishedAt && <> · published {new Date(s.publishedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</>}
+                  {typeof s.viewCount === "number" && <> · {s.viewCount.toLocaleString()} views</>}
                 </div>
                 {s.excerpt && <div className="text-sm text-gray-400 truncate">{s.excerpt}</div>}
               </div>

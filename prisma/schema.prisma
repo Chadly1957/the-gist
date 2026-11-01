@@ -767,6 +767,9 @@ model Story {
   headerImageUrl String?
   body           String // rich text HTML from the admin editor, sanitized on save
   excerpt        String? // summary; auto-derived from the body when left blank
+  seoTitle       String? // optional search/social title override; falls back to the headline
+  seoDescription String? // optional search/social description override; falls back to the excerpt
+  viewCount      Int       @default(0) // public article page views (client beacon, one per reader session)
   status         String    @default("draft") // draft | published
   publishedAt    DateTime? // stamped when the story first goes published
   createdAt      DateTime  @default(now())

@@ -10,8 +10,16 @@ import Link from "@/components/workspace/WorkspaceLink";
 // workspace (name + area) so it renders correctly for every city, and the
 // subscriber count comes from the same /api/subscriber-count endpoint the
 // homepage hero uses (rounded down; omitted when too small to mention).
-export default function AboutGist() {
+//
+// utmCampaign is optional attribution: when a page passes it (article
+// pages pass their slug), the Subscribe button carries UTM tags so a join
+// from that page is recorded on the subscriber (utm_source=article) and
+// shows up in analytics under that campaign.
+export default function AboutGist({ utmCampaign }: { utmCampaign?: string } = {}) {
   const { workspace } = useWorkspace();
+  const joinHref = utmCampaign
+    ? `/join?utm_source=article&utm_medium=organic&utm_campaign=${encodeURIComponent(utmCampaign)}`
+    : "/join";
   const [subCount, setSubCount] = useState<number | null>(null);
 
   useEffect(() => {
@@ -35,7 +43,7 @@ export default function AboutGist() {
           )}
         </p>
         <Link
-          href="/join"
+          href={joinHref}
           className="inline-block bg-green-700 hover:bg-green-800 text-white font-semibold px-6 py-3.5 rounded-xl text-sm transition-colors"
         >
           Subscribe free
