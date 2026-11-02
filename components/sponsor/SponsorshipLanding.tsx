@@ -30,12 +30,12 @@ const PINE = "#0c5e59";
 const PINE_DARK = "#0a3232";
 const PINE_DEEP = "#072b29";
 const MINT = "#c8f6e7";
-const CREAM = "#faf9f5";
-const CREAM_DARK = "#f1f0e9";
-const INK = "#182c2d";
-const MUTED = "#61706c";
-const BORDER = "#dce6df";
-const MINT_BG = "#eaf4ec";
+const CREAM = "#ffffff";
+const CREAM_DARK = "#f3f4f6";
+const INK = "#111827";
+const MUTED = "#6b7280";
+const BORDER = "#e5e7eb";
+const MINT_BG = "#f9fafb";
 
 function Check({ className = "w-4 h-4" }: { className?: string }) {
   return (
