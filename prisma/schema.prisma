@@ -40,6 +40,8 @@ model Workspace {
   sponsorWeekBookingRows      SponsorWeekBooking[]
   sponsorEmailTemplateRows    SponsorEmailTemplate[]
   sponsorEmailCampaignRows    SponsorEmailCampaign[]
+  sponsorNurtureSendRows      SponsorNurtureSend[]
+  sponsorNurtureClickRows     SponsorNurtureClick[]
   sponsorDayConfigRows        SponsorDayConfig[]
   gameSponsorEventRows        GameSponsorEvent[]
   eventRows                   Event[]
@@ -310,9 +312,48 @@ model SponsorEmailCampaign {
   failedCount    Int       @default(0)
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
+  sends          SponsorNurtureSend[]
 
   @@unique([id, workspaceId])
   @@index([workspaceId])
+}
+
+// Per-recipient tracking for one nurture campaign send: mirrors the
+// newsletter's NewsletterRecipient open/click pattern so the Nurture tab
+// can report opens and link clicks per campaign.
+model SponsorNurtureSend {
+  workspaceId String             @default("decatur")
+  workspace   Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  id          String             @id @default(cuid())
+  campaignId  String
+  campaign    SponsorEmailCampaign @relation(fields: [campaignId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
+  profileId   String?
+  email       String
+  openedAt    DateTime?
+  openCount   Int                @default(0)
+  clickedAt   DateTime?
+  clickCount  Int                @default(0)
+  createdAt   DateTime           @default(now())
+  clicks      SponsorNurtureClick[]
+
+  @@unique([id, workspaceId])
+  @@index([workspaceId])
+  @@index([campaignId])
+}
+
+model SponsorNurtureClick {
+  workspaceId String           @default("decatur")
+  workspace   Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  id          String           @id @default(cuid())
+  sendId      String
+  send        SponsorNurtureSend @relation(fields: [sendId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
+  url         String
+  label       String?
+  createdAt   DateTime         @default(now())
+
+  @@unique([id, workspaceId])
+  @@index([workspaceId])
+  @@index([sendId])
 }
 
 model SpotlightListing {
@@ -392,7 +433,7 @@ model SponsorWeek {
   workspaceId String               @default("decatur")
   workspace   Workspace            @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
   id          String               @id @default(cuid())
-  weekStart   String // Monday, YYYY-MM-DD
+  weekStart   String // Run start date, YYYY-MM-DD (any weekday since Nov 2026; historically Mondays)
   createdAt   DateTime             @default(now())
   holds       SponsorHold[]
   bookings    SponsorWeekBooking[]

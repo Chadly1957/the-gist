@@ -60,18 +60,29 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  const listing = await prisma.spotlightListing.create({
-    data: {
-      sponsorId: profile.id,
-      businessName: trimmedBusiness,
-      description: trimmedDescription,
-      ctaUrl: normalizedWebsite,
-      ctaLabel: "Visit Website",
-      category: validCategory,
-      status: "active",
-      approvedAt: new Date(),
-    },
+  // A returning business re-submitting the form (same email + business)
+  // reuses its existing listing instead of stacking a duplicate in the
+  // directory. The confirmation email below still goes out, so they get a
+  // fresh portal link either way.
+  const existingListing = await prisma.spotlightListing.findFirst({
+    where: { sponsorId: profile.id },
+    orderBy: { createdAt: "asc" },
+    select: { id: true },
   });
+  const listing =
+    existingListing ??
+    (await prisma.spotlightListing.create({
+      data: {
+        sponsorId: profile.id,
+        businessName: trimmedBusiness,
+        description: trimmedDescription,
+        ctaUrl: normalizedWebsite,
+        ctaLabel: "Visit Website",
+        category: validCategory,
+        status: "active",
+        approvedAt: new Date(),
+      },
+    }));
 
   const appUrl = await getWorkspaceUrl();
   const portalUrl = `${appUrl}/sponsor/portal?token=${profile.magicToken}`;

@@ -10,16 +10,12 @@ import { normalizeUrl } from "@/lib/url";
 type Step = "week" | "business";
 export type WeekTier = "presenting" | "standard";
 
-interface TierAvailability {
-  tier: WeekTier;
-  state: "available" | "one_left" | "sold";
-  taken: number;
-  slots: number;
-}
-interface WeekAvailability {
-  weekStart: string;
+interface RunAvailability {
+  start: string;
   label: string;
-  tiers: TierAvailability[];
+  state: "available" | "one_left" | "sold";
+  spotsLeft: number;
+  priceCents: number;
 }
 
 export interface WeekBookingPrefill {
@@ -52,7 +48,7 @@ interface WeekBookingFlowProps {
 const TIER_META: Record<WeekTier, { label: string; blurb: string }> = {
   presenting: {
     label: "Presenting Sponsor",
-    blurb: "Top of the email. Your logo, a short write-up, and link. Exclusive: only one per week.",
+    blurb: "Top of the email. Your logo, a short write-up, and link. Exclusive: only one per issue.",
   },
   standard: {
     label: "7-Issue Featured Campaign",
@@ -62,6 +58,32 @@ const TIER_META: Record<WeekTier, { label: string; blurb: string }> = {
 
 function money(cents: number): string {
   return `$${Math.round(cents / 100)}`;
+}
+
+function isoOf(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+function addDaysISO(iso: string, n: number): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  const dt = new Date(y, m - 1, d);
+  dt.setDate(dt.getDate() + n);
+  return isoOf(dt);
+}
+function rangeLabel(iso: string): string {
+  const fmt = (x: string) => {
+    const [y, m, d] = x.split("-").map(Number);
+    return new Date(y, m - 1, d).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  };
+  return `${fmt(iso)} - ${fmt(addDaysISO(iso, 6))}`;
+}
+// Campaigns start from tomorrow (today's issue is already out) through
+// 8 weeks out; the server enforces the same window.
+const MIN_START = addDaysISO(isoOf(new Date()), 1);
+const MAX_START = addDaysISO(isoOf(new Date()), 56);
+function nextMonday(): string {
+  const today = new Date();
+  const diff = today.getDay() === 0 ? 1 : 8 - today.getDay();
+  return addDaysISO(isoOf(today), diff);
 }
 
 export default function WeekBookingFlow({
@@ -91,9 +113,12 @@ export default function WeekBookingFlow({
   const priceLabel = priceCents != null ? money(priceCents) : "";
 
   const [step, setStep] = useState<Step>("week");
-  const [weeks, setWeeks] = useState<WeekAvailability[]>([]);
-  const [weeksLoading, setWeeksLoading] = useState(true);
-  const [weeksError, setWeeksError] = useState("");
+  const [startDate, setStartDate] = useState<string>(() =>
+    suggestedWeek && suggestedWeek >= MIN_START && suggestedWeek <= MAX_START ? suggestedWeek : nextMonday()
+  );
+  const [run, setRun] = useState<RunAvailability | null>(null);
+  const [checking, setChecking] = useState(false);
+  const [checkError, setCheckError] = useState("");
 
   // Hold state
   const [holdToken, setHoldToken] = useState("");
@@ -127,33 +152,33 @@ export default function WeekBookingFlow({
     setForm((f) => ({ ...f, [key]: val }));
   }
 
-  async function loadWeeks() {
-    setWeeksLoading(true);
-    setWeeksError("");
+  async function checkAvailability(date: string, mkt: "single" | "both") {
+    setChecking(true);
+    setCheckError("");
     try {
-      const res = await workspaceFetch(market === "both" ? "/api/sponsor/bundle-weeks" : "/api/sponsor/weeks");
+      const res = await workspaceFetch(
+        `/api/sponsor/run-availability?start=${date}${mkt === "both" ? "&bundle=1" : ""}`
+      );
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Could not load weeks.");
-      setWeeks(data.weeks);
-      if (data.tiers?.[bookingTier]?.priceCents != null) {
-        if (market === "both") setBundlePriceCents(data.tiers[bookingTier].priceCents);
-        else setSinglePriceCents(data.tiers[bookingTier].priceCents);
-      }
-      if (data.bundle) {
-        setBundlePriceCents(data.bundle.priceCents);
-        setBundleStandaloneCents(data.bundle.standaloneTotalCents);
+      if (!res.ok) throw new Error(data.error || "Could not check those dates.");
+      setRun(data);
+      if (data.priceCents != null) {
+        if (mkt === "both") setBundlePriceCents(data.priceCents);
+        else setSinglePriceCents(data.priceCents);
       }
     } catch {
-      setWeeksError("Could not load availability. Please refresh and try again.");
+      setRun(null);
+      setCheckError("Could not check those dates. Please try again.");
     } finally {
-      setWeeksLoading(false);
+      setChecking(false);
     }
   }
 
   useEffect(() => {
-    loadWeeks();
+    if (step !== "week") return;
+    checkAvailability(startDate, market);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [market]);
+  }, [startDate, market]);
 
   // Learn the single-city price up front so the market toggle can show both
   // prices before the buyer picks a mode.
@@ -184,7 +209,7 @@ export default function WeekBookingFlow({
   function switchMarket(next: "single" | "both") {
     if (next === market || step !== "week") return;
     setMarket(next);
-    setWeeks([]);
+    setRun(null);
   }
 
   // Portal prefill from the sponsor profile
@@ -271,11 +296,12 @@ export default function WeekBookingFlow({
     }
     setHoldToken("");
     setStep("week");
-    setHoldError("Your 10-minute reservation expired. Please pick a week again.");
-    loadWeeks();
+    setHoldError("Your 10-minute reservation expired. Please pick a start day again.");
+    checkAvailability(startDate, market);
   }
 
-  async function pickWeek(week: WeekAvailability) {
+  async function pickStart() {
+    if (!run || run.state === "sold") return;
     setHolding(true);
     setHoldError("");
     try {
@@ -283,13 +309,13 @@ export default function WeekBookingFlow({
         const res = await workspaceFetch("/api/sponsor/bundle-holds", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ weekStart: week.weekStart }),
+          body: JSON.stringify({ weekStart: startDate }),
         });
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "Could not reserve that week.");
+        if (!res.ok) throw new Error(data.error || "Could not reserve those dates.");
         setBundleHoldTokens(data.holds);
         setHoldToken("");
-        setHeldWeekLabel(week.label);
+        setHeldWeekLabel(run.label);
         setExpiresAt(new Date(data.expiresAt).getTime());
         setSecondsLeft(Math.round((new Date(data.expiresAt).getTime() - Date.now()) / 1000));
         setStep("business");
@@ -299,36 +325,36 @@ export default function WeekBookingFlow({
       const res = await workspaceFetch("/api/sponsor/week-holds", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tier: bookingTier, weekStart: week.weekStart }),
+        body: JSON.stringify({ tier: bookingTier, weekStart: startDate }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Could not reserve that week.");
+      if (!res.ok) throw new Error(data.error || "Could not reserve those dates.");
       setHoldToken(data.holdToken);
       setBundleHoldTokens(null);
-      setHeldWeekLabel(week.label);
+      setHeldWeekLabel(run.label);
       setExpiresAt(new Date(data.expiresAt).getTime());
       setSecondsLeft(Math.round((new Date(data.expiresAt).getTime() - Date.now()) / 1000));
       setStep("business");
       window.scrollTo(0, 0);
     } catch (e) {
-      setHoldError(e instanceof Error ? e.message : "Could not reserve that week.");
-      loadWeeks();
+      setHoldError(e instanceof Error ? e.message : "Could not reserve those dates.");
+      checkAvailability(startDate, market);
     } finally {
       setHolding(false);
     }
   }
 
-  // Renewal deep link: auto-reserve the suggested week once weeks are loaded.
+  // Renewal deep link: auto-reserve the suggested start day once its
+  // availability comes back open.
   useEffect(() => {
-    if (suggestedTried.current || weeksLoading || weeks.length === 0 || !suggestedWeek) return;
+    if (suggestedTried.current || !suggestedWeek || !run) return;
+    if (run.start !== suggestedWeek) return;
     suggestedTried.current = true;
-    const week = weeks.find((w) => w.weekStart === suggestedWeek);
-    const t = week?.tiers.find((x) => x.tier === bookingTier);
-    if (week && t && t.state !== "sold") {
-      pickWeek(week);
+    if (run.state !== "sold") {
+      pickStart();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [weeksLoading, weeks, suggestedWeek]);
+  }, [run, suggestedWeek]);
 
   function backToWeeks() {
     handleHoldExpired();
@@ -423,7 +449,7 @@ export default function WeekBookingFlow({
 
         {cancelled && step === "week" && (
           <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 mb-5 text-sm text-amber-800">
-            Your payment was cancelled (no charge was made). Pick a week to try again.
+            Your payment was cancelled (no charge was made). Pick a start day to try again.
           </div>
         )}
 
@@ -464,51 +490,51 @@ export default function WeekBookingFlow({
                 </button>
               </div>
             )}
-            <p className="text-xs text-green-600 font-medium mb-1">Step 1 of 3: Pick your week</p>
+            <p className="text-xs text-green-600 font-medium mb-1">Step 1 of 3: Pick your start day</p>
             <p className="text-sm font-semibold text-gray-900 mb-4">
-              {priceLabel ? `${priceLabel} · ` : ""}7 issues, Monday to Sunday{market === "both" ? " · runs in both cities the same week" : ""}
+              {priceLabel ? `${priceLabel} · ` : ""}7 consecutive daily issues from your start day{market === "both" ? " · runs in both cities on the same dates" : ""}
             </p>
 
-            {weeksLoading && <p className="text-sm text-gray-500 py-8 text-center">Loading weeks…</p>}
-            {weeksError && <p className="text-sm text-red-600 py-4">{weeksError}</p>}
-
-            {!weeksLoading && !weeksError && (
-              <div className="space-y-2">
-                {weeks.map((week) => {
-                  const t = week.tiers.find((x) => x.tier === bookingTier)!;
-                  const sold = t.state === "sold";
-                  return (
-                    <button
-                      key={week.weekStart}
-                      type="button"
-                      disabled={sold || holding}
-                      onClick={() => pickWeek(week)}
-                      className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border text-left transition-colors ${
-                        sold
-                          ? "border-gray-100 bg-gray-50 text-gray-400 cursor-not-allowed"
-                          : "border-gray-200 hover:border-green-500 hover:bg-green-50"
-                      }`}
-                    >
-                      <span className="text-sm font-semibold text-gray-900">{week.label}</span>
-                      {sold ? (
-                        <span className="text-xs font-semibold text-gray-400 bg-gray-100 px-2.5 py-1 rounded-full">Sold</span>
-                      ) : t.state === "one_left" ? (
-                        <span className="text-xs font-semibold text-amber-700 bg-amber-100 px-2.5 py-1 rounded-full">
-                          1 slot left
-                        </span>
-                      ) : (
-                        <span className="text-xs font-semibold text-green-700 bg-green-100 px-2.5 py-1 rounded-full">
-                          Available
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1">Start day</label>
+              <input
+                type="date"
+                value={startDate}
+                min={MIN_START}
+                max={MAX_START}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+              />
+              <p className="text-sm font-semibold text-gray-900 mt-3">
+                Your campaign runs {rangeLabel(startDate)}: 7 consecutive issues.
+              </p>
+              {checking && <p className="text-sm text-gray-500 mt-2">Checking those dates…</p>}
+              {checkError && <p className="text-sm text-red-600 mt-2">{checkError}</p>}
+              {!checking && !checkError && run && run.state === "sold" && (
+                <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 mt-2">
+                  Those dates are full. Pick a different start day.
+                </p>
+              )}
+              {!checking && !checkError && run && run.state === "one_left" && (
+                <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 mt-2">
+                  Almost gone: only 1 spot left on some of those days.
+                </p>
+              )}
+              {!checking && !checkError && run && run.state === "available" && (
+                <p className="text-sm text-green-700 font-medium mt-2">That start day is open.</p>
+              )}
+              <button
+                type="button"
+                disabled={checking || holding || !run || run.state === "sold"}
+                onClick={pickStart}
+                className="w-full mt-4 bg-green-700 hover:bg-green-800 disabled:opacity-50 text-white font-semibold py-3 rounded-xl text-sm transition-colors"
+              >
+                {holding ? "Reserving…" : `Reserve ${rangeLabel(startDate)}`}
+              </button>
+            </div>
             {holdError && <p className="text-sm text-red-600 mt-4">{holdError}</p>}
             <p className="text-xs text-gray-400 mt-5 text-center">
-              Picking a week reserves your slot for 10 minutes while you tell us about your business.
+              Picking a start day reserves your slot for 10 minutes while you tell us about your business.
             </p>
           </>
         )}
@@ -611,7 +637,7 @@ export default function WeekBookingFlow({
                 {submitting ? "Starting secure checkout…" : `Continue to payment${priceLabel ? ` — ${priceLabel}` : ""}`}
               </button>
               <button type="button" onClick={backToWeeks} className="w-full text-xs text-gray-400 hover:text-gray-600 py-1">
-                ← Pick a different week
+                ← Pick a different start day
               </button>
             </form>
           </>

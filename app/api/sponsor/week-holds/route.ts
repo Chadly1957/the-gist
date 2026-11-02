@@ -4,10 +4,9 @@ import { basePrisma } from "@/lib/db-base";
 import {
   HOLD_MINUTES,
   WEEK_TIERS,
-  bookableSponsorWeeks,
-  countTaken,
+  countRunTaken,
+  isBookableStartDate,
   isSellableTier,
-  mondayOf,
   withWeekLock,
   type WeekTier,
 } from "@/lib/sponsor-weeks";
@@ -25,10 +24,10 @@ export async function POST(req: NextRequest) {
   const workspace = await getWorkspace();
   const workspaceId = workspace.id;
 
-  // The current week is bookable while it is still a full week (no issue
-  // sent yet); otherwise booking starts next Monday.
-  if (typeof weekStart !== "string" || mondayOf(weekStart) !== weekStart || !(await bookableSponsorWeeks(workspaceId)).includes(weekStart)) {
-    return NextResponse.json({ error: "Pick a valid week." }, { status: 400 });
+  // Any start day from tomorrow through 8 weeks out; the run is the 7
+  // consecutive days from that start.
+  if (!isBookableStartDate(weekStart)) {
+    return NextResponse.json({ error: "Pick a valid start day." }, { status: 400 });
   }
 
   try {
@@ -37,7 +36,7 @@ export async function POST(req: NextRequest) {
         where: { workspaceId_weekStart: { workspaceId, weekStart } },
         select: { id: true },
       });
-      const taken = await countTaken(tx, workspaceId, week.id, tier as WeekTier);
+      const taken = await countRunTaken(tx, workspaceId, weekStart, tier as WeekTier);
       if (taken >= WEEK_TIERS[tier as WeekTier].slots) {
         return null;
       }
@@ -53,7 +52,7 @@ export async function POST(req: NextRequest) {
     });
 
     if (!hold) {
-      return NextResponse.json({ error: "That slot just sold. Please pick another week." }, { status: 409 });
+      return NextResponse.json({ error: "Those dates just filled. Please pick another start day." }, { status: 409 });
     }
     return NextResponse.json({ holdToken: hold.holdToken, expiresAt: hold.expiresAt.toISOString() });
   } catch (err) {

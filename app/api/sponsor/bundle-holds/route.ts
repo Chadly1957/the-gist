@@ -4,20 +4,19 @@ import {
   CAMPAIGN_BUNDLE_SLUGS,
   HOLD_MINUTES,
   WEEK_TIERS,
-  bookableSponsorWeeks,
-  countTaken,
-  mondayOf,
+  countRunTaken,
+  isBookableStartDate,
   withWeekLock,
 } from "@/lib/sponsor-weeks";
 
 export const dynamic = "force-dynamic";
 
-// Reserve the campaign slot for the same week in BOTH bundle markets.
+// Reserve the campaign slot for the same 7-day run in BOTH bundle markets.
 // All-or-nothing: if either city is full, no hold is kept.
 export async function POST(req: NextRequest) {
   const { weekStart } = await req.json();
-  if (typeof weekStart !== "string" || mondayOf(weekStart) !== weekStart) {
-    return NextResponse.json({ error: "Pick a valid week." }, { status: 400 });
+  if (!isBookableStartDate(weekStart)) {
+    return NextResponse.json({ error: "Pick a valid start day." }, { status: 400 });
   }
 
   const workspaces = await basePrisma.workspace.findMany({
@@ -27,12 +26,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Bundle is not available right now." }, { status: 503 });
   }
   const ordered = CAMPAIGN_BUNDLE_SLUGS.map((slug) => workspaces.find((w) => w.slug === slug)!);
-
-  for (const ws of ordered) {
-    if (!(await bookableSponsorWeeks(ws.id)).includes(weekStart)) {
-      return NextResponse.json({ error: "Pick a valid week." }, { status: 400 });
-    }
-  }
 
   const tier = "standard" as const;
   const created: { workspaceId: string; holdId: string; holdToken: string }[] = [];
@@ -44,7 +37,7 @@ export async function POST(req: NextRequest) {
           where: { workspaceId_weekStart: { workspaceId: ws.id, weekStart } },
           select: { id: true },
         });
-        const taken = await countTaken(tx, ws.id, week.id, tier);
+        const taken = await countRunTaken(tx, ws.id, weekStart, tier);
         if (taken >= WEEK_TIERS[tier].slots) return null;
         return tx.sponsorHold.create({
           data: {
@@ -62,7 +55,7 @@ export async function POST(req: NextRequest) {
           await basePrisma.sponsorHold.deleteMany({ where: { id: { in: created.map((c) => c.holdId) } } });
         }
         return NextResponse.json(
-          { error: `${ws.area} just filled for that week. Please pick another week.` },
+          { error: `${ws.area} just filled for those dates. Please pick another start day.` },
           { status: 409 }
         );
       }
@@ -74,7 +67,7 @@ export async function POST(req: NextRequest) {
     if (created.length > 0) {
       await basePrisma.sponsorHold.deleteMany({ where: { id: { in: created.map((c) => c.holdId) } } });
     }
-    return NextResponse.json({ error: "Could not reserve that week. Please try again." }, { status: 500 });
+    return NextResponse.json({ error: "Could not reserve those dates. Please try again." }, { status: 500 });
   }
 
   const holds: Record<string, string> = {};

@@ -30,12 +30,12 @@ const PINE = "#0c5e59";
 const PINE_DARK = "#0a3232";
 const PINE_DEEP = "#072b29";
 const MINT = "#c8f6e7";
-const CREAM = "#faf9f5";
-const CREAM_DARK = "#f1f0e9";
-const INK = "#182c2d";
-const MUTED = "#61706c";
-const BORDER = "#dce6df";
-const MINT_BG = "#eaf4ec";
+const CREAM = "#ffffff";
+const CREAM_DARK = "#f3f4f6";
+const INK = "#111827";
+const MUTED = "#6b7280";
+const BORDER = "#e5e7eb";
+const MINT_BG = "#f9fafb";
 
 function Check({ className = "w-4 h-4" }: { className?: string }) {
   return (
@@ -111,11 +111,86 @@ export default function SponsorshipLanding() {
   const [heroError, setHeroError] = useState("");
   const [heroDone, setHeroDone] = useState(false);
 
+  // Email-first gate in the hero card: returning businesses (anyone with
+  // a sponsor profile in this city) get their portal link emailed instead
+  // of a signup form, so nurture emails linking here never create
+  // duplicate profiles. New emails fall through to the free form below.
+  const [gate, setGate] = useState<"email" | "found" | "new">("email");
+  const [gateEmail, setGateEmail] = useState("");
+  const [gateBusy, setGateBusy] = useState(false);
+  const [gateError, setGateError] = useState("");
+  const [gateBusinesses, setGateBusinesses] = useState<string[]>([]);
+  const [gateEmailed, setGateEmailed] = useState(true);
+
+  async function submitGate(e: React.FormEvent) {
+    e.preventDefault();
+    setGateBusy(true);
+    setGateError("");
+    try {
+      const res = await workspaceFetch("/api/sponsor/lookup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: gateEmail }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Something went wrong.");
+      if (data.found) {
+        setGateBusinesses(Array.isArray(data.businesses) ? data.businesses : []);
+        setGateEmailed(data.emailed !== false);
+        setGate("found");
+      } else {
+        setHero((h) => ({ ...h, email: gateEmail }));
+        setGate("new");
+      }
+    } catch (err) {
+      setGateError(err instanceof Error ? err.message : "Something went wrong.");
+    } finally {
+      setGateBusy(false);
+    }
+  }
+
   // Bottom lead form.
   const [lead, setLead] = useState({ businessName: "", contactName: "", email: "", goal: "" });
   const [leadBusy, setLeadBusy] = useState(false);
   const [leadError, setLeadError] = useState("");
   const [leadDone, setLeadDone] = useState<Interest | null>(null);
+
+  // Email-first gate for the bottom form, same rule as the hero card: a
+  // returning business gets its portal link emailed instead of the full
+  // form, so this form can't create duplicate profiles either.
+  const [leadGate, setLeadGate] = useState<"email" | "found" | "new">("email");
+  const [leadGateEmail, setLeadGateEmail] = useState("");
+  const [leadGateBusy, setLeadGateBusy] = useState(false);
+  const [leadGateError, setLeadGateError] = useState("");
+  const [leadGateBusinesses, setLeadGateBusinesses] = useState<string[]>([]);
+  const [leadGateEmailed, setLeadGateEmailed] = useState(true);
+
+  async function submitLeadGate(e: React.FormEvent) {
+    e.preventDefault();
+    setLeadGateBusy(true);
+    setLeadGateError("");
+    try {
+      const res = await workspaceFetch("/api/sponsor/lookup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: leadGateEmail }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Something went wrong.");
+      if (data.found) {
+        setLeadGateBusinesses(Array.isArray(data.businesses) ? data.businesses : []);
+        setLeadGateEmailed(data.emailed !== false);
+        setLeadGate("found");
+      } else {
+        setLead((l) => ({ ...l, email: leadGateEmail }));
+        setLeadGate("new");
+      }
+    } catch (err) {
+      setLeadGateError(err instanceof Error ? err.message : "Something went wrong.");
+    } finally {
+      setLeadGateBusy(false);
+    }
+  }
 
   function scrollToId(id: string) {
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -233,6 +308,42 @@ export default function SponsorshipLanding() {
                   </Link>
                 </div>
               </div>
+            ) : gate === "email" ? (
+              <>
+                <h2 className="text-lg font-extrabold mb-1">Start with your business email</h2>
+                <p className="text-[13px] mb-4" style={{ color: MUTED }}>
+                  Already listed with {workspace.name}? We&apos;ll email your sponsor portal link, no forms to redo.
+                  New here? We&apos;ll set up your free listing.
+                </p>
+                <form onSubmit={submitGate} className="space-y-3">
+                  <input required type="email" placeholder="Email address *" value={gateEmail} onChange={(e) => setGateEmail(e.target.value)} className={inputCls} style={inputStyle} />
+                  {gateError && <p className="text-sm text-red-600">{gateError}</p>}
+                  <button type="submit" disabled={gateBusy} className="w-full py-3 rounded-xl text-white font-semibold text-sm disabled:opacity-50 hover:opacity-90" style={{ background: PINE }}>
+                    {gateBusy ? "Checking…" : "Continue"}
+                  </button>
+                </form>
+              </>
+            ) : gate === "found" ? (
+              <div className="text-center py-8">
+                <div className="w-12 h-12 rounded-full mx-auto mb-4 flex items-center justify-center" style={{ background: MINT_BG, color: PINE }}>
+                  <Check className="w-6 h-6" />
+                </div>
+                <h2 className="text-xl font-extrabold mb-2">Welcome back{gateBusinesses.length ? `, ${gateBusinesses[0]}` : ""}!</h2>
+                <p className="text-sm leading-relaxed mb-5" style={{ color: MUTED }}>
+                  {gateEmailed ? (
+                    <>
+                      Your sponsor portal link is on its way to <strong style={{ color: INK }}>{gateEmail}</strong>.
+                      Your listing, details, and booking are all saved there, no need to enter everything again.
+                      {gateBusinesses.length > 1 ? ` We found ${gateBusinesses.length} businesses under this email and sent a link for each one.` : ""}
+                    </>
+                  ) : (
+                    <>We found your business, but the portal email didn&apos;t go through. Email chad@thegistdecatur.com and we&apos;ll send your link by hand.</>
+                  )}
+                </p>
+                <button onClick={() => { setGate("email"); setGateEmail(""); }} className="text-sm font-semibold hover:underline" style={{ color: PINE_DARK }}>
+                  Use a different email
+                </button>
+              </div>
             ) : (
               <>
                 <h2 className="text-lg font-extrabold mb-1">Claim your free listing</h2>
@@ -279,7 +390,7 @@ export default function SponsorshipLanding() {
             ["1,069", "Newsletter subscriptions across both markets"],
             ["36%", "Average open rate, last 30 issues"],
             ["31", "Issues opened per reader, last 90 days"],
-            ["7 days", "A week, including Saturday and Sunday"],
+            ["7 days", "Per campaign run, weekends included"],
           ].map(([num, label]) => (
             <div key={label} className="border-l-2 pl-4" style={{ borderColor: BORDER }}>
               <p className="text-3xl sm:text-4xl font-extrabold tracking-tight">{num}</p>
@@ -452,9 +563,9 @@ export default function SponsorshipLanding() {
             <ul className="space-y-2.5 text-sm flex-1 mb-7">
               {[
                 "Your logo in the partner strip of every daily issue",
-                "At least 10 premium promotional features per 30 days, per included city",
+                "Daily premium promotional features in every issue, per included city",
                 "Exclusive category among Presenting Partners in each city",
-                "One clearly labeled sponsored business profile per quarter",
+                "One named and linked section of the daily newsletter (Weather brought to you by…)",
                 "Gist Deals offer placement during the partnership",
                 "Monthly performance reporting and creative refreshes",
               ].map((item) => (
@@ -658,7 +769,7 @@ export default function SponsorshipLanding() {
             ) : (
               <>
                 <h3 className="text-lg font-extrabold mb-1">What would you like to do?</h3>
-                <p className="text-[13px] mb-4" style={{ color: MUTED }}>Choose an option. Your business can always start with the free listing.</p>
+                <p className="text-[13px] mb-4" style={{ color: MUTED }}>Choose an option, then start with your email. Already listed? You&apos;ll get your portal link instead of a form.</p>
                 <div className="grid grid-cols-3 gap-2 mb-5">
                   {([
                     ["free", "Free listing"],
@@ -676,6 +787,40 @@ export default function SponsorshipLanding() {
                     </button>
                   ))}
                 </div>
+                {leadGate === "email" ? (
+                  <form onSubmit={submitLeadGate} className="space-y-3">
+                    <div>
+                      <label className="block text-xs font-semibold mb-1" style={{ color: MUTED }}>Email address *</label>
+                      <input required type="email" placeholder="name@business.com" value={leadGateEmail} onChange={(e) => setLeadGateEmail(e.target.value)} className={inputCls} style={inputStyle} />
+                    </div>
+                    <p className="text-xs leading-relaxed" style={{ color: MUTED }}>
+                      Already listed with us? We&apos;ll send your sponsor portal link instead of asking for everything again.
+                    </p>
+                    {leadGateError && <p className="text-sm text-red-600">{leadGateError}</p>}
+                    <button type="submit" disabled={leadGateBusy} className="w-full py-3.5 rounded-xl text-white font-semibold text-sm disabled:opacity-50 hover:opacity-90" style={{ background: PINE }}>
+                      {leadGateBusy ? "Checking\u2026" : "Continue"}
+                    </button>
+                  </form>
+                ) : leadGate === "found" ? (
+                  <div className="text-center py-6">
+                    <h4 className="text-base font-extrabold mb-2">Welcome back{leadGateBusinesses.length ? `, ${leadGateBusinesses[0]}` : ""}!</h4>
+                    <p className="text-sm leading-relaxed mb-5" style={{ color: MUTED }}>
+                      {leadGateEmailed ? (
+                        <>Your sponsor portal link is on its way to <strong style={{ color: INK }}>{leadGateEmail}</strong>. Your listing, details, and booking are all saved there.</>
+                      ) : (
+                        <>We found your business, but the portal email didn&apos;t go through. Email chad@thegistdecatur.com and we&apos;ll send your link by hand.</>
+                      )}
+                    </p>
+                    <div className="flex flex-wrap justify-center gap-4">
+                      <button onClick={() => { setLead((l) => ({ ...l, email: leadGateEmail })); setLeadGate("new"); }} className="text-sm font-semibold hover:underline" style={{ color: PINE_DARK }}>
+                        Still send this inquiry
+                      </button>
+                      <button onClick={() => { setLeadGate("email"); setLeadGateEmail(""); }} className="text-sm font-semibold hover:underline" style={{ color: MUTED }}>
+                        Use a different email
+                      </button>
+                    </div>
+                  </div>
+                ) : (
                 <form onSubmit={submitLead} className="space-y-3">
                   <div className="grid sm:grid-cols-2 gap-3">
                     <div>
@@ -723,6 +868,7 @@ export default function SponsorshipLanding() {
                           : <>Ask about a partnership <Arrow /></>}
                   </button>
                 </form>
+                )}
               </>
             )}
           </div>

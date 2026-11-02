@@ -10,12 +10,11 @@ import {
   CAMPAIGN_BUNDLE_SLUGS,
   bundleShareCents,
   campaignPriceCents,
-  countTaken,
+  countRunTaken,
   formatWeekRange,
+  isBookableStartDate,
   isSellableTier,
   isValidTier,
-  mondayOf,
-  bookableSponsorWeeks,
   withWeekLock,
   type WeekTier,
 } from "@/lib/sponsor-weeks";
@@ -39,7 +38,7 @@ export async function POST(req: NextRequest) {
     returnTo,
   } = await req.json();
 
-  if (!holdToken && !bundleHoldTokens) return NextResponse.json({ error: "Your reservation expired. Please pick a week again." }, { status: 400 });
+  if (!holdToken && !bundleHoldTokens) return NextResponse.json({ error: "Your reservation expired. Please pick a start day again." }, { status: 400 });
 
   const trimmedBusiness = businessName?.trim();
   const trimmedContact = contactName?.trim();
@@ -101,7 +100,7 @@ export async function POST(req: NextRequest) {
     for (const ws of ordered) {
       const token = (bundleHoldTokens as Record<string, unknown>)[ws.slug];
       if (typeof token !== "string" || !token) {
-        return NextResponse.json({ error: "Your reservation expired. Please pick a week again." }, { status: 400 });
+        return NextResponse.json({ error: "Your reservation expired. Please pick a start day again." }, { status: 400 });
       }
       const hold = await basePrisma.sponsorHold.findFirst({
         where: { workspaceId: ws.id, holdToken: token, expiresAt: { gt: new Date() } },
@@ -110,13 +109,12 @@ export async function POST(req: NextRequest) {
       if (
         !hold ||
         hold.tier !== "standard" ||
-        mondayOf(hold.week.weekStart) !== hold.week.weekStart ||
-        !(await bookableSponsorWeeks(ws.id)).includes(hold.week.weekStart)
+        !isBookableStartDate(hold.week.weekStart)
       ) {
-        return NextResponse.json({ error: "Your reservation expired. Please pick a week again." }, { status: 400 });
+        return NextResponse.json({ error: "Your reservation expired. Please pick a start day again." }, { status: 400 });
       }
       if (bundleWeekStart && bundleWeekStart !== hold.week.weekStart) {
-        return NextResponse.json({ error: "Your reservation expired. Please pick a week again." }, { status: 400 });
+        return NextResponse.json({ error: "Your reservation expired. Please pick a start day again." }, { status: 400 });
       }
       bundleWeekStart = hold.week.weekStart;
       holds.push({ ws, holdToken: token, weekId: hold.week.id });
@@ -137,7 +135,7 @@ export async function POST(req: NextRequest) {
               unit_amount: CAMPAIGN_BUNDLE_PRICE_CENTS,
               product_data: {
                 name: `${ordered.map((w) => w.name).join(" + ")} - ${tierLabel}`,
-                description: `Both cities, week of ${formatWeekRange(weekStart)}`,
+                description: `Both cities, ${formatWeekRange(weekStart)} (7 issues)`,
               },
             },
             quantity: 1,
@@ -165,7 +163,7 @@ export async function POST(req: NextRequest) {
             where: { workspaceId: ws.id, holdToken, expiresAt: { gt: new Date() } },
           });
           if (!liveHold) throw new Error("Hold expired during checkout.");
-          const taken = await countTaken(tx, ws.id, weekId, "standard", liveHold.id);
+          const taken = await countRunTaken(tx, ws.id, weekStart, "standard", liveHold.id);
           if (taken >= WEEK_TIERS.standard.slots) throw new Error("That slot just sold.");
 
           let profile =
@@ -228,7 +226,7 @@ export async function POST(req: NextRequest) {
       }
       const soldOut = err instanceof Error && err.message === "That slot just sold.";
       return NextResponse.json(
-        { error: soldOut ? "That slot just sold in one of the cities. Please pick another week." : "Could not reserve your slots. Please try again." },
+        { error: soldOut ? "That slot just sold in one of the cities. Please pick another start day." : "Could not reserve your slots. Please try again." },
         { status: soldOut ? 409 : 500 }
       );
     }
@@ -248,8 +246,8 @@ export async function POST(req: NextRequest) {
     where: { workspaceId, holdToken, expiresAt: { gt: new Date() } },
     include: { week: { select: { id: true, weekStart: true } } },
   });
-  if (!hold || !isValidTier(hold.tier) || mondayOf(hold.week.weekStart) !== hold.week.weekStart || !(await bookableSponsorWeeks(workspaceId)).includes(hold.week.weekStart)) {
-    return NextResponse.json({ error: "Your reservation expired. Please pick a week again." }, { status: 400 });
+  if (!hold || !isValidTier(hold.tier) || !isBookableStartDate(hold.week.weekStart)) {
+    return NextResponse.json({ error: "Your reservation expired. Please pick a start day again." }, { status: 400 });
   }
   const tier = hold.tier as WeekTier;
   if (!isSellableTier(tier)) {
@@ -277,7 +275,7 @@ export async function POST(req: NextRequest) {
             unit_amount: amountCents,
             product_data: {
               name: `${workspace.name} - ${tierLabel}`,
-              description: `Week of ${formatWeekRange(hold.week.weekStart)}`,
+              description: `${formatWeekRange(hold.week.weekStart)} (7 issues)`,
             },
           },
           quantity: 1,
@@ -303,7 +301,7 @@ export async function POST(req: NextRequest) {
         where: { workspaceId, holdToken, expiresAt: { gt: new Date() } },
       });
       if (!liveHold) throw new Error("Hold expired during checkout.");
-      const taken = await countTaken(tx, workspaceId, hold.week.id, tier, liveHold.id);
+      const taken = await countRunTaken(tx, workspaceId, hold.week.weekStart, tier, liveHold.id);
       if (taken >= WEEK_TIERS[tier].slots) throw new Error("That slot just sold.");
 
       let profile = portalProfile
@@ -358,7 +356,7 @@ export async function POST(req: NextRequest) {
       /* already completed or expired */
     }
     const msg = err instanceof Error && err.message === "That slot just sold."
-      ? "That slot just sold. Please pick another week."
+      ? "That slot just sold. Please pick another start day."
       : "Could not reserve your slot. Please try again.";
     return NextResponse.json({ error: msg }, { status: err instanceof Error && err.message === "That slot just sold." ? 409 : 500 });
   }

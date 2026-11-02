@@ -14,10 +14,35 @@ export interface NurtureRenderContext {
   appUrl: string;
   portalUrl: string;
   unsubscribeUrl: string;
+  /**
+   * Per-recipient tracking for real campaign sends only. The server-side
+   * mailer supplies the send row id and the HMAC signer (lib/tracking is
+   * node-only, so the signer is injected rather than imported here; this
+   * module also runs in the admin editor's browser preview, which never
+   * sets tracking). When absent, links render direct and no pixel is
+   * added: previews and test sends stay untracked.
+   */
+  tracking?: {
+    sendId: string;
+    sign: (url: string) => string;
+  };
 }
 
 function abs(url: string, ctx: NurtureRenderContext): string {
   return url.startsWith("/") && ctx.appUrl ? `${ctx.appUrl}${url}` : url;
+}
+
+/** Rewrite a destination through the nurture click tracker when tracked. */
+function tracked(url: string, label: string, ctx: NurtureRenderContext): string {
+  const absolute = abs(url, ctx);
+  if (!ctx.tracking || !ctx.appUrl) return absolute;
+  const params = new URLSearchParams({
+    r: ctx.tracking.sendId,
+    u: absolute,
+    t: label,
+    s: ctx.tracking.sign(absolute),
+  });
+  return `${ctx.appUrl}/api/track/nurture-click?${params.toString()}`;
 }
 
 function renderBlock(block: NurtureBlock, ctx: NurtureRenderContext): string {
@@ -37,13 +62,13 @@ function renderBlock(block: NurtureBlock, ctx: NurtureRenderContext): string {
       if (!block.url) return "";
       const img = `<img src="${escapeHtml(abs(block.url, ctx))}" alt="${escapeHtml(block.alt || "")}" style="display: block; width: 100%; max-width: 552px; height: auto; border-radius: 10px;" />`;
       const wrapped = block.linkUrl
-        ? `<a href="${escapeHtml(abs(block.linkUrl, ctx))}" target="_blank" rel="noopener noreferrer">${img}</a>`
+        ? `<a href="${escapeHtml(tracked(block.linkUrl, "image", ctx))}" target="_blank" rel="noopener noreferrer">${img}</a>`
         : img;
       return `<div style="margin: 0 0 18px;">${wrapped}</div>`;
     }
     case "button": {
       if (!block.linkUrl) return "";
-      return `<p style="margin: 6px 0 20px; text-align: center;"><a href="${escapeHtml(abs(block.linkUrl, ctx))}" target="_blank" rel="noopener noreferrer" style="display: inline-block; background: ${ctx.brandColor}; color: #ffffff; padding: 13px 26px; border-radius: 10px; text-decoration: none; font-weight: 600; font-size: 15px;">${escapeHtml(block.label || "Learn more")}</a></p>`;
+      return `<p style="margin: 6px 0 20px; text-align: center;"><a href="${escapeHtml(tracked(block.linkUrl, "button", ctx))}" target="_blank" rel="noopener noreferrer" style="display: inline-block; background: ${ctx.brandColor}; color: #ffffff; padding: 13px 26px; border-radius: 10px; text-decoration: none; font-weight: 600; font-size: 15px;">${escapeHtml(block.label || "Learn more")}</a></p>`;
     }
     case "divider":
       return `<hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;" />`;
@@ -67,7 +92,7 @@ export function renderNurtureEmail(blocks: NurtureBlock[], ctx: NurtureRenderCon
       <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 22px 0 16px;" />
       <p style="margin: 0 0 10px; color: #6b7280; font-size: 13px; line-height: 1.5;">
         Manage your free listing, book a campaign, and check your results any time in your
-        <a href="${escapeHtml(ctx.portalUrl)}" style="color: ${ctx.brandColor}; font-weight: 600;">sponsor portal</a>.
+        <a href="${escapeHtml(tracked(ctx.portalUrl, "portal", ctx))}" style="color: ${ctx.brandColor}; font-weight: 600;">sponsor portal</a>.
       </p>
       <p style="margin: 0; color: #9ca3af; font-size: 12px; line-height: 1.5;">
         You're receiving this because ${escapeHtml(ctx.businessName)} is listed free with ${escapeHtml(ctx.workspaceName)}.
@@ -75,6 +100,7 @@ export function renderNurtureEmail(blocks: NurtureBlock[], ctx: NurtureRenderCon
       </p>
     </div>
   </div>
+  ${ctx.tracking && ctx.appUrl ? `<img src="${escapeHtml(`${ctx.appUrl}/api/track/nurture-open?r=${ctx.tracking.sendId}`)}" width="1" height="1" alt="" style="display: none;" />` : ""}
 </body>
 </html>`;
 }

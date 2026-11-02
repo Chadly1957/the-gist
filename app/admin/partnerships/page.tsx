@@ -41,6 +41,7 @@ export default function PartnershipsPage() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
+  const todayStr = new Date().toISOString().slice(0, 10);
   const [form, setForm] = useState({
     businessName: "",
     contactName: "",
@@ -48,6 +49,7 @@ export default function PartnershipsPage() {
     category: "dining",
     tier: "one_city",
     workspaceIds: ["decatur"] as string[],
+    startDate: "",
     notes: "",
     // Ad creative profile
     logoUrl: "",
@@ -99,7 +101,7 @@ export default function PartnershipsPage() {
       if (!res.ok) throw new Error(data.error || "Failed to create partnership.");
       setSuccess(`Invoice sent to ${data.invoiceSentTo}. They just click and pay.`);
       setShowForm(false);
-      setForm({ businessName: "", contactName: "", email: "", category: "dining", tier: "one_city", workspaceIds: ["decatur"], notes: "", logoUrl: "", website: "", headline: "", adBody: "", ctaLabel: "", ctaUrl: "", imageUrl: "" });
+      setForm({ businessName: "", contactName: "", email: "", category: "dining", tier: "one_city", workspaceIds: ["decatur"], startDate: "", notes: "", logoUrl: "", website: "", headline: "", adBody: "", ctaLabel: "", ctaUrl: "", imageUrl: "" });
       load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create partnership.");
@@ -173,6 +175,16 @@ export default function PartnershipsPage() {
                 onChange={(e) => setForm({ ...form, email: e.target.value })}
                 className="mt-1 w-full border rounded-lg px-3 py-2"
                 placeholder="chad@example.com"
+              />
+            </label>
+            <label className="block">
+              <span className="text-sm font-medium">Start date (first invoice goes out that day)</span>
+              <input
+                type="date"
+                min={todayStr}
+                value={form.startDate || todayStr}
+                onChange={(e) => setForm({ ...form, startDate: e.target.value })}
+                className="mt-1 w-full border rounded-lg px-3 py-2"
               />
             </label>
             <label className="block">
