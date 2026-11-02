@@ -52,6 +52,7 @@ export async function POST(req: NextRequest) {
     tier?: string;
     workspaceIds?: string[];
     notes?: string;
+    startDate?: string;
     // Ad creative profile (optional at setup, goes live when paid)
     logoUrl?: string;
     website?: string;
@@ -81,6 +82,15 @@ export async function POST(req: NextRequest) {
   if (workspaceIds.length === 0) {
     return NextResponse.json({ error: "At least one city workspace is required." }, { status: 400 });
   }
+  // Start day chosen by the partner: the partnership starts that day and
+  // the first invoice lands that day. Nothing is billed before the start,
+  // so nothing is ever prorated. Defaults to today.
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const startDateStr = body.startDate?.trim() || todayStr;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(startDateStr) || startDateStr < todayStr) {
+    return NextResponse.json({ error: "Start date must be today or a future date (YYYY-MM-DD)." }, { status: 400 });
+  }
+  const startDate = new Date(`${startDateStr}T00:00:00Z`);
   // One partner per category per city: block duplicates on active/pending partnerships.
   const clash = await basePrisma.presentingPartnership.findFirst({
     where: {
@@ -132,6 +142,10 @@ export async function POST(req: NextRequest) {
     days_until_due: 7,
     description: `${label} — ${businessName}`,
     items: [{ price: priceId }],
+    // Future start: hold billing until the start date. trial_end makes
+    // the first invoice issue on that date and anchors the monthly cycle
+    // to it, with no proration.
+    ...(startDateStr > todayStr ? { trial_end: Math.floor(startDate.getTime() / 1000) } : {}),
     metadata: {
       kind: "presenting_partnership",
       businessName,
@@ -189,6 +203,7 @@ export async function POST(req: NextRequest) {
       stripeCustomerId: customer.id,
       stripeSubscriptionId: subscription.id,
       status: "pending_payment",
+      startDate,
       sponsorProfileId,
       logoUrl,
       website,

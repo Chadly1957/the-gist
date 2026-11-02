@@ -34,6 +34,18 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
   let failed = 0;
   for (const recipient of recipients) {
     try {
+      // Per-recipient tracking row first, so the email's links and open
+      // pixel can point at it. Tracking must never block the send itself.
+      let trackingSendId: string | undefined;
+      try {
+        const row = await prisma.sponsorNurtureSend.create({
+          data: { campaignId: campaign.id, profileId: recipient.id, email: recipient.email },
+          select: { id: true },
+        });
+        trackingSendId = row.id;
+      } catch (trackErr) {
+        console.error(`Nurture tracking row failed for ${recipient.email}:`, trackErr);
+      }
       await sendNurtureEmail({
         client,
         workspaceName: workspace.name,
@@ -42,6 +54,7 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
         recipient,
         subject: campaign.subject,
         blocksJson: campaign.blocks,
+        trackingSendId,
       });
     } catch (err) {
       failed++;

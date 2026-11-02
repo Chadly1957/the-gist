@@ -8,7 +8,7 @@ import {
   campaignPriceCents,
   isValidTier,
   withWeekLock,
-  countTaken,
+  countRunTaken,
   buildWeekProjectionRows,
   addDaysISO,
   type WeekTier,
@@ -97,7 +97,7 @@ export async function POST(req: NextRequest) {
   }
   if (!isValidTier(tier)) return NextResponse.json({ error: "Invalid tier." }, { status: 400 });
   if (!/^\d{4}-\d{2}-\d{2}$/.test(weekStart)) {
-    return NextResponse.json({ error: "weekStart must be YYYY-MM-DD (a Monday)." }, { status: 400 });
+    return NextResponse.json({ error: "weekStart must be YYYY-MM-DD (the run start date)." }, { status: 400 });
   }
 
   const profile = await basePrisma.sponsorProfile.findFirst({
@@ -118,7 +118,7 @@ export async function POST(req: NextRequest) {
         update: {},
         select: { id: true },
       });
-      const taken = await countTaken(tx, workspaceId, week.id, tier as WeekTier);
+      const taken = await countRunTaken(tx, workspaceId, weekStart, tier as WeekTier);
       if (taken >= WEEK_TIERS[tier as WeekTier].slots) {
         throw new Error(
           tier === "presenting"

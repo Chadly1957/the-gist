@@ -3,6 +3,7 @@ import { getEmailClient } from "./email";
 import { getWorkspace, getWorkspaceUrl } from "./workspace";
 import { renderNurtureEmail, renderNurtureSubject } from "./sponsor-nurture-render";
 import { parseBlocks, type NurtureRecipient } from "./sponsor-nurture-shared";
+import { signTrackingUrl } from "./tracking";
 
 // Shared sending plumbing for the nurture routes: resolves the workspace
 // email client the same way the sponsor portal emails do.
@@ -24,6 +25,11 @@ export async function sendNurtureEmail(args: {
   recipient: NurtureRecipient;
   subject: string;
   blocksJson: string;
+  /**
+   * SponsorNurtureSend row id for real campaign sends: links and the open
+   * pixel get tracked against it. Omit for test sends (untracked).
+   */
+  trackingSendId?: string;
 }): Promise<void> {
   const html = renderNurtureEmail(parseBlocks(args.blocksJson), {
     businessName: args.recipient.businessName,
@@ -33,6 +39,9 @@ export async function sendNurtureEmail(args: {
     appUrl: args.appUrl,
     portalUrl: `${args.appUrl}/sponsor/portal?token=${args.recipient.magicToken}`,
     unsubscribeUrl: `${args.appUrl}/sponsor/nurture-unsubscribe?token=${args.recipient.magicToken}`,
+    tracking: args.trackingSendId
+      ? { sendId: args.trackingSendId, sign: signTrackingUrl }
+      : undefined,
   });
   await args.client.sendEmail({
     to: args.recipient.email,

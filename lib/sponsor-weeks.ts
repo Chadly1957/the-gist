@@ -2,11 +2,15 @@ import { basePrisma } from "./db-base";
 
 // Sponsor campaign packages (October 2026 restructure): one buyer-facing
 // product, the 7-Issue Featured Campaign, sold per market with a both-cities
-// bundle. A campaign runs Monday-Sunday (7 consecutive daily issues) in the
-// in-article featured placement, 2 slots per city per week. The legacy
-// weekly Presenting Sponsor tier is retired from sale (presenting placement
-// is partnership-only now); its config stays so historical bookings,
-// availability math for old rows, and admin tools keep working.
+// bundle. A campaign runs 7 consecutive daily issues from a start day the
+// buyer picks (November 2026: fixed Monday-Sunday weeks retired; a run is
+// any 7 consecutive days, and SponsorWeek.weekStart now means "run start
+// date", any weekday — historical Monday-start rows are just runs that
+// started on a Monday). 2 slots per city per day in the in-article
+// featured placement. The legacy weekly Presenting Sponsor tier is retired
+// from sale (presenting placement is partnership-only now); its config
+// stays so historical bookings, availability math for old rows, and admin
+// tools keep working.
 export const WEEK_TIERS = {
   presenting: { priceCents: 15000, slots: 1, label: "Presenting Sponsor", adType: "presenting", sellable: false },
   standard: { priceCents: 15000, slots: 2, label: "7-Issue Featured Campaign", adType: "in_article", sellable: true },
@@ -68,6 +72,26 @@ export function mondayOf(dateStr: string): string {
   return toISODate(d);
 }
 
+/** Sunday (YYYY-MM-DD) of the week containing the given date. */
+export function sundayOf(dateStr: string): string {
+  const d = parseISODate(dateStr);
+  d.setDate(d.getDate() - d.getDay()); // getDay(): 0 = Sunday
+  return toISODate(d);
+}
+
+/**
+ * A buyer-chosen campaign start day is bookable from tomorrow through 8
+ * weeks out. Tomorrow is the floor: by the time anyone books, today's
+ * issue has already gone out, so a same-day start would deliver 6 issues
+ * instead of the promised 7.
+ */
+export function isBookableStartDate(start: unknown): start is string {
+  if (typeof start !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(start)) return false;
+  if (toISODate(parseISODate(start)) !== start) return false; // e.g. Feb 31
+  const today = toISODate(new Date());
+  return start >= addDaysISO(today, 1) && start <= addDaysISO(today, 56);
+}
+
 /** Next 8 sponsor weeks, always starting with the coming Monday (full weeks only). */
 export function upcomingSponsorWeeks(count = 8): string[] {
   const today = new Date();
@@ -78,25 +102,26 @@ export function upcomingSponsorWeeks(count = 8): string[] {
 }
 
 /**
- * Weeks a buyer may book right now, for the admin and public flows. The
- * current week is included only on Monday before the newsletter goes out:
- * once Monday's issue is sent the week is partial and booking starts with
- * next Monday. Server dates are UTC (Vercel), which matches the existing
- * week math; the newsletter sends on weekday mornings, so the boundary
- * cases (e.g. Sunday night UTC = the coming week, fully unsent) behave
- * correctly.
+ * Calendar weeks for DISPLAY surfaces (the admin availability strip):
+ * Sunday-Saturday weeks, starting with the coming Sunday. Buyers no
+ * longer pick from this list — they choose any start day and
+ * isBookableStartDate + countRunTaken govern what can sell — but admin
+ * still plans around calendar weeks, and this keeps that view honest.
+ * The current week is included only on Sunday before the newsletter goes
+ * out: once Sunday's issue is sent the week is partial. Server dates are
+ * UTC (Vercel), which matches the existing week math.
  */
 export async function bookableSponsorWeeks(workspaceId: string, count = 8): Promise<string[]> {
   const today = toISODate(new Date());
-  const thisMonday = mondayOf(today);
-  // 1 = Monday. Only Monday can still be a full, unsent week.
-  let includeCurrent = parseISODate(today).getDay() === 1;
+  const thisSunday = sundayOf(today);
+  // 0 = Sunday. Only Sunday can still be a full, unsent week.
+  let includeCurrent = parseISODate(today).getDay() === 0;
   if (includeCurrent) {
     const sent = await basePrisma.newsletterSend.findFirst({
       where: {
         workspaceId,
         status: "sent",
-        sentAt: { gte: new Date(`${thisMonday}T00:00:00Z`) },
+        sentAt: { gte: new Date(`${thisSunday}T00:00:00Z`) },
       },
       select: { id: true },
     });
@@ -104,7 +129,7 @@ export async function bookableSponsorWeeks(workspaceId: string, count = 8): Prom
   }
   const start = includeCurrent ? 0 : 1;
   const weeks: string[] = [];
-  for (let i = start; i < start + count; i++) weeks.push(addDaysISO(thisMonday, i * 7));
+  for (let i = start; i < start + count; i++) weeks.push(addDaysISO(thisSunday, i * 7));
   return weeks;
 }
 
@@ -184,27 +209,120 @@ export async function countTaken(
   return holds + bookings;
 }
 
+/**
+ * Fullest day in a 7-day window starting at firstDay: for each day, count
+ * the runs (holds + bookings, by their start dates) covering that day
+ * plus standalone day-level usage, and return the max. A campaign can
+ * only sell when every day of its run has a free slot, so the fullest
+ * day is the number that decides availability.
+ */
+function maxTakenOverDays(runStarts: string[], dayUsage: Map<string, number>, firstDay: string): number {
+  let max = 0;
+  for (let o = 0; o < 7; o++) {
+    const day = addDaysISO(firstDay, o);
+    let taken = dayUsage.get(day) ?? 0;
+    for (const s of runStarts) {
+      if (s <= day && day <= addDaysISO(s, 6)) taken++;
+    }
+    if (taken > max) max = taken;
+  }
+  return max;
+}
+
+type RunCountDb = Omit<typeof basePrisma, "$transaction" | "$extends">;
+
+/**
+ * Occupancy for a buyer-chosen 7-day run: the fullest day's taken count
+ * across every overlapping run (any start date) plus standalone day
+ * placements. Works inside a withWeekLock transaction or standalone.
+ * When converting a hold into a booking, pass excludeHoldId so the
+ * buyer's own hold does not count against them.
+ */
+export async function countRunTaken(
+  db: RunCountDb,
+  workspaceId: string,
+  startDate: string,
+  tier: WeekTier,
+  excludeHoldId?: string
+): Promise<number> {
+  const now = new Date();
+  const from = addDaysISO(startDate, -6);
+  const to = addDaysISO(startDate, 6);
+  const [holds, bookings, dayRows] = await Promise.all([
+    db.sponsorHold.findMany({
+      where: { workspaceId, tier, expiresAt: { gt: now }, week: { weekStart: { gte: from, lte: to } } },
+      select: { id: true, week: { select: { weekStart: true } } },
+    }),
+    db.sponsorWeekBooking.findMany({
+      where: { workspaceId, tier, status: { in: OCCUPYING_STATUSES }, week: { weekStart: { gte: from, lte: to } } },
+      select: { week: { select: { weekStart: true } } },
+    }),
+    // Standalone day-level admin placements (sponsorWeekBookingId IS
+    // NULL). Projected run rows carry sponsorWeekBookingId, so they are
+    // excluded here and counted once via the run bookings above.
+    db.adBooking.findMany({
+      where: {
+        workspaceId,
+        date: { gte: startDate, lte: addDaysISO(startDate, 6) },
+        sponsorWeekBookingId: null,
+        type: WEEK_TIERS[tier].adType,
+        status: { in: ["approved", "pending_review", "pending_payment"] },
+      },
+      select: { date: true },
+    }),
+  ]);
+  const runStarts = [
+    ...holds.filter((h) => h.id !== excludeHoldId).map((h) => h.week.weekStart),
+    ...bookings.map((b) => b.week.weekStart),
+  ];
+  const dayUsage = new Map<string, number>();
+  for (const r of dayRows) dayUsage.set(r.date, (dayUsage.get(r.date) ?? 0) + 1);
+  return maxTakenOverDays(runStarts, dayUsage, startDate);
+}
+
+export interface RunAvailability {
+  tier: WeekTier;
+  state: WeekState;
+  taken: number;
+  slots: number;
+  spotsLeft: number;
+}
+
+/** Availability for one buyer-chosen run (7 days from startDate). */
+export async function getRunAvailability(
+  workspaceId: string,
+  startDate: string,
+  tier: WeekTier
+): Promise<RunAvailability> {
+  const taken = await countRunTaken(basePrisma as RunCountDb, workspaceId, startDate, tier);
+  const slots = WEEK_TIERS[tier].slots;
+  const spotsLeft = Math.max(0, slots - taken);
+  const state: WeekState = taken >= slots ? "sold" : taken === slots - 1 ? "one_left" : "available";
+  return { tier, state, taken, slots, spotsLeft };
+}
+
 export async function getWeeksAvailability(workspaceId: string): Promise<WeekAvailability[]> {
   const now = new Date();
   const weeks = await bookableSponsorWeeks(workspaceId);
-  // All issue dates across the upcoming weeks (campaigns run Mon-Sun).
-  const issueDates = weeks.flatMap((w) => [0, 1, 2, 3, 4, 5, 6].map((o) => addDaysISO(w, o)));
+  if (weeks.length === 0) return [];
+  const firstDay = weeks[0];
+  const lastDay = addDaysISO(weeks[weeks.length - 1], 6);
+  // Runs can start up to 6 days before the window and still overlap it.
+  const runFrom = addDaysISO(firstDay, -6);
+  const runTo = addDaysISO(lastDay, 6);
   const [holds, bookings, dayRows] = await Promise.all([
     basePrisma.sponsorHold.findMany({
-      where: { workspaceId, week: { weekStart: { in: weeks } }, expiresAt: { gt: now } },
+      where: { workspaceId, expiresAt: { gt: now }, week: { weekStart: { gte: runFrom, lte: runTo } } },
       select: { tier: true, week: { select: { weekStart: true } } },
     }),
     basePrisma.sponsorWeekBooking.findMany({
-      where: { workspaceId, week: { weekStart: { in: weeks } }, status: { in: OCCUPYING_STATUSES } },
+      where: { workspaceId, status: { in: OCCUPYING_STATUSES }, week: { weekStart: { gte: runFrom, lte: runTo } } },
       select: { tier: true, week: { select: { weekStart: true } } },
     }),
-    // Standalone day-level admin placements (sponsorWeekBookingId IS NULL).
-    // Projected week rows carry sponsorWeekBookingId, so they are excluded
-    // here and counted once via the weekly bookings above.
     basePrisma.adBooking.findMany({
       where: {
         workspaceId,
-        date: { in: issueDates },
+        date: { gte: firstDay, lte: lastDay },
         sponsorWeekBookingId: null,
         type: { in: ["in_article", "presenting"] },
         status: { in: ["approved", "pending_review", "pending_payment"] },
@@ -212,32 +330,28 @@ export async function getWeeksAvailability(workspaceId: string): Promise<WeekAva
       select: { date: true, type: true },
     }),
   ]);
-  const takenByWeekTier = new Map<string, number>();
+  const runStartsByTier = new Map<WeekTier, string[]>();
   for (const r of [...holds, ...bookings]) {
-    const key = `${r.week.weekStart}:${r.tier}`;
-    takenByWeekTier.set(key, (takenByWeekTier.get(key) ?? 0) + 1);
+    const list = runStartsByTier.get(r.tier as WeekTier) ?? [];
+    list.push(r.week.weekStart);
+    runStartsByTier.set(r.tier as WeekTier, list);
   }
-  // A campaign package needs one free slot on EVERY day Mon-Sun.
-  // Fold day-level fills in as: weeklyTaken + max over the week's days of
-  // standalone day usage, so a single-day admin fill shows real scarcity.
-  const dayUsageByDate = new Map<string, Map<string, number>>();
+  const dayUsageByTierDate = new Map<string, Map<string, number>>();
   for (const r of dayRows) {
     const tier = r.type === "presenting" ? "presenting" : "standard";
-    let m = dayUsageByDate.get(r.date);
-    if (!m) { m = new Map(); dayUsageByDate.set(r.date, m); }
-    m.set(tier, (m.get(tier) ?? 0) + 1);
+    let m = dayUsageByTierDate.get(tier);
+    if (!m) { m = new Map(); dayUsageByTierDate.set(tier, m); }
+    m.set(r.date, (m.get(r.date) ?? 0) + 1);
   }
   return weeks.map((weekStart) => ({
     weekStart,
     label: formatWeekRange(weekStart),
     tiers: (Object.keys(WEEK_TIERS) as WeekTier[]).map((tier) => {
-      const weeklyTaken = takenByWeekTier.get(`${weekStart}:${tier}`) ?? 0;
-      let maxDay = 0;
-      for (let o = 0; o < 7; o++) {
-        const m = dayUsageByDate.get(addDaysISO(weekStart, o));
-        if (m) maxDay = Math.max(maxDay, m.get(tier) ?? 0);
-      }
-      const taken = weeklyTaken + maxDay;
+      const taken = maxTakenOverDays(
+        runStartsByTier.get(tier) ?? [],
+        dayUsageByTierDate.get(tier) ?? new Map<string, number>(),
+        weekStart
+      );
       const slots = WEEK_TIERS[tier].slots;
       const state: WeekState = taken >= slots ? "sold" : taken === slots - 1 ? "one_left" : "available";
       return { tier, state, taken, slots };
@@ -246,7 +360,8 @@ export async function getWeeksAvailability(workspaceId: string): Promise<WeekAva
 }
 
 /**
- * Project a paid campaign booking into 7 day-based AdBooking rows (Mon-Sun)
+ * Project a paid campaign booking into 7 day-based AdBooking rows (the
+ * 7 consecutive days from the run's start date)
  * so the existing send pipeline, analytics, and portal keep working
  * unchanged. Copy handling: buyer's own copy goes live immediately; when
  * Chad writes the copy the rows wait in pending_review until he finalizes
@@ -268,7 +383,7 @@ export interface WeekBookingProjectionInput {
   isComp?: boolean;
 }
 
-/** Build the 7 Mon-Sun AdBooking rows for a paid campaign booking (pure). */
+/** Build the 7 consecutive-day AdBooking rows for a paid campaign booking (pure). */
 export function buildWeekProjectionRows(booking: WeekBookingProjectionInput) {
   const adType = WEEK_TIERS[booking.tier].adType;
   const copy = booking.finalAdCopy ?? booking.aboutText;

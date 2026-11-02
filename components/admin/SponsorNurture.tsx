@@ -32,6 +32,13 @@ interface CampaignItem {
   recipientCount: number;
   failedCount: number;
   updatedAt: string;
+  stats: {
+    opens: number;
+    openRate: number;
+    clicks: number;
+    clickers: number;
+    clickRate: number;
+  } | null;
 }
 
 interface Draft {
@@ -298,7 +305,7 @@ export default function SponsorNurture() {
                   <p className="text-xs text-gray-400">
                     {NURTURE_AUDIENCE_LABELS[c.audience]}
                     {c.status === "sent" && c.sentAt
-                      ? ` · sent ${new Date(c.sentAt).toLocaleDateString()} to ${c.recipientCount}${c.failedCount ? ` (${c.failedCount} failed)` : ""}`
+                      ? ` · sent ${new Date(c.sentAt).toLocaleDateString()} to ${c.recipientCount}${c.failedCount ? ` (${c.failedCount} failed)` : ""}${c.stats ? ` · ${Math.round(c.stats.openRate * 100)}% opened (${c.stats.opens}) · ${c.stats.clicks} clicks, ${Math.round(c.stats.clickRate * 100)}% clicked` : ""}`
                       : ` · edited ${new Date(c.updatedAt).toLocaleDateString()}`}
                   </p>
                 </div>

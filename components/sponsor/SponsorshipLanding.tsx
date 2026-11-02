@@ -111,6 +111,44 @@ export default function SponsorshipLanding() {
   const [heroError, setHeroError] = useState("");
   const [heroDone, setHeroDone] = useState(false);
 
+  // Email-first gate in the hero card: returning businesses (anyone with
+  // a sponsor profile in this city) get their portal link emailed instead
+  // of a signup form, so nurture emails linking here never create
+  // duplicate profiles. New emails fall through to the free form below.
+  const [gate, setGate] = useState<"email" | "found" | "new">("email");
+  const [gateEmail, setGateEmail] = useState("");
+  const [gateBusy, setGateBusy] = useState(false);
+  const [gateError, setGateError] = useState("");
+  const [gateBusinesses, setGateBusinesses] = useState<string[]>([]);
+  const [gateEmailed, setGateEmailed] = useState(true);
+
+  async function submitGate(e: React.FormEvent) {
+    e.preventDefault();
+    setGateBusy(true);
+    setGateError("");
+    try {
+      const res = await workspaceFetch("/api/sponsor/lookup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: gateEmail }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Something went wrong.");
+      if (data.found) {
+        setGateBusinesses(Array.isArray(data.businesses) ? data.businesses : []);
+        setGateEmailed(data.emailed !== false);
+        setGate("found");
+      } else {
+        setHero((h) => ({ ...h, email: gateEmail }));
+        setGate("new");
+      }
+    } catch (err) {
+      setGateError(err instanceof Error ? err.message : "Something went wrong.");
+    } finally {
+      setGateBusy(false);
+    }
+  }
+
   // Bottom lead form.
   const [lead, setLead] = useState({ businessName: "", contactName: "", email: "", goal: "" });
   const [leadBusy, setLeadBusy] = useState(false);
@@ -233,6 +271,42 @@ export default function SponsorshipLanding() {
                   </Link>
                 </div>
               </div>
+            ) : gate === "email" ? (
+              <>
+                <h2 className="text-lg font-extrabold mb-1">Start with your business email</h2>
+                <p className="text-[13px] mb-4" style={{ color: MUTED }}>
+                  Already listed with {workspace.name}? We&apos;ll email your sponsor portal link, no forms to redo.
+                  New here? We&apos;ll set up your free listing.
+                </p>
+                <form onSubmit={submitGate} className="space-y-3">
+                  <input required type="email" placeholder="Email address *" value={gateEmail} onChange={(e) => setGateEmail(e.target.value)} className={inputCls} style={inputStyle} />
+                  {gateError && <p className="text-sm text-red-600">{gateError}</p>}
+                  <button type="submit" disabled={gateBusy} className="w-full py-3 rounded-xl text-white font-semibold text-sm disabled:opacity-50 hover:opacity-90" style={{ background: PINE }}>
+                    {gateBusy ? "Checking…" : "Continue"}
+                  </button>
+                </form>
+              </>
+            ) : gate === "found" ? (
+              <div className="text-center py-8">
+                <div className="w-12 h-12 rounded-full mx-auto mb-4 flex items-center justify-center" style={{ background: MINT_BG, color: PINE }}>
+                  <Check className="w-6 h-6" />
+                </div>
+                <h2 className="text-xl font-extrabold mb-2">Welcome back{gateBusinesses.length ? `, ${gateBusinesses[0]}` : ""}!</h2>
+                <p className="text-sm leading-relaxed mb-5" style={{ color: MUTED }}>
+                  {gateEmailed ? (
+                    <>
+                      Your sponsor portal link is on its way to <strong style={{ color: INK }}>{gateEmail}</strong>.
+                      Your listing, details, and booking are all saved there, no need to enter everything again.
+                      {gateBusinesses.length > 1 ? ` We found ${gateBusinesses.length} businesses under this email and sent a link for each one.` : ""}
+                    </>
+                  ) : (
+                    <>We found your business, but the portal email didn&apos;t go through. Email chad@thegistdecatur.com and we&apos;ll send your link by hand.</>
+                  )}
+                </p>
+                <button onClick={() => { setGate("email"); setGateEmail(""); }} className="text-sm font-semibold hover:underline" style={{ color: PINE_DARK }}>
+                  Use a different email
+                </button>
+              </div>
             ) : (
               <>
                 <h2 className="text-lg font-extrabold mb-1">Claim your free listing</h2>
@@ -279,7 +353,7 @@ export default function SponsorshipLanding() {
             ["1,069", "Newsletter subscriptions across both markets"],
             ["36%", "Average open rate, last 30 issues"],
             ["31", "Issues opened per reader, last 90 days"],
-            ["7 days", "A week, including Saturday and Sunday"],
+            ["7 days", "Per campaign run, weekends included"],
           ].map(([num, label]) => (
             <div key={label} className="border-l-2 pl-4" style={{ borderColor: BORDER }}>
               <p className="text-3xl sm:text-4xl font-extrabold tracking-tight">{num}</p>
@@ -452,9 +526,9 @@ export default function SponsorshipLanding() {
             <ul className="space-y-2.5 text-sm flex-1 mb-7">
               {[
                 "Your logo in the partner strip of every daily issue",
-                "At least 10 premium promotional features per 30 days, per included city",
+                "Daily premium promotional features in every issue, per included city",
                 "Exclusive category among Presenting Partners in each city",
-                "One clearly labeled sponsored business profile per quarter",
+                "One named and linked section of the daily newsletter (Weather brought to you by…)",
                 "Gist Deals offer placement during the partnership",
                 "Monthly performance reporting and creative refreshes",
               ].map((item) => (
