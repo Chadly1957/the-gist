@@ -155,6 +155,43 @@ export default function SponsorshipLanding() {
   const [leadError, setLeadError] = useState("");
   const [leadDone, setLeadDone] = useState<Interest | null>(null);
 
+  // Email-first gate for the bottom form, same rule as the hero card: a
+  // returning business gets its portal link emailed instead of the full
+  // form, so this form can't create duplicate profiles either.
+  const [leadGate, setLeadGate] = useState<"email" | "found" | "new">("email");
+  const [leadGateEmail, setLeadGateEmail] = useState("");
+  const [leadGateBusy, setLeadGateBusy] = useState(false);
+  const [leadGateError, setLeadGateError] = useState("");
+  const [leadGateBusinesses, setLeadGateBusinesses] = useState<string[]>([]);
+  const [leadGateEmailed, setLeadGateEmailed] = useState(true);
+
+  async function submitLeadGate(e: React.FormEvent) {
+    e.preventDefault();
+    setLeadGateBusy(true);
+    setLeadGateError("");
+    try {
+      const res = await workspaceFetch("/api/sponsor/lookup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: leadGateEmail }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Something went wrong.");
+      if (data.found) {
+        setLeadGateBusinesses(Array.isArray(data.businesses) ? data.businesses : []);
+        setLeadGateEmailed(data.emailed !== false);
+        setLeadGate("found");
+      } else {
+        setLead((l) => ({ ...l, email: leadGateEmail }));
+        setLeadGate("new");
+      }
+    } catch (err) {
+      setLeadGateError(err instanceof Error ? err.message : "Something went wrong.");
+    } finally {
+      setLeadGateBusy(false);
+    }
+  }
+
   function scrollToId(id: string) {
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
@@ -732,7 +769,7 @@ export default function SponsorshipLanding() {
             ) : (
               <>
                 <h3 className="text-lg font-extrabold mb-1">What would you like to do?</h3>
-                <p className="text-[13px] mb-4" style={{ color: MUTED }}>Choose an option. Your business can always start with the free listing.</p>
+                <p className="text-[13px] mb-4" style={{ color: MUTED }}>Choose an option, then start with your email. Already listed? You&apos;ll get your portal link instead of a form.</p>
                 <div className="grid grid-cols-3 gap-2 mb-5">
                   {([
                     ["free", "Free listing"],
@@ -750,6 +787,40 @@ export default function SponsorshipLanding() {
                     </button>
                   ))}
                 </div>
+                {leadGate === "email" ? (
+                  <form onSubmit={submitLeadGate} className="space-y-3">
+                    <div>
+                      <label className="block text-xs font-semibold mb-1" style={{ color: MUTED }}>Email address *</label>
+                      <input required type="email" placeholder="name@business.com" value={leadGateEmail} onChange={(e) => setLeadGateEmail(e.target.value)} className={inputCls} style={inputStyle} />
+                    </div>
+                    <p className="text-xs leading-relaxed" style={{ color: MUTED }}>
+                      Already listed with us? We&apos;ll send your sponsor portal link instead of asking for everything again.
+                    </p>
+                    {leadGateError && <p className="text-sm text-red-600">{leadGateError}</p>}
+                    <button type="submit" disabled={leadGateBusy} className="w-full py-3.5 rounded-xl text-white font-semibold text-sm disabled:opacity-50 hover:opacity-90" style={{ background: PINE }}>
+                      {leadGateBusy ? "Checking\u2026" : "Continue"}
+                    </button>
+                  </form>
+                ) : leadGate === "found" ? (
+                  <div className="text-center py-6">
+                    <h4 className="text-base font-extrabold mb-2">Welcome back{leadGateBusinesses.length ? `, ${leadGateBusinesses[0]}` : ""}!</h4>
+                    <p className="text-sm leading-relaxed mb-5" style={{ color: MUTED }}>
+                      {leadGateEmailed ? (
+                        <>Your sponsor portal link is on its way to <strong style={{ color: INK }}>{leadGateEmail}</strong>. Your listing, details, and booking are all saved there.</>
+                      ) : (
+                        <>We found your business, but the portal email didn&apos;t go through. Email chad@thegistdecatur.com and we&apos;ll send your link by hand.</>
+                      )}
+                    </p>
+                    <div className="flex flex-wrap justify-center gap-4">
+                      <button onClick={() => { setLead((l) => ({ ...l, email: leadGateEmail })); setLeadGate("new"); }} className="text-sm font-semibold hover:underline" style={{ color: PINE_DARK }}>
+                        Still send this inquiry
+                      </button>
+                      <button onClick={() => { setLeadGate("email"); setLeadGateEmail(""); }} className="text-sm font-semibold hover:underline" style={{ color: MUTED }}>
+                        Use a different email
+                      </button>
+                    </div>
+                  </div>
+                ) : (
                 <form onSubmit={submitLead} className="space-y-3">
                   <div className="grid sm:grid-cols-2 gap-3">
                     <div>
@@ -797,6 +868,7 @@ export default function SponsorshipLanding() {
                           : <>Ask about a partnership <Arrow /></>}
                   </button>
                 </form>
+                )}
               </>
             )}
           </div>
