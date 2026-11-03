@@ -6,7 +6,7 @@ import { runDealsNurture } from "@/lib/deals-nurture";
 export const dynamic = "force-dynamic";
 
 // Hourly: walk new subscribers through the post-signup Deals nurture
-// sequence (touches at 2h / 24h / 72h / day 5) until they buy the book,
+// sequence (touches at 2h / 24h) until they buy the book,
 // opt out of deal reminders, or unsubscribe.
 export async function GET(req: NextRequest) {
   const secret = process.env.CRON_SECRET;

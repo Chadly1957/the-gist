@@ -5,13 +5,13 @@ import { couponBookAccessWhere } from "@/lib/coupon-book";
 import { escapeHtml } from "@/lib/html";
 
 // Post-signup Deals nurture sequence. New subscribers see the one-time offer
-// on the thank-you page; anyone who doesn't buy enters this 4-touch email
-// sequence (2h / 24h / 72h / day 5). Stops when they buy the book, opt out of
+// on the thank-you page; anyone who doesn't buy enters this 2-touch email
+// sequence (2h / 24h). Stops when they buy the book, opt out of
 // deal reminders, or unsubscribe. Driven hourly by /api/cron/deals-nurture.
+// (Touches 3 and 4, 72h and day 5, were removed 2026-11-03 on Chad's call.)
 //
 // The offer is deliberately simple: the book, $15 a year, backed by the
 // One-Deal Promise. No bundles, no bonus stack, no manufactured urgency.
-// Touch 3's urgency is real: it's the last email about the book.
 
 // touch -> hours after subscribedAt before it's due, and minimum hours since
 // the previous touch was sent (keeps pacing sane for older subscribers who
@@ -19,8 +19,6 @@ import { escapeHtml } from "@/lib/html";
 const SCHEDULE = [
   { touch: 1, delayHours: 2, minGapHours: 0 },
   { touch: 2, delayHours: 24, minGapHours: 20 },
-  { touch: 3, delayHours: 72, minGapHours: 40 },
-  { touch: 4, delayHours: 120, minGapHours: 40 },
 ];
 const ENROLL_WINDOW_HOURS = 24 * 8;
 
@@ -117,36 +115,8 @@ function buildTouch(
     };
   }
 
-  if (touch === 3) {
-    return {
-      subject: "Last email about the Deals book",
-      html: wrap(`
-        ${p(greeting)}
-        ${p(`This is the last email I&apos;ll send you about the Deals book. I don&apos;t want to be that guy.`)}
-        ${p(`If you want it, it&apos;s <strong style="color: #111827;">$15 a year</strong>, and the One-Deal Promise still applies: save $15 in 60 days or email me for a full refund.`)}
-        ${ctaHtml(opts.link, "Get the Book, $15 a year")}
-        ${p(`Either way, the newsletter is free forever.`)}
-        ${sign}`),
-    };
-  }
-
-  // touch 4: plain-text founder note
-  return {
-    subject: "quick question",
-    html: wrap(`
-      ${p(greeting)}
-      <p style="color: #4b5563; font-size: 14px; line-height: 1.7;">It&apos;s Chad.</p>
-      <p style="color: #4b5563; font-size: 14px; line-height: 1.7;">
-        I noticed you didn&apos;t grab the Deals book, and that&apos;s totally fine. The newsletter is free forever either way.
-      </p>
-      <p style="color: #4b5563; font-size: 14px; line-height: 1.7;">
-        But I&apos;m trying to make the book something people actually want, so can I ask: <strong style="color: #111827;">what held you back?</strong>
-      </p>
-      <p style="color: #4b5563; font-size: 14px; line-height: 1.7;">
-        Just hit reply. I read every one.
-      </p>
-      <p style="color: #4b5563; font-size: 14px; line-height: 1.7;">Thanks,<br>Chad</p>`),
-  };
+  // Unreachable: SCHEDULE only defines touches 1 and 2.
+  throw new Error(`Unknown deals nurture touch: ${touch}`);
 }
 
 async function sendNurtureTouch(

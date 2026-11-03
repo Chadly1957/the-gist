@@ -40,7 +40,7 @@ export function buildDealsPsBlock(opts: {
     <strong style="color: #111827;">P.S.</strong> The newsletter is free forever.
     Separately, I built <strong style="color: #111827;">The Gist Deals</strong>:
     a digital book of real discounts from local ${opts.area} businesses,
-    right on your phone. $15 once, yours for life.
+    right on your phone. $15 a year.
     <a href="${dealsLink}" style="color: ${opts.linkColor}; font-weight: bold;">See what&apos;s inside</a>
   </p>
 </div>`;
