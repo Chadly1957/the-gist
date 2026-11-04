@@ -1,12 +1,18 @@
 import { workspaceEnv, getWorkspace } from "@/lib/workspace";
 import nodemailer from "nodemailer";
 
+export interface EmailAttachment {
+  filename: string;
+  content: Buffer;
+}
+
 interface EmailPayload {
   to: string;
   subject: string;
   htmlBody: string;
   textBody?: string;
   headers?: Record<string, string>;
+  attachments?: EmailAttachment[];
 }
 
 export class ResendClient {
@@ -36,6 +42,14 @@ export class ResendClient {
           html: payload.htmlBody,
           ...(payload.textBody ? { text: payload.textBody } : {}),
           ...(payload.headers ? { headers: payload.headers } : {}),
+          ...(payload.attachments?.length
+            ? {
+                attachments: payload.attachments.map((a) => ({
+                  filename: a.filename,
+                  content: a.content.toString("base64"),
+                })),
+              }
+            : {}),
         }),
         signal: controller.signal,
         cache: "no-store",
@@ -151,7 +165,7 @@ export class UnosendClient {
       : opts.fromEmail;
   }
 
-  private async post(payload: { from: string; to: string[]; subject: string; html: string; text?: string; headers?: Record<string, string> }) {
+  private async post(payload: { from: string; to: string[]; subject: string; html: string; text?: string; headers?: Record<string, string>; attachments?: Array<{ filename: string; content: string }> }) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 15000);
     try {
@@ -179,6 +193,14 @@ export class UnosendClient {
         html: payload.htmlBody,
         ...(payload.textBody ? { text: payload.textBody } : {}),
         ...(payload.headers ? { headers: payload.headers } : {}),
+        ...(payload.attachments?.length
+          ? {
+              attachments: payload.attachments.map((a) => ({
+                filename: a.filename,
+                content: a.content.toString("base64"),
+              })),
+            }
+          : {}),
       });
       if (!res.ok) {
         const text = await res.text().catch(() => res.statusText);
@@ -276,6 +298,14 @@ export class SmtpEmailClient {
         html: payload.htmlBody,
         text: payload.textBody,
         headers: payload.headers,
+        ...(payload.attachments?.length
+          ? {
+              attachments: payload.attachments.map((a) => ({
+                filename: a.filename,
+                content: a.content,
+              })),
+            }
+          : {}),
       });
       return { success: true };
     } catch (err) {

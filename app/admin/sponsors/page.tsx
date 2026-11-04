@@ -1,7 +1,8 @@
 "use client";
 import { WorkspaceAnchor } from "@/components/workspace/WorkspaceLink";
 
-import { workspaceFetch } from "@/lib/workspace-client";
+import { workspaceFetch, workspacePath } from "@/lib/workspace-client";
+import { defaultKitEmailBody } from "@/lib/sponsor-slug";
 
 import { useEffect, useRef, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
@@ -57,6 +58,8 @@ interface Profile {
   notes: string | null;
   createdAt: string;
   portalUrl: string;
+  joinUrl: string;
+  lastKitSentAt: string | null;
 }
 
 interface WeekBooking {
@@ -317,6 +320,82 @@ function AdminSponsorsContent() {
     setEmailSending(false);
   }
 
+  // Sponsor Amp Kit: landing-URL copy state + kit email compose
+  const [workspaceName, setWorkspaceName] = useState("");
+  const [workspaceArea, setWorkspaceArea] = useState("");
+  const [copiedJoinId, setCopiedJoinId] = useState<string | null>(null);
+  const [kitTarget, setKitTarget] = useState<Profile | null>(null);
+  const [kitTo, setKitTo] = useState("");
+  const [kitSubject, setKitSubject] = useState("");
+  const [kitBody, setKitBody] = useState("");
+  const [kitFiles, setKitFiles] = useState<File[]>([]);
+  const [kitAttachQr, setKitAttachQr] = useState(true);
+  const [kitSending, setKitSending] = useState(false);
+  const [kitResult, setKitResult] = useState<{ ok: boolean; message: string } | null>(null);
+  const kitFileRef = useRef<HTMLInputElement>(null);
+
+  async function copyJoinUrl(p: Profile) {
+    try {
+      await navigator.clipboard.writeText(p.joinUrl);
+      setCopiedJoinId(p.id);
+      setTimeout(() => setCopiedJoinId((cur) => (cur === p.id ? null : cur)), 2000);
+    } catch {
+      // Clipboard unavailable (permissions); the URL is visible to copy by hand.
+    }
+  }
+
+  function openKit(p: Profile) {
+    setKitTarget(p);
+    setKitTo(p.email);
+    setKitSubject(`Your Gist partner kit for ${p.businessName}`);
+    setKitBody(
+      defaultKitEmailBody({
+        contactName: p.contactName,
+        businessName: p.businessName,
+        landingUrl: p.joinUrl,
+        newsletterName: workspaceName,
+        area: workspaceArea,
+      })
+    );
+    setKitFiles([]);
+    setKitAttachQr(true);
+    setKitResult(null);
+  }
+
+  function closeKit() {
+    setKitTarget(null);
+    setKitFiles([]);
+    setKitResult(null);
+  }
+
+  async function sendKit() {
+    if (!kitTarget) return;
+    setKitSending(true);
+    setKitResult(null);
+    try {
+      const fd = new FormData();
+      fd.append("to", kitTo);
+      fd.append("subject", kitSubject);
+      fd.append("body", kitBody);
+      fd.append("attachQr", kitAttachQr ? "true" : "false");
+      for (const f of kitFiles) fd.append("files", f);
+      const res = await workspaceFetch(`/api/admin/sponsors/profiles/${kitTarget.id}/kit-email`, {
+        method: "POST",
+        body: fd,
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setKitResult({ ok: true, message: `Kit sent to ${kitTo} with ${data.attachments?.length ?? 0} attachment${(data.attachments?.length ?? 0) !== 1 ? "s" : ""}.` });
+        load();
+      } else {
+        setKitResult({ ok: false, message: data.error || "Send failed." });
+      }
+    } catch {
+      setKitResult({ ok: false, message: "Network error." });
+    }
+    setKitSending(false);
+  }
+
   // New booking modal (triggered by calendar date click)
   const [newBookingDate, setNewBookingDate] = useState<string | null>(null);
   const [newBookingDates, setNewBookingDates] = useState<string[]>([]);
@@ -452,6 +531,8 @@ function AdminSponsorsContent() {
       setSpotlights(data.spotlights || []);
       setBookings(data.bookings || []);
       setProfiles(data.profiles || []);
+      setWorkspaceName(data.workspaceName || "");
+      setWorkspaceArea(data.workspaceArea || "");
       setPrices((p) => ({ ...p, ...Object.fromEntries(
         Object.entries(settingsData.settings || {}).filter(([k]) => k.startsWith("sponsorship_price_"))
       )}));
@@ -1423,17 +1504,38 @@ function AdminSponsorsContent() {
               </div>
               {profiles.length === 0 && <p className="text-sm text-gray-400">No sponsors yet.</p>}
               {profiles.map((p) => (
-                <div key={p.id} className="bg-white rounded-xl border border-gray-200 p-4 flex items-center gap-4">
+                <div key={p.id} className="bg-white rounded-xl border border-gray-200 p-4 flex flex-wrap items-center gap-4">
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-gray-800">{p.businessName}</p>
                     <p className="text-xs text-gray-500">{p.contactName} · {p.email}{p.phone ? ` · ${p.phone}` : ""}</p>
                     {p.website && <WorkspaceAnchor href={p.website} target="_blank" rel="noopener noreferrer" className="text-xs text-green-700 hover:underline">{p.website}</WorkspaceAnchor>}
+                    <div className="flex items-center gap-2 mt-1.5 min-w-0">
+                      <span className="text-[11px] text-gray-400 shrink-0">Join page:</span>
+                      <span className="text-[11px] text-gray-600 font-mono truncate">{p.joinUrl}</span>
+                      <button onClick={() => copyJoinUrl(p)}
+                        className="text-[11px] text-green-700 hover:underline shrink-0 font-semibold">
+                        {copiedJoinId === p.id ? "Copied ✓" : "Copy"}
+                      </button>
+                    </div>
+                    {p.lastKitSentAt && (
+                      <p className="text-[11px] text-gray-400 mt-0.5">
+                        Last kit sent {new Date(p.lastKitSentAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                      </p>
+                    )}
                   </div>
-                  <div className="flex items-center gap-2 shrink-0">
+                  <div className="flex items-center gap-2 shrink-0 flex-wrap">
                     <button onClick={() => openEmail(p)}
                       className="text-xs text-green-700 border border-green-200 rounded-lg px-3 py-1.5 hover:bg-green-50 whitespace-nowrap">
                       Email
                     </button>
+                    <button onClick={() => openKit(p)}
+                      className="text-xs text-green-700 border border-green-200 rounded-lg px-3 py-1.5 hover:bg-green-50 whitespace-nowrap">
+                      Email Kit
+                    </button>
+                    <a href={workspacePath(`/api/admin/sponsors/profiles/${p.id}/qr`)}
+                      className="text-xs text-green-700 border border-green-200 rounded-lg px-3 py-1.5 hover:bg-green-50 whitespace-nowrap">
+                      Download QR
+                    </a>
                     <WorkspaceAnchor href={p.portalUrl} target="_blank" rel="noopener noreferrer"
                       className="text-xs text-green-700 border border-green-200 rounded-lg px-3 py-1.5 hover:bg-green-50 whitespace-nowrap">
                       Open Portal ↗
@@ -1768,6 +1870,116 @@ function AdminSponsorsContent() {
                   <button onClick={closeEmail}
                     className="px-4 py-2 border border-gray-200 text-gray-600 rounded-lg text-sm font-semibold hover:bg-gray-50">
                     {emailResult?.ok ? "Close" : "Cancel"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* AMP KIT COMPOSE MODAL */}
+          {kitTarget !== null && (
+            <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+              <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <h2 className="text-base font-bold text-gray-900">
+                      Email Kit — {kitTarget.businessName}
+                    </h2>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Their flyer, QR code, and graphics, with their join page link.
+                    </p>
+                  </div>
+                  <button onClick={closeKit} className="text-gray-400 hover:text-gray-600 text-lg leading-none shrink-0">✕</button>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">To</label>
+                  <input
+                    type="email"
+                    value={kitTo}
+                    onChange={(e) => setKitTo(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Subject</label>
+                  <input
+                    type="text"
+                    value={kitSubject}
+                    onChange={(e) => setKitSubject(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Message</label>
+                  <textarea
+                    rows={12}
+                    value={kitBody}
+                    onChange={(e) => setKitBody(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-y"
+                  />
+                  <p className="text-xs text-gray-400 mt-1">Plain text — blank lines become paragraphs, single line breaks are preserved.</p>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Attachments (flyer, graphics)</label>
+                  <input
+                    ref={kitFileRef}
+                    type="file"
+                    multiple
+                    accept=".png,.jpg,.jpeg,.pdf,.gif,.webp"
+                    onChange={(e) => setKitFiles(Array.from(e.target.files || []))}
+                    className="block w-full text-sm text-gray-600 file:mr-3 file:px-3 file:py-1.5 file:border file:border-gray-200 file:rounded-lg file:text-xs file:font-semibold file:bg-gray-50 hover:file:bg-gray-100"
+                  />
+                  {kitFiles.length > 0 && (
+                    <ul className="mt-2 space-y-1">
+                      {kitFiles.map((f, i) => (
+                        <li key={`${f.name}-${i}`} className="flex items-center justify-between text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5">
+                          <span className="truncate">{f.name} <span className="text-gray-400">({(f.size / 1024).toFixed(0)} KB)</span></span>
+                          <button type="button"
+                            onClick={() => setKitFiles((files) => files.filter((_, j) => j !== i))}
+                            className="text-gray-400 hover:text-red-500 font-bold ml-2 shrink-0">
+                            ×
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {kitFiles.reduce((sum, f) => sum + f.size, 0) > 10 * 1024 * 1024 && (
+                    <p className="text-xs text-red-500 mt-1 font-medium">Attachments total over 10 MB — remove a file before sending.</p>
+                  )}
+                  <p className="text-xs text-gray-400 mt-1">png, jpg, pdf, gif, or webp, up to 10 MB total.</p>
+                </div>
+
+                <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={kitAttachQr}
+                    onChange={(e) => setKitAttachQr(e.target.checked)}
+                    className="w-4 h-4 accent-green-700"
+                  />
+                  Attach their QR code PNG
+                </label>
+
+                {kitResult && (
+                  <p className={`text-sm font-medium ${kitResult.ok ? "text-green-600" : "text-red-600"}`}>
+                    {kitResult.message}
+                  </p>
+                )}
+
+                <div className="flex gap-2">
+                  <button
+                    onClick={sendKit}
+                    disabled={kitSending || !kitTo.trim() || !kitSubject.trim() || !kitBody.trim() || kitFiles.reduce((sum, f) => sum + f.size, 0) > 10 * 1024 * 1024}
+                    className="px-4 py-2 bg-green-700 text-white rounded-lg text-sm font-semibold hover:bg-green-800 disabled:opacity-50"
+                  >
+                    {kitSending ? "Sending…" : "Send Kit"}
+                  </button>
+                  <button onClick={closeKit}
+                    className="px-4 py-2 border border-gray-200 text-gray-600 rounded-lg text-sm font-semibold hover:bg-gray-50">
+                    {kitResult?.ok ? "Close" : "Cancel"}
                   </button>
                 </div>
               </div>
