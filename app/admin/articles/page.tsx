@@ -19,6 +19,7 @@ interface Story {
   seoDescription: string | null;
   viewCount: number;
   status: string;
+  section: string;
   publishedAt: string | null;
   updatedAt: string;
 }
@@ -33,6 +34,7 @@ const EMPTY_FORM = {
   seoTitle: "",
   seoDescription: "",
   status: "draft",
+  section: "news",
 };
 
 const STATUS_COLORS: Record<string, string> = {
@@ -122,6 +124,7 @@ export default function ArticlesPage() {
       seoTitle: s.seoTitle || "",
       seoDescription: s.seoDescription || "",
       status: s.status,
+      section: s.section || "news",
     });
     setSlugTouched(true);
     setShowForm(true);
@@ -144,6 +147,7 @@ export default function ArticlesPage() {
       seoTitle: form.seoTitle,
       seoDescription: form.seoDescription,
       status: form.status,
+      section: form.section,
     };
     try {
       const url = editingId ? `/api/admin/stories/${editingId}` : "/api/admin/stories";
@@ -157,7 +161,7 @@ export default function ArticlesPage() {
       setSuccess(
         editingId
           ? "Article updated."
-          : `Article created${data.story.status === "published" ? ` and live at /articles/${data.story.slug}` : " as a draft"}.`
+          : `Article created${data.story.status === "published" ? ` and live at ${data.story.section === "local" ? "/local" : "/articles"}/${data.story.slug}` : " as a draft"}.`
       );
       setShowForm(false);
       load();
@@ -233,7 +237,7 @@ export default function ArticlesPage() {
                 className="mt-1 w-full border rounded-lg px-3 py-2 font-mono text-sm"
                 placeholder="auto from headline"
               />
-              <span className="text-xs text-gray-400">The article lives at /articles/&lt;this slug&gt;.</span>
+              <span className="text-xs text-gray-400">The path depends on the Section below: /articles/&lt;this slug&gt; or /local/&lt;this slug&gt;.</span>
             </label>
           </div>
 
@@ -306,6 +310,13 @@ export default function ArticlesPage() {
                 <option value="published">Published (live)</option>
               </select>
             </label>
+            <label className="block">
+              <span className="text-sm font-medium">Section</span>
+              <select value={form.section} onChange={(e) => setForm({ ...form, section: e.target.value })} className="mt-1 border rounded-lg px-3 py-2">
+                <option value="news">News (/articles)</option>
+                <option value="local">Local evergreen (/local)</option>
+              </select>
+            </label>
             <button type="submit" disabled={saving} className="px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium disabled:opacity-50">
               {saving ? "Saving..." : editingId ? "Save changes" : "Create article"}
             </button>
@@ -326,7 +337,7 @@ export default function ArticlesPage() {
               <div className="flex-1 min-w-0">
                 <div className="font-semibold truncate">{s.headline}</div>
                 <div className="text-sm text-gray-500 truncate">
-                  by {s.author} · /articles/{s.slug}
+                  by {s.author} · {s.section === "local" ? "/local/" : "/articles/"}{s.slug}
                   {s.publishedAt && <> · published {new Date(s.publishedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</>}
                   {typeof s.viewCount === "number" && <> · {s.viewCount.toLocaleString()} views</>}
                 </div>
@@ -335,7 +346,7 @@ export default function ArticlesPage() {
               <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${STATUS_COLORS[s.status] || "bg-gray-100"}`}>{s.status}</span>
               {s.status === "published" ? (
                 <>
-                  <Link href={`/articles/${s.slug}`} className="text-sm text-blue-600 hover:underline">View</Link>
+                  <Link href={s.section === "local" ? `/local/${s.slug}` : `/articles/${s.slug}`} className="text-sm text-blue-600 hover:underline">View</Link>
                   <button onClick={() => setStatus(s, "draft")} className="text-sm text-gray-500 hover:underline">Unpublish</button>
                 </>
               ) : (

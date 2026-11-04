@@ -30,7 +30,7 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function ArticlesIndexPage() {
   const workspace = await getWorkspace();
   const stories = await prisma.story.findMany({
-    where: { status: "published" },
+    where: { status: "published", section: "news" },
     orderBy: { publishedAt: "desc" },
     select: {
       id: true,

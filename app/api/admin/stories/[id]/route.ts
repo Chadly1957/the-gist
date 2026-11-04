@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAdminSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { deriveExcerpt, sanitizeArticleHtml, slugify } from "@/lib/articles";
+import { isStorySection } from "@/lib/local-seo";
 
 export const dynamic = "force-dynamic";
 
@@ -67,6 +68,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (body.seoDescription !== undefined) {
     data.seoDescription =
       typeof body.seoDescription === "string" && body.seoDescription.trim() ? body.seoDescription.trim() : null;
+  }
+  if (body.section !== undefined) {
+    if (!isStorySection(body.section)) {
+      return NextResponse.json({ error: "Invalid section." }, { status: 400 });
+    }
+    data.section = body.section;
   }
   if (typeof body.status === "string") {
     if (!VALID_STATUS.includes(body.status)) return NextResponse.json({ error: "Invalid status." }, { status: 400 });

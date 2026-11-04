@@ -15,7 +15,7 @@ export async function GET() {
   const workspace = await getWorkspace();
   const base = (await getWorkspaceUrl()).replace(/\/$/, "");
   const stories = await prisma.story.findMany({
-    where: { status: "published" },
+    where: { status: "published", section: "news" },
     orderBy: { publishedAt: "desc" },
     take: 50,
   });

@@ -7,6 +7,7 @@ import {
   PARTNER_CATEGORIES,
   isPartnerCategory,
 } from "@/lib/partner-categories";
+import { isLocalCategorySlug } from "@/lib/local-seo";
 
 export const dynamic = "force-dynamic";
 
@@ -97,9 +98,19 @@ export default async function PartnersPage() {
 
             {sections.map((s) => (
               <section key={s.slug} id={s.slug} className="mb-12 scroll-mt-24">
-                <h2 className="text-sm font-bold uppercase tracking-widest text-gray-500 mb-4">
-                  {s.label}
-                </h2>
+                <div className="flex items-baseline justify-between gap-4 mb-4">
+                  <h2 className="text-sm font-bold uppercase tracking-widest text-gray-500">
+                    {s.label}
+                  </h2>
+                  {isLocalCategorySlug(s.slug) && (
+                    <Link
+                      href={`/local/${s.slug}`}
+                      className="text-xs font-semibold text-green-700 hover:underline shrink-0"
+                    >
+                      See all {s.label} in {ws.area} →
+                    </Link>
+                  )}
+                </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   {s.items.map((p) => (
                     <div key={p.id} className="border border-gray-200 rounded-2xl p-5 flex flex-col">
