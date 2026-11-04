@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAdminSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { deriveExcerpt, sanitizeArticleHtml, slugify } from "@/lib/articles";
+import { isStorySection } from "@/lib/local-seo";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +19,7 @@ interface StoryBody {
   seoTitle?: string | null;
   seoDescription?: string | null;
   status?: string;
+  section?: string;
 }
 
 // GET /api/admin/stories — list this workspace's stories, newest first.
@@ -43,6 +45,7 @@ export async function POST(req: NextRequest) {
   const bodyHtml = sanitizeArticleHtml(body.body || "");
   if (!bodyHtml) return NextResponse.json({ error: "Write the article body first." }, { status: 400 });
   const status = body.status && VALID_STATUS.includes(body.status) ? body.status : "draft";
+  const section = isStorySection(body.section) ? body.section : "news";
 
   let slug = slugify(body.slug?.trim() || headline);
   if (!slug) return NextResponse.json({ error: "Could not generate a URL slug from that headline." }, { status: 400 });
@@ -65,6 +68,7 @@ export async function POST(req: NextRequest) {
       seoTitle: body.seoTitle?.trim() || null,
       seoDescription: body.seoDescription?.trim() || null,
       status,
+      section,
       publishedAt: status === "published" ? new Date() : null,
     },
   });

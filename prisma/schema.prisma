@@ -812,6 +812,7 @@ model Story {
   seoDescription String? // optional search/social description override; falls back to the excerpt
   viewCount      Int       @default(0) // public article page views (client beacon, one per reader session)
   status         String    @default("draft") // draft | published
+  section        String    @default("news") // news | local (evergreen SEO route at /local)
   publishedAt    DateTime? // stamped when the story first goes published
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt

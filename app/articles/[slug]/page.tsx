@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { getWorkspace, getWorkspaceUrl } from "@/lib/workspace";
 import { deriveExcerpt } from "@/lib/articles";
@@ -12,7 +12,16 @@ export const dynamic = "force-dynamic";
 
 async function getPublishedStory(slug: string) {
   return prisma.story.findFirst({
-    where: { slug, status: "published" },
+    where: { slug, status: "published", section: "news" },
+  });
+}
+
+// A published story living in the evergreen section: its canonical home
+// is /local/<slug>, so anything that lands here gets sent there.
+async function getLocalStory(slug: string) {
+  return prisma.story.findFirst({
+    where: { slug, status: "published", section: "local" },
+    select: { id: true },
   });
 }
 
@@ -56,7 +65,13 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 export default async function ArticlePage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const story = await getPublishedStory(slug);
-  if (!story) notFound();
+  if (!story) {
+    if (await getLocalStory(slug)) {
+      const base = (await getWorkspaceUrl()).replace(/\/$/, "");
+      permanentRedirect(`${base}/local/${slug}`);
+    }
+    notFound();
+  }
   const workspace = await getWorkspace();
   const base = (await getWorkspaceUrl()).replace(/\/$/, "");
   const url = `${base}/articles/${story.slug}`;
