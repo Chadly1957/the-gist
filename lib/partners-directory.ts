@@ -1,5 +1,6 @@
 import { prisma } from "./db";
 import { PARTNER_CATEGORIES } from "./partner-categories";
+import { LOCAL_CATEGORY_INDEX_MIN, isLocalCategorySlug } from "./local-seo";
 
 // The public Community Partner directory set for this workspace, shared
 // by /partners, the /local category pages + hub, and the sitemap so all
@@ -44,3 +45,21 @@ export async function getPartnerDirectory() {
 
 export type PartnerDirectory = Awaited<ReturnType<typeof getPartnerDirectory>>;
 export type PartnerListing = PartnerDirectory["partners"][number];
+
+// The indexable slice of the directory: the categories whose public
+// listing count has earned a /local page. The count is taken from the
+// very items array the category page renders, and the /local hub lists
+// exactly this summary, so a hub count can never drift from the number
+// of cards on the page it links to.
+export function indexableDirectoryCategories(
+  byCategory: Map<string, PartnerListing[]>
+): Array<{ slug: string; label: string; count: number; items: PartnerListing[] }> {
+  return PARTNER_CATEGORIES.filter(
+    (c) =>
+      isLocalCategorySlug(c.slug) &&
+      (byCategory.get(c.slug)?.length ?? 0) >= LOCAL_CATEGORY_INDEX_MIN
+  ).map((c) => {
+    const items = byCategory.get(c.slug) ?? [];
+    return { slug: c.slug, label: c.label, count: items.length, items };
+  });
+}

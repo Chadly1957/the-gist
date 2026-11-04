@@ -1,13 +1,11 @@
 import type { Metadata } from "next";
 import { prisma } from "@/lib/db";
 import { getWorkspace, getWorkspaceUrl } from "@/lib/workspace";
-import { PARTNER_CATEGORIES } from "@/lib/partner-categories";
-import { getPartnerDirectory } from "@/lib/partners-directory";
 import {
-  LOCAL_CATEGORY_INDEX_MIN,
-  isLocalCategorySlug,
-  workspaceCityState,
-} from "@/lib/local-seo";
+  getPartnerDirectory,
+  indexableDirectoryCategories,
+} from "@/lib/partners-directory";
+import { workspaceCityState } from "@/lib/local-seo";
 import Link from "@/components/workspace/WorkspaceLink";
 import SiteHeader from "@/components/SiteHeader";
 
@@ -39,11 +37,7 @@ export default async function LocalHubPage() {
   const tz = workspace.timezone || "America/Chicago";
 
   const { byCategory } = await getPartnerDirectory();
-  const categories = PARTNER_CATEGORIES.filter(
-    (c) =>
-      isLocalCategorySlug(c.slug) &&
-      (byCategory.get(c.slug)?.length ?? 0) >= LOCAL_CATEGORY_INDEX_MIN
-  ).map((c) => ({ slug: c.slug, label: c.label, count: byCategory.get(c.slug)?.length ?? 0 }));
+  const categories = indexableDirectoryCategories(byCategory);
 
   const stories = await prisma.story.findMany({
     where: { status: "published", section: "local" },
