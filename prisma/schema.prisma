@@ -41,6 +41,7 @@ model Workspace {
   sponsorEmailTemplateRows    SponsorEmailTemplate[]
   sponsorEmailCampaignRows    SponsorEmailCampaign[]
   sponsorKitSendRows          SponsorKitSend[]
+  mediaKitTemplateRows        MediaKitTemplate[]
   sponsorNurtureSendRows      SponsorNurtureSend[]
   sponsorNurtureClickRows     SponsorNurtureClick[]
   sponsorDayConfigRows        SponsorDayConfig[]
@@ -359,6 +360,26 @@ model SponsorKitSend {
   @@unique([id, workspaceId])
   @@index([workspaceId])
   @@index([sponsorId])
+}
+
+// Media Kit Builder (Admin > Sponsors > Profiles): per-workspace
+// flyer/social background templates with the QR and logo zones drawn on
+// them in the admin zone editor. Zones are relative 0-1 coordinates
+// stored as JSON ({ x, y, w, h }). One row per kind per workspace.
+model MediaKitTemplate {
+  workspaceId String    @default("decatur")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  id          String    @id @default(cuid())
+  kind        String
+  imageUrl    String
+  qrZone      Json
+  logoZone    Json
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([id, workspaceId])
+  @@unique([workspaceId, kind])
+  @@index([workspaceId])
 }
 
 model SponsorNurtureClick {

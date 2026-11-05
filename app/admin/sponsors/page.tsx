@@ -8,6 +8,7 @@ import { useEffect, useRef, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import SponsorPreview from "@/components/SponsorPreview";
 import SponsorNurture from "@/components/admin/SponsorNurture";
+import { MediaKitModal, MediaKitTemplatesCard } from "@/components/admin/MediaKit";
 import UrlInput from "@/components/UrlInput";
 import MultiDateCalendar from "@/components/MultiDateCalendar";
 import { PARTNER_CATEGORIES } from "@/lib/partner-categories";
@@ -333,6 +334,7 @@ function AdminSponsorsContent() {
   const [kitSending, setKitSending] = useState(false);
   const [kitResult, setKitResult] = useState<{ ok: boolean; message: string } | null>(null);
   const kitFileRef = useRef<HTMLInputElement>(null);
+  const [mediaKitTarget, setMediaKitTarget] = useState<Profile | null>(null);
 
   async function copyJoinUrl(p: Profile) {
     try {
@@ -1493,6 +1495,7 @@ function AdminSponsorsContent() {
           {/* PROFILES */}
           {tab === "profiles" && (
             <div className="space-y-3">
+              <MediaKitTemplatesCard />
               <div className="flex items-center justify-between">
                 <p className="text-sm text-gray-500">{profiles.length} sponsor{profiles.length !== 1 ? "s" : ""}</p>
                 {profiles.length > 0 && (
@@ -1531,6 +1534,10 @@ function AdminSponsorsContent() {
                     <button onClick={() => openKit(p)}
                       className="text-xs text-green-700 border border-green-200 rounded-lg px-3 py-1.5 hover:bg-green-50 whitespace-nowrap">
                       Email Kit
+                    </button>
+                    <button onClick={() => setMediaKitTarget(p)}
+                      className="text-xs text-green-700 border border-green-200 rounded-lg px-3 py-1.5 hover:bg-green-50 whitespace-nowrap">
+                      Media Kit
                     </button>
                     <a href={workspacePath(`/api/admin/sponsors/profiles/${p.id}/qr`)}
                       className="text-xs text-green-700 border border-green-200 rounded-lg px-3 py-1.5 hover:bg-green-50 whitespace-nowrap">
@@ -1984,6 +1991,17 @@ function AdminSponsorsContent() {
                 </div>
               </div>
             </div>
+          )}
+
+          {/* MEDIA KIT MODAL */}
+          {mediaKitTarget !== null && (
+            <MediaKitModal
+              profile={mediaKitTarget}
+              workspaceName={workspaceName}
+              workspaceArea={workspaceArea}
+              onClose={() => setMediaKitTarget(null)}
+              onSent={() => { load(); }}
+            />
           )}
 
           {/* PRICING */}
