@@ -1,6 +1,11 @@
 import sharp from "sharp";
 import QRCode from "qrcode";
+import { existsSync, mkdirSync, writeFileSync } from "fs";
+import { tmpdir } from "os";
+import { join } from "path";
+import { parse as parseFont, type Font } from "opentype.js";
 import type { MediaKitZone } from "./media-kit-shared";
+import { MEDIA_KIT_FONT_BASE64 } from "./media-kit-font";
 
 // Pure composition core for the Media Kit Builder: no database, no
 // request state. lib/media-kit.ts loads templates/profiles and calls
@@ -12,6 +17,19 @@ import type { MediaKitZone } from "./media-kit-shared";
 //      transparency preserved. When the profile has no usable logo, the
 //      business name is rendered as text in the logo zone instead
 //      (approved fallback, Nov 5 2026) and the caller is told why.
+//
+// Font independence (Nov 5 2026 fix): serverless runtimes ship without
+// usable fonts, and anything routed through the system font stack
+// degrades there: SVG <text> collapses to a strip of tiny
+// missing-glyph marks. So this module carries its own font
+// (lib/media-kit-font.ts):
+//   - the business-name fallback is drawn as vector paths computed
+//     from that font with opentype.js, never as SVG <text>, and
+//   - the same font is registered with fontconfig below, so sponsor
+//     SVG logos that contain live <text> can still rasterize.
+// Logo rasters also get their transparent padding trimmed before the
+// contain-fit, so a logo exported on an oversized transparent canvas
+// fills its zone instead of shrinking to its artwork fraction.
 
 export interface ComposeProfile {
   businessName: string;
@@ -43,36 +61,127 @@ export async function buildQrPngAtSize(targetUrl: string, sizePx: number): Promi
   });
 }
 
-function escapeXml(text: string): string {
-  return text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&apos;");
+/* ---------------- Bundled font + fontconfig ---------------- */
+
+function bundledFontBytes(): Buffer {
+  return Buffer.from(MEDIA_KIT_FONT_BASE64, "base64");
 }
 
-// Business name as an SVG overlay sized for the logo zone: bold sans,
-// dark slate, single line, shrunk (and if needed squeezed via
-// textLength) until it fits the box.
+let cachedFont: Font | null = null;
+function bundledFont(): Font {
+  if (cachedFont) return cachedFont;
+  const bytes = bundledFontBytes();
+  const arrayBuffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+  cachedFont = parseFont(arrayBuffer);
+  return cachedFont;
+}
+
+// Register the bundled font with fontconfig so librsvg/pango (used by
+// sharp when rasterizing sponsor SVG logos) can find a real font even
+// on servers that ship none. Best effort: wrapped in try/catch and
+// idempotent. The name fallback does not depend on this (it is drawn
+// as paths); this exists for SVG logos containing live <text>.
+let fontConfigDone = false;
+function ensureBundledFontConfig(): void {
+  if (fontConfigDone) return;
+  fontConfigDone = true;
+  try {
+    const dir = join(tmpdir(), "gist-media-kit-fonts");
+    mkdirSync(dir, { recursive: true });
+    const fontPath = join(dir, "DejaVuSans-Bold.ttf");
+    if (!existsSync(fontPath)) writeFileSync(fontPath, bundledFontBytes());
+    const cacheDir = join(dir, "cache");
+    mkdirSync(cacheDir, { recursive: true });
+    const confPath = join(dir, "fonts.conf");
+    writeFileSync(
+      confPath,
+      `<?xml version="1.0"?>\n<!DOCTYPE fontconfig SYSTEM "fonts.dtd">\n` +
+        `<fontconfig><dir>${dir}</dir><dir>/usr/share/fonts</dir><dir>/usr/local/share/fonts</dir>` +
+        `<cachedir>${cacheDir}</cachedir></fontconfig>\n`
+    );
+    process.env.FONTCONFIG_FILE = confPath;
+  } catch {
+    // Silent: a fontless environment is still handled by the path-based
+    // name fallback and the degenerate-render guard for SVG logos.
+  }
+}
+ensureBundledFontConfig();
+
+/* ---------------- Business-name fallback (vector paths) ---------------- */
+
+// Business name as an SVG overlay sized for the logo zone. The glyphs
+// are vector paths from the bundled font (opentype.js), so the render
+// is identical on every server and never depends on installed fonts.
+// Layout: one line when it fits at a strong size; otherwise the name
+// wraps at a word boundary into two lines when that clearly wins.
+// Lines are centered; if even the floor size overflows the zone width,
+// the line is squeezed horizontally (paths scale cleanly) instead of
+// shrinking below legibility.
 export function nameFallbackSvg(businessName: string, widthPx: number, heightPx: number): Buffer {
   const name = businessName.trim() || "Community Partner";
-  let fontSize = Math.max(14, Math.floor(heightPx * 0.42));
-  // Bold-sans glyph advance runs about 0.62em for DejaVu Sans Bold.
-  // Estimate the line width, shrink the font if it would exceed 94% of
-  // the zone, and pin the rendered width with textLength so font
-  // metrics on the server can never push the name past the zone edges.
+  const font = bundledFont();
   const maxWidth = widthPx * 0.94;
-  let estimatedWidth = 0.62 * fontSize * name.length;
-  if (estimatedWidth > maxWidth) {
-    fontSize = Math.max(12, Math.floor(fontSize * (maxWidth / estimatedWidth)));
-    estimatedWidth = 0.62 * fontSize * name.length;
+  const advancePerPx = (text: string) => font.getAdvanceWidth(text, 100, { kerning: true }) / 100;
+  const fitSize = (lines: string[], cap: number) => {
+    const widest = Math.max(...lines.map((line) => advancePerPx(line)));
+    return widest > 0 ? Math.min(cap, maxWidth / widest) : cap;
+  };
+
+  let lines = [name];
+  let size = fitSize(lines, heightPx * 0.6);
+  const words = name.split(/\s+/).filter(Boolean);
+  if (words.length > 1) {
+    let bestSplit: string[] | null = null;
+    let bestWorst = Infinity;
+    for (let i = 1; i < words.length; i++) {
+      const a = words.slice(0, i).join(" ");
+      const b = words.slice(i).join(" ");
+      const worst = Math.max(advancePerPx(a), advancePerPx(b));
+      if (worst < bestWorst) {
+        bestWorst = worst;
+        bestSplit = [a, b];
+      }
+    }
+    if (bestSplit) {
+      const twoLineSize = fitSize(bestSplit, heightPx * 0.34);
+      if (twoLineSize >= size * 1.35) {
+        lines = bestSplit;
+        size = twoLineSize;
+      }
+    }
   }
-  const textLengthAttr = ` textLength="${Math.round(Math.min(estimatedWidth, maxWidth))}" lengthAdjust="spacingAndGlyphs"`;
-  const baselineY = Math.round(heightPx / 2 + fontSize * 0.36);
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${widthPx}" height="${heightPx}"><text x="${Math.round(widthPx / 2)}" y="${baselineY}" font-family="DejaVu Sans, Arial, Helvetica, sans-serif" font-size="${fontSize}" font-weight="700" fill="#1f2937" text-anchor="middle"${textLengthAttr}>${escapeXml(name)}</text></svg>`;
+
+  const MIN_FONT_SIZE = 12;
+  let squeeze = 1;
+  if (size < MIN_FONT_SIZE) {
+    for (const line of lines) {
+      const adv = advancePerPx(line) * MIN_FONT_SIZE;
+      if (adv > 0) squeeze = Math.min(squeeze, maxWidth / adv);
+    }
+    size = MIN_FONT_SIZE;
+  }
+
+  const ascent = (font.ascender / font.unitsPerEm) * size;
+  const descent = (-font.descender / font.unitsPerEm) * size;
+  const lineHeight = size * 1.22;
+  const blockHeight = ascent + descent + (lines.length - 1) * lineHeight;
+  let baseline = (heightPx - blockHeight) / 2 + ascent;
+
+  const parts: string[] = [];
+  for (const line of lines) {
+    const adv = advancePerPx(line) * size;
+    const d = font.getPath(line, 0, 0, size, { kerning: true }).toPathData(2);
+    parts.push(
+      `<g transform="translate(${(widthPx / 2).toFixed(1)} ${baseline.toFixed(1)}) scale(${squeeze.toFixed(3)} 1)">` +
+        `<path d="${d}" transform="translate(${(-adv / 2).toFixed(1)} 0)" fill="#1f2937"/></g>`
+    );
+    baseline += lineHeight;
+  }
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${widthPx}" height="${heightPx}">${parts.join("")}</svg>`;
   return Buffer.from(svg);
 }
+
+/* ---------------- Logo overlay ---------------- */
 
 interface PlacedOverlay {
   input: Buffer;
@@ -93,6 +202,102 @@ async function fetchImageBuffer(url: string): Promise<Buffer> {
   } finally {
     clearTimeout(timer);
   }
+}
+
+function looksLikeSvg(raw: Buffer, url: string): boolean {
+  if (/\.svg(\?|#|$)/i.test(url)) return true;
+  const head = raw.subarray(0, 1024).toString("utf8");
+  return /<svg[\s>]/i.test(head);
+}
+
+// Fraction of a raster actually covered by artwork, measured on the
+// alpha channel (SVG rasters are transparent where nothing is drawn).
+// Returns null when the image has no alpha channel to judge by.
+async function measureContentFraction(
+  buf: Buffer
+): Promise<{ widthFraction: number; heightFraction: number } | null> {
+  try {
+    const img = sharp(buf).ensureAlpha();
+    const meta = await img.metadata();
+    if (!meta.width || !meta.height) return null;
+    const { data, info } = await img.raw().toBuffer({ resolveWithObject: true });
+    const channels = info.channels;
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -1;
+    let maxY = -1;
+    for (let y = 0; y < info.height; y++) {
+      for (let x = 0; x < info.width; x++) {
+        if (data[(y * info.width + x) * channels + 3] > 16) {
+          if (x < minX) minX = x;
+          if (x > maxX) maxX = x;
+          if (y < minY) minY = y;
+          if (y > maxY) maxY = y;
+        }
+      }
+    }
+    if (maxX < 0) return { widthFraction: 0, heightFraction: 0 };
+    return {
+      widthFraction: (maxX - minX + 1) / info.width,
+      heightFraction: (maxY - minY + 1) / info.height,
+    };
+  } catch {
+    return null;
+  }
+}
+
+// Prepare a fetched logo for placement: SVG logos are rasterized
+// (with a guard against the degenerate fontless-text render), and any
+// logo on a transparent canvas gets its empty padding trimmed so the
+// artwork itself fills the zone under the contain-fit.
+async function prepareLogoRaster(
+  raw: Buffer,
+  logoUrl: string
+): Promise<{ buffer: Buffer } | { degenerate: true }> {
+  let work = raw;
+
+  if (looksLikeSvg(raw, logoUrl)) {
+    ensureBundledFontConfig();
+    let raster = await sharp(raw).png().toBuffer();
+    const rasterMeta = await sharp(raster).metadata();
+    if ((rasterMeta.width || 0) > 2000) {
+      raster = await sharp(raster).resize({ width: 2000 }).png().toBuffer();
+    }
+    const hasLiveText = /<text[\s>]/i.test(raw.toString("utf8", 0, 65536));
+    if (hasLiveText) {
+      // A live-text SVG depends on server fonts to rasterize. When the
+      // environment cannot render text, the artwork collapses to a
+      // tiny fraction of its canvas; detect that and let the caller
+      // fall back to the business name instead of compositing specks.
+      const fraction = await measureContentFraction(raster);
+      if (fraction && (fraction.heightFraction < 0.05 || fraction.widthFraction < 0.05)) {
+        return { degenerate: true };
+      }
+    }
+    work = raster;
+  }
+
+  try {
+    const meta = await sharp(work).metadata();
+    if (meta.hasAlpha && meta.width && meta.height) {
+      const corner = await sharp(work)
+        .extract({ left: 0, top: 0, width: 1, height: 1 })
+        .ensureAlpha()
+        .raw()
+        .toBuffer();
+      if (corner[3] < 8) {
+        const trimmed = await sharp(work).trim({ threshold: 10 }).png().toBuffer();
+        const trimmedMeta = await sharp(trimmed).metadata();
+        if ((trimmedMeta.width || 0) >= 8 && (trimmedMeta.height || 0) >= 8) {
+          work = trimmed;
+        }
+      }
+    }
+  } catch {
+    // Trimming is an optimization; the untrimmed raster still works.
+  }
+
+  return { buffer: work };
 }
 
 // Resolve the logo overlay for one zone: the fetched logo contain-fit
@@ -118,7 +323,11 @@ async function resolveLogoOverlay(
 
   try {
     const raw = await fetchImageBuffer(profile.logoUrl);
-    const resized = await sharp(raw)
+    const prepared = await prepareLogoRaster(raw, profile.logoUrl);
+    if ("degenerate" in prepared) {
+      return fallback("The sponsor's logo could not be used, so their business name was used instead.");
+    }
+    const resized = await sharp(prepared.buffer)
       .resize({ width: zoneWidth, height: zoneHeight, fit: "inside" })
       .png()
       .toBuffer();
