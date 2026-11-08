@@ -181,6 +181,7 @@ function PortalContent() {
   const [sUploading, setSUploading] = useState(false);
   const [sSubmitting, setSSubmitting] = useState(false);
   const [sError, setSError] = useState("");
+  const [sNotice, setSNotice] = useState("");
   const [sSuccess, setSSuccess] = useState(false);
   const [sShowPreview, setSShowPreview] = useState(false);
   const sFileRef = useRef<HTMLInputElement>(null);
@@ -377,7 +378,7 @@ function PortalContent() {
 
   async function submitSpotlight(e: React.FormEvent) {
     e.preventDefault();
-    setSSubmitting(true); setSError("");
+    setSSubmitting(true); setSError(""); setSNotice("");
     try {
       if (editingSpotlight) {
         const res = await workspaceFetch("/api/sponsor/spotlight", {
@@ -399,6 +400,13 @@ function PortalContent() {
         });
         const data = await res.json();
         if (res.ok) { setSSuccess(true); setProfile((p) => p ? { ...p, spotlights: [data.listing, ...p.spotlights] } : p); }
+        else if (data.code === "existing_listing" && data.listing) {
+          const existing = data.listing as Spotlight;
+          setProfile((p) => p ? { ...p, spotlights: p.spotlights.some((s) => s.id === existing.id) ? p.spotlights : [existing, ...p.spotlights] } : p);
+          setEditingSpotlight(existing);
+          setSForm({ businessName: existing.businessName, logoUrl: existing.logoUrl || "", description: existing.description, ctaLabel: existing.ctaLabel, ctaUrl: existing.ctaUrl, category: existing.category || "" });
+          setSNotice("You already have a business listing, so we didn't create a second one. You're editing your existing listing now: make your changes and hit save.");
+        }
         else setSError(data.error || "Submission failed.");
       }
     } catch (_e) { setSError("Connection error."); }
@@ -954,6 +962,26 @@ function PortalContent() {
               </div>
             ) : (
               <form onSubmit={submitSpotlight} className="space-y-4 bg-white rounded-xl border border-gray-200 p-6">
+                {!editingSpotlight && profile.spotlights.some((s) => ["pending", "approved", "active"].includes(s.status)) && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+                    <p className="text-sm text-amber-800 font-semibold">You already have a business listing.</p>
+                    <p className="text-xs text-amber-700 mt-0.5">Submitting this form will not create a second one. To change your listing, edit the one you have:</p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const s = profile.spotlights.find((x) => ["pending", "approved", "active"].includes(x.status));
+                        if (s) {
+                          setEditingSpotlight(s);
+                          setSForm({ businessName: s.businessName, logoUrl: s.logoUrl || "", description: s.description, ctaLabel: s.ctaLabel, ctaUrl: s.ctaUrl, category: s.category || "" });
+                          setSError(""); setSNotice("");
+                        }
+                      }}
+                      className="mt-2 text-xs font-semibold text-amber-800 underline"
+                    >
+                      Edit my existing listing
+                    </button>
+                  </div>
+                )}
                 <div>
                   <label className="block text-xs font-semibold text-gray-600 mb-1">Business Name *</label>
                   <input type="text" value={sForm.businessName} onChange={(e) => setSForm((f) => ({ ...f, businessName: e.target.value }))} required
@@ -1014,6 +1042,7 @@ function PortalContent() {
                   </div>
                 </div>
 
+                {sNotice && <p className="text-sm text-green-700 bg-green-50 border border-green-100 rounded-lg px-3 py-2">{sNotice}</p>}
                 {sError && <p className="text-sm text-red-600">{sError}</p>}
 
                 <div className="border-t border-gray-100 pt-4">

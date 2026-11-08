@@ -12,6 +12,28 @@ export async function POST(req: NextRequest) {
   const profile = await prisma.sponsorProfile.findUnique({ where: { magicToken: token } });
   if (!profile) return NextResponse.json({ error: "Invalid token." }, { status: 401 });
 
+  // One live listing per business (added 2026-11-07): if this sponsor
+  // already has a listing that is pending or public, never create a
+  // second one, because duplicate listings show the business twice in
+  // the directory and the newsletter rotation. The portal turns this
+  // 409 into an "edit your existing listing" redirect. An expired
+  // listing does not block a fresh one.
+  const existingListing = await prisma.spotlightListing.findFirst({
+    where: { sponsorId: profile.id, status: { in: ["pending", "approved", "active"] } },
+    orderBy: { createdAt: "desc" },
+  });
+  if (existingListing) {
+    return NextResponse.json(
+      {
+        error:
+          "You already have a business listing. Edit your existing listing instead of creating a new one.",
+        code: "existing_listing",
+        listing: existingListing,
+      },
+      { status: 409 }
+    );
+  }
+
   if (!businessName || !description || !ctaUrl) {
     return NextResponse.json({ error: "Business name, description, and CTA URL are required." }, { status: 400 });
   }
