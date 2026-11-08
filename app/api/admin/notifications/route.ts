@@ -17,7 +17,11 @@ export async function GET() {
 
   const [boardPosts, spotlights, bookings, orders, recentProfiles] = await Promise.all([
     prisma.boardPost.findMany({
-      where: { workspaceId: wid, status: "pending_approval" },
+      where: {
+        workspaceId: wid,
+        status: "active",
+        paidAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) },
+      },
       orderBy: { createdAt: "desc" },
       take: 5,
       select: { id: true, title: true, createdAt: true },
@@ -56,8 +60,14 @@ export async function GET() {
     }),
   ]);
 
-  const [boardPending, sponsorPending, ordersUnfulfilled] = await Promise.all([
-    prisma.boardPost.count({ where: { workspaceId: wid, status: "pending_approval" } }),
+  const [boardNew, sponsorPending, ordersUnfulfilled] = await Promise.all([
+    prisma.boardPost.count({
+      where: {
+        workspaceId: wid,
+        status: "active",
+        paidAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) },
+      },
+    }),
     Promise.all([
       prisma.spotlightListing.count({ where: { workspaceId: wid, status: "pending" } }),
       prisma.adBooking.count({ where: { workspaceId: wid, status: "pending_review" } }),
@@ -66,7 +76,7 @@ export async function GET() {
   ]);
 
   return NextResponse.json({
-    boardPending,
+    boardNew,
     boardItems: boardPosts,
     sponsorPending,
     sponsorItems: [
@@ -82,6 +92,8 @@ export async function GET() {
       createdAt: o.paidAt,
     })),
     recentProfiles,
-    total: boardPending + sponsorPending + ordersUnfulfilled,
+    // Board posts are informational only (they auto-approve), so they
+    // never count toward the attention badge.
+    total: sponsorPending + ordersUnfulfilled,
   });
 }

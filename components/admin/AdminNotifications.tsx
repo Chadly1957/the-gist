@@ -3,7 +3,7 @@ import Link from "@/components/workspace/WorkspaceLink";
 import { useState } from "react";
 
 export interface AdminNotificationData {
-  boardPending: number;
+  boardNew: number;
   boardItems: { id: string; title: string; createdAt: string }[];
   sponsorPending: number;
   sponsorItems: { id: string; label: string; createdAt: string }[];
@@ -69,7 +69,7 @@ export default function AdminNotifications({
 
             {!notes ? (
               <p className="px-4 py-4 text-sm text-gray-500">Loading…</p>
-            ) : total === 0 && notes.recentProfiles.length === 0 ? (
+            ) : total === 0 && notes.boardNew === 0 && notes.recentProfiles.length === 0 ? (
               <p className="px-4 py-4 text-sm text-gray-500">All caught up. Nothing needs your attention.</p>
             ) : (
               <div className="max-h-96 overflow-y-auto">
@@ -77,18 +77,6 @@ export default function AdminNotifications({
                   <div className="px-4 pt-3 pb-1">
                     <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Needs your attention</p>
                   </div>
-                )}
-                {notes.boardPending > 0 && (
-                  <Link href="/admin/board" onClick={() => setOpen(false)} className="block px-4 py-2.5 hover:bg-gray-50">
-                    <p className="text-sm font-medium text-gray-800">
-                      📌 {notes.boardPending} board post{notes.boardPending !== 1 ? "s" : ""} awaiting approval
-                    </p>
-                    {notes.boardItems.slice(0, 3).map((b) => (
-                      <p key={b.id} className="text-xs text-gray-500 truncate">
-                        {b.title} · {fmt(b.createdAt)}
-                      </p>
-                    ))}
-                  </Link>
                 )}
                 {notes.sponsorPending > 0 && (
                   <Link href="/admin/sponsors" onClick={() => setOpen(false)} className="block px-4 py-2.5 hover:bg-gray-50">
@@ -113,6 +101,23 @@ export default function AdminNotifications({
                       </p>
                     ))}
                   </Link>
+                )}
+                {notes.boardNew > 0 && (
+                  <>
+                    <div className="px-4 pt-3 pb-1 border-t border-gray-100">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">New board posts · past 7 days</p>
+                    </div>
+                    <Link href="/admin/board" onClick={() => setOpen(false)} className="block px-4 py-2.5 hover:bg-gray-50">
+                      <p className="text-sm font-medium text-gray-800">
+                        📌 {notes.boardNew} new board post{notes.boardNew !== 1 ? "s" : ""}, live now
+                      </p>
+                      {notes.boardItems.slice(0, 3).map((b) => (
+                        <p key={b.id} className="text-xs text-gray-500 truncate">
+                          {b.title} · {fmt(b.createdAt)}
+                        </p>
+                      ))}
+                    </Link>
+                  </>
                 )}
                 {notes.recentProfiles.length > 0 && (
                   <>

@@ -9,8 +9,8 @@ export const dynamic = "force-dynamic";
 // POST /api/board/checkout { title, description, category, linkUrl,
 // contactInfo, displayName, email }
 // Creates a pending BoardPost, then a Stripe Checkout session for the flat
-// $5. The webhook marks the post paid (pending_approval) on
-// checkout.session.completed; an admin approval starts the 7-day run.
+// $5. The webhook marks the post paid and live (active) on
+// checkout.session.completed; the 7-day run starts at payment.
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
   const validated = validateBoardPostInput(body);

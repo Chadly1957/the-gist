@@ -249,7 +249,7 @@ function BoardPostForm() {
                 {submitting ? "Redirecting to checkout…" : `Post it — $${(BOARD_PRICE_CENTS / 100).toFixed(0)} for ${BOARD_RUN_DAYS} days`}
               </button>
               <p className="text-xs text-gray-400 text-center">
-                Posts are reviewed before they run in the newsletter. Anything inappropriate is rejected and refunded.
+                Your post goes live as soon as payment clears. Anything inappropriate may be removed and refunded.
               </p>
               <Link href="/board" className="block text-center text-xs text-gray-400 hover:text-gray-600 transition-colors">
                 ← Back to the Board

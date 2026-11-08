@@ -84,17 +84,14 @@ export default function BoardAdminPage() {
     );
   }
 
-  const awaiting = posts.filter((p) => p.status === "pending_approval");
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
       <h1 className="text-2xl font-bold text-gray-900 mb-1">Gist Board</h1>
       <p className="text-sm text-gray-500 mb-6">
-        Community classifieds: $5 for a 7-day run. Approving a post starts its run immediately;
-        approved posts appear in every issue until they expire, plus the public Board page.
-        {awaiting.length > 0 && (
-          <span className="font-semibold text-amber-700"> {awaiting.length} awaiting approval.</span>
-        )}
+        Community classifieds: $5 for a 7-day run. Posts go live automatically as soon as
+        payment clears, and appear in every issue until they expire, plus the public Board page.
+        Rejecting a post removes it and refunds the $5.
       </p>
 
       {notice && (

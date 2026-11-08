@@ -5,6 +5,7 @@ import Stripe from "stripe";
 import { alertBookingFailureOnce } from "@/lib/sponsor-booking-alerts";
 import { recordPaidProductOrder, shippingFromSession } from "@/lib/products";
 import { isProductSize } from "@/lib/product-sizes";
+import { BOARD_RUN_DAYS } from "@/lib/board-constants";
 import {
   couponBookPrepaidYearEnd,
   couponBookPurchaseHasAccess,
@@ -321,8 +322,10 @@ async function handleCouponBookSubscriptionEvent(event: Stripe.Event, stripe: St
 }
 
 // Board posts: the checkout route creates the BoardPost row as
-// pending_payment; fulfillment flips it to pending_approval (the 7-day run
-// starts only when an admin approves). Idempotent: re-delivered events no-op.
+// pending_payment; fulfillment flips it straight to active (auto-approved
+// 2026-11-07, so a time-sensitive post is never stuck waiting on a manual
+// approval; the admin bell just notes the new post). The 7-day run starts
+// at payment. Idempotent: re-delivered events no-op.
 async function fulfillBoardPost(workspaceId: string, session: Stripe.Checkout.Session) {
   const paidAt = new Date();
   const postId = session.metadata?.boardPostId;
@@ -339,8 +342,10 @@ async function fulfillBoardPost(workspaceId: string, session: Stripe.Checkout.Se
     await basePrisma.boardPost.update({
       where: { id: existing.id },
       data: {
-        status: "pending_approval",
+        status: "active",
         paidAt,
+        approvedAt: paidAt,
+        expiresAt: new Date(paidAt.getTime() + BOARD_RUN_DAYS * 24 * 60 * 60 * 1000),
         stripeSessionId: session.id,
         stripePaymentIntent:
           typeof session.payment_intent === "string" ? session.payment_intent : undefined,
