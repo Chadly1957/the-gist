@@ -248,7 +248,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               : pathname.startsWith(item.href);
           const badge =
             item.href === "/admin/board"
-              ? notes?.boardPending ?? 0
+              ? notes?.boardNew ?? 0
               : item.href === "/admin/sponsors"
                 ? notes?.sponsorPending ?? 0
                 : item.href === "/admin/products"
