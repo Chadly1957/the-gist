@@ -15,7 +15,7 @@ export async function GET() {
   const workspace = await getWorkspace();
   const wid = workspace.id;
 
-  const [boardPosts, spotlights, bookings, orders, recentProfiles] = await Promise.all([
+  const [boardPosts, spotlights, bookings, orders, recentProfiles, pendingEvents] = await Promise.all([
     prisma.boardPost.findMany({
       where: {
         workspaceId: wid,
@@ -58,9 +58,17 @@ export async function GET() {
       take: 5,
       select: { id: true, businessName: true, createdAt: true },
     }),
+    // Public-form event submissions land as "pending" with no other
+    // signal; soonest event first so overdue ones surface at the top.
+    prisma.event.findMany({
+      where: { workspaceId: wid, status: "pending" },
+      orderBy: { eventDate: "asc" },
+      take: 5,
+      select: { id: true, title: true, createdAt: true },
+    }),
   ]);
 
-  const [boardNew, sponsorPending, ordersUnfulfilled] = await Promise.all([
+  const [boardNew, sponsorPending, ordersUnfulfilled, eventsPending] = await Promise.all([
     prisma.boardPost.count({
       where: {
         workspaceId: wid,
@@ -73,6 +81,7 @@ export async function GET() {
       prisma.adBooking.count({ where: { workspaceId: wid, status: "pending_review" } }),
     ]).then(([a, b]) => a + b),
     prisma.productOrder.count({ where: { workspaceId: wid, status: "paid", fulfilledAt: null } }),
+    prisma.event.count({ where: { workspaceId: wid, status: "pending" } }),
   ]);
 
   return NextResponse.json({
@@ -91,9 +100,12 @@ export async function GET() {
       label: `${o.product.name} — ${o.email}`,
       createdAt: o.paidAt,
     })),
+    eventsPending,
+    eventItems: pendingEvents.map((e) => ({ id: e.id, label: e.title, createdAt: e.createdAt })),
     recentProfiles,
     // Board posts are informational only (they auto-approve), so they
-    // never count toward the attention badge.
-    total: sponsorPending + ordersUnfulfilled,
+    // never count toward the attention badge. Pending events do count:
+    // a human has to approve them before they can run.
+    total: sponsorPending + ordersUnfulfilled + eventsPending,
   });
 }

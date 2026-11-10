@@ -9,6 +9,8 @@ export interface AdminNotificationData {
   sponsorItems: { id: string; label: string; createdAt: string }[];
   ordersUnfulfilled: number;
   orderItems: { id: string; label: string; createdAt: string | null }[];
+  eventsPending: number;
+  eventItems: { id: string; label: string; createdAt: string }[];
   recentProfiles: { id: string; businessName: string; createdAt: string }[];
   total: number;
 }
@@ -86,6 +88,18 @@ export default function AdminNotifications({
                     {notes.sponsorItems.slice(0, 3).map((s) => (
                       <p key={s.id} className="text-xs text-gray-500 truncate">
                         {s.label} · {fmt(s.createdAt)}
+                      </p>
+                    ))}
+                  </Link>
+                )}
+                {notes.eventsPending > 0 && (
+                  <Link href="/admin/events" onClick={() => setOpen(false)} className="block px-4 py-2.5 hover:bg-gray-50">
+                    <p className="text-sm font-medium text-gray-800">
+                      📅 {notes.eventsPending} event{notes.eventsPending !== 1 ? "s" : ""} pending review
+                    </p>
+                    {notes.eventItems.slice(0, 3).map((e) => (
+                      <p key={e.id} className="text-xs text-gray-500 truncate">
+                        {e.label} · {fmt(e.createdAt)}
                       </p>
                     ))}
                   </Link>
