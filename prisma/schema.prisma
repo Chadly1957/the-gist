@@ -1109,6 +1109,7 @@ model BoardPost {
   email               String
   status              String    @default("pending_payment") // pending_payment | pending_approval | active | rejected
   amountCents         Int       @default(500)
+  runWeeks            Int       @default(1)
   stripeSessionId     String?   @unique
   stripePaymentIntent String?
   paidAt              DateTime?

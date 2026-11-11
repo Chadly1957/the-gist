@@ -3,7 +3,33 @@
 // Server code in lib/board.ts re-exports these.
 
 export const BOARD_PRICE_CENTS = 500;
+// One week of Board run, in days. A post's total run is
+// BOARD_RUN_DAYS * runWeeks (see boardRunDays).
 export const BOARD_RUN_DAYS = 7;
+// Buyers pick how many weeks a post runs: 1 to BOARD_MAX_RUN_WEEKS.
+export const BOARD_MAX_RUN_WEEKS = 4;
+export const BOARD_RUN_WEEK_OPTIONS = [1, 2, 3, 4] as const;
+
+export function boardRunDays(weeks: number): number {
+  return weeks * BOARD_RUN_DAYS;
+}
+
+// Coerce an untrusted value to a valid run length (1..BOARD_MAX_RUN_WEEKS),
+// defaulting to 1 week. Used for legacy rows and webhook safety; the
+// checkout validator rejects out-of-range input instead of clamping.
+export function clampBoardRunWeeks(value: unknown): number {
+  const n = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(n)) return 1;
+  return Math.min(BOARD_MAX_RUN_WEEKS, Math.max(1, Math.trunc(n)));
+}
+
+export function boardRunWeeksLabel(weeks: number): string {
+  return weeks === 1 ? "1 week" : `${weeks} weeks`;
+}
+
+export function boardRunPriceCents(weeks: number): number {
+  return BOARD_PRICE_CENTS * clampBoardRunWeeks(weeks);
+}
 
 export const BOARD_CATEGORIES = [
   { key: "for_sale", label: "For Sale" },
@@ -23,7 +49,7 @@ export function boardCategoryLabel(key: string): string {
 // What the poster picked on the "What would you like to share?" step. The
 // intent is recorded on the post and preselects the category plus tailored
 // form hints, but it never changes the placement itself: every post is
-// still the same $5, 7-day Board run.
+// still the same Board run: $5 per week, for 1 to 4 weeks.
 export const BOARD_INTENTS = [
   {
     key: "event",

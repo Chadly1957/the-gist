@@ -3,7 +3,7 @@ import { getAdminSession } from "@/lib/auth";
 import { getWorkspace } from "@/lib/workspace";
 import { prisma } from "@/lib/db";
 import Stripe from "stripe";
-import { BOARD_RUN_DAYS } from "@/lib/board";
+import { boardRunDays, clampBoardRunWeeks } from "@/lib/board";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +27,7 @@ export async function GET() {
       email: true,
       status: true,
       amountCents: true,
+      runWeeks: true,
       paidAt: true,
       approvedAt: true,
       expiresAt: true,
@@ -37,7 +38,8 @@ export async function GET() {
 }
 
 // PATCH /api/admin/board { id, action: "approve" | "reject" }
-// Approve starts the 7-day run now. Reject refunds the $5 (when a payment
+// Approve starts the post's run (its purchased weeks) now. Reject refunds
+// what the buyer paid (when a payment
 // intent is on file) and marks the post rejected; a failed refund still
 // rejects but reports it so it can be refunded manually in Stripe.
 export async function PATCH(req: NextRequest) {
@@ -58,7 +60,8 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: "Only posts awaiting approval can be approved." }, { status: 400 });
     }
     const approvedAt = new Date();
-    const expiresAt = new Date(approvedAt.getTime() + BOARD_RUN_DAYS * 24 * 60 * 60 * 1000);
+    const runDays = boardRunDays(clampBoardRunWeeks(post.runWeeks));
+    const expiresAt = new Date(approvedAt.getTime() + runDays * 24 * 60 * 60 * 1000);
     const updated = await prisma.boardPost.update({
       where: { id: post.id },
       data: { status: "active", approvedAt, expiresAt },

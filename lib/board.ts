@@ -1,17 +1,23 @@
 import { prisma } from "@/lib/db";
-import { BOARD_CATEGORIES, BOARD_INTENTS } from "./board-constants";
+import { BOARD_CATEGORIES, BOARD_INTENTS, BOARD_MAX_RUN_WEEKS } from "./board-constants";
 
 export {
   BOARD_PRICE_CENTS,
   BOARD_RUN_DAYS,
+  BOARD_MAX_RUN_WEEKS,
+  BOARD_RUN_WEEK_OPTIONS,
   BOARD_CATEGORIES,
   BOARD_INTENTS,
   boardCategoryLabel,
   boardIntentLabel,
+  boardRunDays,
+  clampBoardRunWeeks,
+  boardRunWeeksLabel,
+  boardRunPriceCents,
 } from "./board-constants";
 export type { BoardCategoryKey, BoardIntentKey } from "./board-constants";
 
-// Gist Board: community classifieds, $5 flat for a 7-day run.
+// Gist Board: community classifieds, $5 per week for a 1 to 4 week run.
 // A post is live while it is approved and inside its approvedAt->expiresAt
 // window, so expiry needs no cron: every read filters on the window.
 
@@ -24,6 +30,7 @@ export interface BoardPostInput {
   contactInfo: string;
   displayName: string;
   email: string;
+  runWeeks: number;
 }
 
 // Shared server-side validation for the post form (the client mirrors the
@@ -39,6 +46,16 @@ export function validateBoardPostInput(body: unknown): { input: BoardPostInput }
   const contactInfo = str(b.contactInfo);
   const displayName = str(b.displayName);
   const email = str(b.email).toLowerCase();
+  // Run length in weeks. Missing means the classic 1-week post; anything
+  // present must be a whole number inside the allowed range.
+  let runWeeks = 1;
+  if (b.runWeeks !== undefined && b.runWeeks !== null && b.runWeeks !== "") {
+    const n = typeof b.runWeeks === "number" ? b.runWeeks : Number(b.runWeeks);
+    if (!Number.isInteger(n) || n < 1 || n > BOARD_MAX_RUN_WEEKS) {
+      return { error: `Pick a run length of 1 to ${BOARD_MAX_RUN_WEEKS} weeks.` };
+    }
+    runWeeks = n;
+  }
 
   if (!title) return { error: "A title is required." };
   if (title.length > 80) return { error: "Keep the title under 80 characters." };
@@ -59,7 +76,7 @@ export function validateBoardPostInput(body: unknown): { input: BoardPostInput }
   if (displayName.length > 40) return { error: "Keep the display name under 40 characters." };
   if (!email || !email.includes("@")) return { error: "A valid email is required." };
 
-  return { input: { title, description, category, intent, linkUrl, contactInfo, displayName, email } };
+  return { input: { title, description, category, intent, linkUrl, contactInfo, displayName, email, runWeeks } };
 }
 
 export interface BoardItem {
@@ -73,7 +90,7 @@ export interface BoardItem {
   expiresAt: Date | null;
 }
 
-// Live posts for a workspace: approved and inside the 7-day window,
+// Live posts for a workspace: approved and inside their run window,
 // newest approvals first.
 export async function getActiveBoardPosts(workspaceId: string): Promise<BoardItem[]> {
   const now = new Date();

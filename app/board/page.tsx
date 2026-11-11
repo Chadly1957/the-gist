@@ -25,14 +25,15 @@ export default async function BoardPage() {
           </p>
           <p className="text-gray-600 text-sm leading-relaxed mt-3 max-w-lg mx-auto">
             Got something worth sharing with the whole town? Put it on the Board and it
-            runs in the morning newsletter and right here for 7 days. No meetings, no
-            pitches, no waiting on anyone to say yes. Just post it.
+            runs in the morning newsletter and right here for as long as you choose,
+            a week at a time. No meetings, no pitches, no waiting on anyone to say yes.
+            Just post it.
           </p>
           <Link
             href="/board/post"
             className="inline-block mt-6 px-5 py-2.5 bg-green-700 text-white rounded-lg font-semibold text-sm hover:bg-green-800"
           >
-            Post something — just $5 for 7 days
+            Post something — $5 per week
           </Link>
         </div>
 
@@ -56,11 +57,11 @@ export default async function BoardPage() {
           <h2 className="text-sm font-bold uppercase tracking-widest text-gray-500 mb-4">How it works</h2>
           <ol className="space-y-3 text-sm text-gray-600">
             <li className="flex gap-3"><span className="font-bold text-green-700 shrink-0">1.</span>Pick what you are sharing and write it in a minute. Title, a line or two, and a link or way to reach you.</li>
-            <li className="flex gap-3"><span className="font-bold text-green-700 shrink-0">2.</span>Pay $5 at checkout. That is the whole price, no subscription, no upsell.</li>
-            <li className="flex gap-3"><span className="font-bold text-green-700 shrink-0">3.</span>We give it a quick review, then it runs in every weekday issue for 7 days and stays on this page.</li>
+            <li className="flex gap-3"><span className="font-bold text-green-700 shrink-0">2.</span>Pick 1 to 4 weeks and pay $5 per week at checkout. That is the whole price, no subscription, no upsell.</li>
+            <li className="flex gap-3"><span className="font-bold text-green-700 shrink-0">3.</span>It goes live as soon as payment clears, then runs in every weekday issue for your chosen weeks and stays on this page.</li>
           </ol>
           <p className="text-xs text-gray-400 mt-4">
-            If a post is rejected, the $5 is refunded in full. Anyone can post, readers and businesses alike.
+            If a post is rejected, what you paid is refunded in full. Anyone can post, readers and businesses alike.
           </p>
         </div>
 

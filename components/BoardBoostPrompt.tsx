@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "@/components/workspace/WorkspaceLink";
-import { BOARD_PRICE_CENTS, BOARD_RUN_DAYS } from "@/lib/board-constants";
+import { BOARD_PRICE_CENTS } from "@/lib/board-constants";
 
 // Offered right after an event is submitted (sponsor portal and the public
 // event form alike). Accepting takes the poster to the Board post form
@@ -27,16 +27,16 @@ export default function BoardBoostPrompt({
     <div className="bg-green-50 border border-green-200 rounded-xl p-6 text-center">
       <p className="text-green-800 font-semibold mb-1">Event submitted!</p>
       <p className="text-sm text-gray-700 mt-3">
-        Add it to the Gist Board for better visibility? ${(BOARD_PRICE_CENTS / 100).toFixed(0)} for{" "}
-        {BOARD_RUN_DAYS} days, and it runs in every weekday issue and on the Board page, not just
-        the calendar.
+        Add it to the Gist Board for better visibility? ${(BOARD_PRICE_CENTS / 100).toFixed(0)} per
+        week, and you choose 1 to 4 weeks on the next step. It runs in every weekday issue and on
+        the Board page, not just the calendar.
       </p>
       <div className="flex flex-col sm:flex-row gap-3 justify-center mt-5">
         <Link
           href={`/board/post?${params.toString()}`}
           className="inline-block bg-green-700 hover:bg-green-800 text-white font-semibold px-5 py-2.5 rounded-xl text-sm transition-colors"
         >
-          Add to the Board — ${(BOARD_PRICE_CENTS / 100).toFixed(0)}
+          Add to the Board — from ${(BOARD_PRICE_CENTS / 100).toFixed(0)}
         </Link>
         <button
           type="button"

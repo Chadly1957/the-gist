@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { workspaceFetch } from "@/lib/workspace-client";
-import { boardCategoryLabel, boardIntentLabel } from "@/lib/board-constants";
+import { boardCategoryLabel, boardIntentLabel, boardRunWeeksLabel } from "@/lib/board-constants";
 
 interface BoardPostRow {
   id: string;
@@ -16,6 +16,7 @@ interface BoardPostRow {
   email: string;
   status: string;
   amountCents: number;
+  runWeeks: number;
   paidAt: string | null;
   approvedAt: string | null;
   expiresAt: string | null;
@@ -52,6 +53,8 @@ export default function BoardAdminPage() {
 
   async function act(id: string, action: "approve" | "reject") {
     setNotice("");
+    const target = posts.find((p) => p.id === id);
+    const paidLabel = target ? `$${(target.amountCents / 100).toFixed(0)}` : "the payment";
     const res = await workspaceFetch("/api/admin/board", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -69,9 +72,11 @@ export default function BoardAdminPage() {
           : "Post rejected. No payment intent was on file, so no automatic refund went out."
       );
     } else if (action === "reject") {
-      setNotice("Post rejected and the $5 was refunded.");
+      setNotice(`Post rejected and ${paidLabel} was refunded.`);
     } else {
-      setNotice("Post approved: it runs for 7 days in the newsletter and on the Board page.");
+      setNotice(
+        `Post approved: it runs for ${target ? boardRunWeeksLabel(target.runWeeks || 1) : "1 week"} in the newsletter and on the Board page.`
+      );
     }
     load();
   }
@@ -89,9 +94,9 @@ export default function BoardAdminPage() {
     <div className="max-w-4xl mx-auto px-4 py-8">
       <h1 className="text-2xl font-bold text-gray-900 mb-1">Gist Board</h1>
       <p className="text-sm text-gray-500 mb-6">
-        Community classifieds: $5 for a 7-day run. Posts go live automatically as soon as
-        payment clears, and appear in every issue until they expire, plus the public Board page.
-        Rejecting a post removes it and refunds the $5.
+        Community classifieds: $5 per week, for 1 to 4 weeks. Posts go live automatically as
+        soon as payment clears, and appear in every issue until they expire, plus the public
+        Board page. Rejecting a post removes it and refunds what the buyer paid.
       </p>
 
       {notice && (
@@ -118,6 +123,7 @@ export default function BoardAdminPage() {
                 {boardIntentLabel(p.intent) ? ` · ${boardIntentLabel(p.intent)}` : ""}
                 {p.displayName ? ` · Posted by ${p.displayName}` : ""}
                 {` · ${p.email}`}
+                {` · Paid $${(p.amountCents / 100).toFixed(0)} · ${boardRunWeeksLabel(p.runWeeks || 1)} run`}
                 {p.linkUrl ? ` · ${p.linkUrl}` : ""}
                 {p.contactInfo ? ` · Contact: ${p.contactInfo}` : ""}
               </p>
@@ -133,14 +139,14 @@ export default function BoardAdminPage() {
                       onClick={() => act(p.id, "approve")}
                       className="bg-green-700 hover:bg-green-800 text-white text-sm font-semibold px-4 py-2 rounded-lg"
                     >
-                      Approve (start 7-day run)
+                      Approve (start {boardRunWeeksLabel(p.runWeeks || 1)} run)
                     </button>
                   )}
                   <button
                     onClick={() => act(p.id, "reject")}
                     className="border border-gray-200 hover:bg-gray-50 text-gray-700 text-sm font-semibold px-4 py-2 rounded-lg"
                   >
-                    Reject{ p.status === "pending_approval" ? " + refund $5" : ""}
+                    Reject{ p.status === "pending_approval" ? ` + refund $${(p.amountCents / 100).toFixed(0)}` : ""}
                   </button>
                 </div>
               )}

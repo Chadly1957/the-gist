@@ -8,7 +8,9 @@ import {
   BOARD_CATEGORIES,
   BOARD_INTENTS,
   BOARD_PRICE_CENTS,
-  BOARD_RUN_DAYS,
+  BOARD_RUN_WEEK_OPTIONS,
+  boardRunPriceCents,
+  boardRunWeeksLabel,
   boardIntentForKey,
 } from "@/lib/board-constants";
 
@@ -27,6 +29,7 @@ function BoardPostForm() {
   const [contactInfo, setContactInfo] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
+  const [runWeeks, setRunWeeks] = useState<number>(1);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -61,6 +64,7 @@ function BoardPostForm() {
           contactInfo: contactInfo.trim(),
           displayName: displayName.trim(),
           email: email.trim(),
+          runWeeks,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -87,8 +91,9 @@ function BoardPostForm() {
           <div className="text-center mb-8">
             <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight mb-2">Post on the Gist Board</h1>
             <p className="text-sm text-gray-500 leading-relaxed">
-              Your post runs in the newsletter and on the Board page for {BOARD_RUN_DAYS} days,
-              for just ${(BOARD_PRICE_CENTS / 100).toFixed(0)}. No meetings, no pitches, just post it.
+              Your post runs in the newsletter and on the Board page for as long as you
+              choose, at just ${(BOARD_PRICE_CENTS / 100).toFixed(0)} per week. No meetings,
+              no pitches, just post it.
             </p>
           </div>
 
@@ -104,7 +109,7 @@ function BoardPostForm() {
               <p className="text-xs text-gray-500 mb-4">
                 Pick one and we will tailor the form. Same Board post either way, ${(
                   BOARD_PRICE_CENTS / 100
-                ).toFixed(0)} for {BOARD_RUN_DAYS} days.
+                ).toFixed(0)} per week, and you pick how many weeks on the next step.
               </p>
               <div className="space-y-3">
                 {BOARD_INTENTS.map((opt) => {
@@ -228,6 +233,35 @@ function BoardPostForm() {
                 />
               </div>
               <div>
+                <span className="block text-xs font-semibold text-gray-600 mb-1">How long should it run?</span>
+                <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Run length">
+                  {BOARD_RUN_WEEK_OPTIONS.map((weeks) => {
+                    const selected = runWeeks === weeks;
+                    return (
+                      <button
+                        key={weeks}
+                        type="button"
+                        role="radio"
+                        aria-checked={selected}
+                        onClick={() => setRunWeeks(weeks)}
+                        className={`px-3 py-2.5 rounded-xl border text-left transition-colors ${
+                          selected
+                            ? "bg-green-50 border-green-600"
+                            : "bg-gray-50 border-gray-200 hover:border-gray-300"
+                        }`}
+                      >
+                        <span className="block text-sm font-semibold text-gray-900">
+                          {boardRunWeeksLabel(weeks)}
+                        </span>
+                        <span className="block text-xs text-gray-500">
+                          ${(boardRunPriceCents(weeks) / 100).toFixed(0)} total · {weeks * 7} days
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              <div>
                 <label htmlFor="board-email" className="block text-xs font-semibold text-gray-600 mb-1">Your email</label>
                 <input
                   id="board-email"
@@ -246,7 +280,7 @@ function BoardPostForm() {
                 disabled={submitting}
                 className="w-full bg-green-700 hover:bg-green-800 disabled:opacity-60 text-white font-bold py-3 rounded-xl text-sm transition-colors"
               >
-                {submitting ? "Redirecting to checkout…" : `Post it — $${(BOARD_PRICE_CENTS / 100).toFixed(0)} for ${BOARD_RUN_DAYS} days`}
+                {submitting ? "Redirecting to checkout…" : `Post it — $${(boardRunPriceCents(runWeeks) / 100).toFixed(0)} for ${boardRunWeeksLabel(runWeeks)}`}
               </button>
               <p className="text-xs text-gray-400 text-center">
                 Your post goes live as soon as payment clears. Anything inappropriate may be removed and refunded.

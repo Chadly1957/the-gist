@@ -2,15 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { getWorkspace, getWorkspaceUrl } from "@/lib/workspace";
 import { prisma } from "@/lib/db";
 import Stripe from "stripe";
-import { BOARD_PRICE_CENTS, validateBoardPostInput } from "@/lib/board";
+import { BOARD_PRICE_CENTS, boardRunPriceCents, validateBoardPostInput } from "@/lib/board";
 
 export const dynamic = "force-dynamic";
 
 // POST /api/board/checkout { title, description, category, linkUrl,
-// contactInfo, displayName, email }
-// Creates a pending BoardPost, then a Stripe Checkout session for the flat
-// $5. The webhook marks the post paid and live (active) on
-// checkout.session.completed; the 7-day run starts at payment.
+// contactInfo, displayName, email, runWeeks }
+// Creates a pending BoardPost, then a Stripe Checkout session at $5 per
+// week for the chosen run length (1 to 4 weeks). The webhook marks the
+// post paid and live (active) on checkout.session.completed; the run
+// starts at payment.
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
   const validated = validateBoardPostInput(body);
@@ -38,7 +39,8 @@ export async function POST(req: NextRequest) {
       displayName: input.displayName || null,
       email: input.email,
       status: "pending_payment",
-      amountCents: BOARD_PRICE_CENTS,
+      amountCents: boardRunPriceCents(input.runWeeks),
+      runWeeks: input.runWeeks,
     },
   });
 
@@ -53,9 +55,12 @@ export async function POST(req: NextRequest) {
           price_data: {
             currency: "usd",
             unit_amount: BOARD_PRICE_CENTS,
-            product_data: { name: `Gist Board post: ${input.title}` },
+            product_data: {
+              name: `Gist Board post: ${input.title}`,
+              description: `Runs ${input.runWeeks} week${input.runWeeks === 1 ? "" : "s"} on the Gist Board`,
+            },
           },
-          quantity: 1,
+          quantity: input.runWeeks,
         },
       ],
       customer_email: input.email,
@@ -65,6 +70,7 @@ export async function POST(req: NextRequest) {
         workspaceId: workspace.id,
         kind: "board_post",
         boardPostId: post.id,
+        runWeeks: String(input.runWeeks),
         email: input.email,
       },
     });

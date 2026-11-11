@@ -340,7 +340,7 @@ function renderBoard(items: BoardItem[], tracking?: TrackingConfig): string {
       <div style="font-size:13px;color:#4b5563;line-height:1.5;font-family:sans-serif;">
         Nothing on the board this week. Be the first to post.
       </div>
-      <a href="{{APP_URL}}/board/post" style="display:inline-block;margin-top:12px;background:#166534;color:#ffffff;padding:10px 20px;border-radius:4px;text-decoration:none;font-size:13px;font-family:sans-serif;font-weight:600;">Post something — just $5 for 7 days</a>
+      <a href="{{APP_URL}}/board/post" style="display:inline-block;margin-top:12px;background:#166534;color:#ffffff;padding:10px 20px;border-radius:4px;text-decoration:none;font-size:13px;font-family:sans-serif;font-weight:600;">Post something — $5 per week</a>
     </div>`;
   }
   const rows = items.map((p) => {
@@ -370,7 +370,7 @@ function renderBoard(items: BoardItem[], tracking?: TrackingConfig): string {
       </div>
       ${rows}
       <div style="font-size:12px;color:#6b7280;font-family:sans-serif;margin-top:4px;">
-        Got something to list? <a href="{{APP_URL}}/board/post" style="color:#15803d;font-weight:600;">Post it on the Board</a> — just $5 for 7 days.
+        Got something to list? <a href="{{APP_URL}}/board/post" style="color:#15803d;font-weight:600;">Post it on the Board</a> — $5 per week.
       </div>
     </div>`;
 }

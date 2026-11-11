@@ -5,7 +5,7 @@ import Stripe from "stripe";
 import { alertBookingFailureOnce } from "@/lib/sponsor-booking-alerts";
 import { recordPaidProductOrder, shippingFromSession } from "@/lib/products";
 import { isProductSize } from "@/lib/product-sizes";
-import { BOARD_RUN_DAYS } from "@/lib/board-constants";
+import { boardRunDays, clampBoardRunWeeks } from "@/lib/board-constants";
 import {
   couponBookPrepaidYearEnd,
   couponBookPurchaseHasAccess,
@@ -324,28 +324,31 @@ async function handleCouponBookSubscriptionEvent(event: Stripe.Event, stripe: St
 // Board posts: the checkout route creates the BoardPost row as
 // pending_payment; fulfillment flips it straight to active (auto-approved
 // 2026-11-07, so a time-sensitive post is never stuck waiting on a manual
-// approval; the admin bell just notes the new post). The 7-day run starts
-// at payment. Idempotent: re-delivered events no-op.
+// approval; the admin bell just notes the new post). The run (the number
+// of weeks purchased) starts at payment. Idempotent: re-delivered events no-op.
 async function fulfillBoardPost(workspaceId: string, session: Stripe.Checkout.Session) {
   const paidAt = new Date();
   const postId = session.metadata?.boardPostId;
   const existing = postId
     ? await basePrisma.boardPost.findFirst({
         where: { id: postId, workspaceId },
-        select: { id: true, status: true },
+        select: { id: true, status: true, runWeeks: true },
       })
     : await basePrisma.boardPost.findFirst({
         where: { stripeSessionId: session.id },
-        select: { id: true, status: true },
+        select: { id: true, status: true, runWeeks: true },
       });
   if (existing && existing.status === "pending_payment") {
+    // The stored runWeeks (set at checkout) decides the run length; legacy
+    // rows without one fall back to a single week.
+    const runDays = boardRunDays(clampBoardRunWeeks(existing.runWeeks));
     await basePrisma.boardPost.update({
       where: { id: existing.id },
       data: {
         status: "active",
         paidAt,
         approvedAt: paidAt,
-        expiresAt: new Date(paidAt.getTime() + BOARD_RUN_DAYS * 24 * 60 * 60 * 1000),
+        expiresAt: new Date(paidAt.getTime() + runDays * 24 * 60 * 60 * 1000),
         stripeSessionId: session.id,
         stripePaymentIntent:
           typeof session.payment_intent === "string" ? session.payment_intent : undefined,
