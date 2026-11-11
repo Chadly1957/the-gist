@@ -334,6 +334,7 @@ function CityLandingPage() {
               <Link href="/products" className="hover:text-gray-600 transition-colors">Shop</Link>
             )}
             <Link href="/sponsor" className="hover:text-gray-600 transition-colors">Advertise</Link>
+            <Link href="/policy" className="hover:text-gray-600 transition-colors">Policies</Link>
             <Link href="/unsubscribe" className="hover:text-gray-600 transition-colors">Unsubscribe</Link>
             <span>&copy; {new Date().getFullYear()} {workspace.name}</span>
           </div>

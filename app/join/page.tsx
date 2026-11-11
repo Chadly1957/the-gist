@@ -459,6 +459,8 @@ export default function JoinPage() {
         <div className="max-w-5xl mx-auto px-6 text-center text-xs text-[#8a8478]">
           &copy; {new Date().getFullYear()} {workspace.name} &middot;{" "}
           <Link href="/unsubscribe" className="hover:text-gray-600 transition-colors">Unsubscribe</Link>
+          {" "}&middot;{" "}
+          <Link href="/policy" className="hover:text-gray-600 transition-colors">Policies</Link>
         </div>
       </footer>
     </div>
