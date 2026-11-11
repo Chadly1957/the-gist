@@ -65,7 +65,7 @@ export default async function PolicyPage() {
     {
       heading: "Contact",
       paragraphs: [
-        `Questions about any of this: email us at the address at the bottom of any issue. The Gist is run by Chad Williams in ${ws.area}.`,
+        `Questions about any of this: email us at the address at the bottom of any issue. The Gist is run by Chad Williams, serving ${ws.area}.`,
       ],
     },
   ];
