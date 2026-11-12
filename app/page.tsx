@@ -115,7 +115,7 @@ function CityLandingPage() {
 
                 <h1 className="text-3xl sm:text-4xl font-extrabold text-gray-900 leading-[1.08] tracking-tight mb-4">
                   If it&apos;s happening<br />
-                  in {workspace.area},<br />
+                  in {workspace.area} IL,<br />
                   <span className="text-green-700">you&apos;ll hear it here first.</span>
                 </h1>
 
