@@ -280,7 +280,7 @@ export default function SponsorJoinClient({ sponsorName, sponsorSlug, card }: Pr
               )}
 
               <h1 className="text-4xl sm:text-5xl font-extrabold text-gray-900 leading-[1.08] tracking-tight mb-5">
-                Everything worth knowing in {workspace.area}, every morning.
+                Everything worth knowing in {workspace.area} IL, every morning.
               </h1>
               <p className="text-base sm:text-lg text-gray-500 leading-relaxed mb-8 max-w-lg">
                 A free 2-minute daily email. The local stories, events, and deals

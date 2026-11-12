@@ -13,8 +13,8 @@ export async function generateMetadata(): Promise<Metadata> {
   const workspace = await getWorkspace();
   const base = (await getWorkspaceUrl()).replace(/\/$/, "");
   const url = `${base}/articles`;
-  const title = `${workspace.area} News & Community Stories | ${workspace.name}`;
-  const description = `Original stories, explainers, and community news from ${workspace.name}, written for ${workspace.area} readers.`;
+  const title = `${workspace.area} IL News & Community Stories | ${workspace.name}`;
+  const description = `Original stories, explainers, and community news from ${workspace.name}, written for ${workspace.area} IL readers.`;
   return {
     title,
     description,
