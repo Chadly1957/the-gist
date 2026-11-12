@@ -89,6 +89,9 @@ interface Profile {
   contactName: string;
   email: string;
   website: string | null;
+  logoUrl: string | null;
+  description: string | null;
+  category: string | null;
   spotlights: Spotlight[];
   bookings: Booking[];
 }
@@ -344,6 +347,17 @@ function PortalContent() {
       .catch(() => setError("Failed to load. Please try again."))
       .finally(() => setLoading(false));
 
+    // Deep link into a portal section, e.g. the listing editor after
+    // signup (?view=spotlight). Unknown values are ignored. bookWeek
+    // below wins when both are present.
+    const viewParam = searchParams.get("view");
+    if (
+      viewParam &&
+      ["overview", "spotlight", "booking", "profile", "event", "billing", "editWeek", "coupons", "deals"].includes(viewParam)
+    ) {
+      setView(viewParam as View);
+    }
+
     // Renewal deep link: jump straight into booking with the suggested week.
     const bookWeek = searchParams.get("bookWeek");
     if (bookWeek) {
@@ -579,8 +593,11 @@ function PortalContent() {
     contactName: profile.contactName || "",
     email: profile.email || "",
     website: profile.website || "",
-    logoUrl: profile.spotlights.find((s) => s.logoUrl)?.logoUrl || "",
-    aboutText: profile.spotlights.find((s) => s.description)?.description || "",
+    // The profile is the single source of truth for the business's
+    // logo and description (unified 2026-11-12); a listing snapshot
+    // is only a fallback for profiles created before the unification.
+    logoUrl: profile.logoUrl || profile.spotlights.find((s) => s.logoUrl)?.logoUrl || "",
+    aboutText: profile.description || profile.spotlights.find((s) => s.description)?.description || "",
   };
 
   const upcomingWeeks = weekBookings.filter((w) => w.status === "paid" || w.status === "pending_payment");
@@ -735,6 +752,20 @@ function PortalContent() {
                   <p className="text-xs text-gray-400">Free — appears in the newsletter calendar</p>
                 </div>
               </button>
+              <WorkspaceAnchor
+                href={`/board/post?token=${encodeURIComponent(token)}`}
+                className="flex items-center gap-3 p-4 bg-white rounded-xl border border-gray-200 hover:border-green-400 hover:shadow-sm transition-all text-left"
+              >
+                <div className="w-9 h-9 rounded-lg bg-rose-50 flex items-center justify-center shrink-0">
+                  <svg className="w-5 h-5 text-rose-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-gray-800">Post on the Board</p>
+                  <p className="text-xs text-gray-400">Your business details are already filled in</p>
+                </div>
+              </WorkspaceAnchor>
               <button
                 onClick={openCoupons}
                 className="relative flex items-center gap-3 p-4 bg-white rounded-xl border border-gray-200 hover:border-green-400 hover:shadow-sm transition-all text-left"
@@ -871,7 +902,7 @@ function PortalContent() {
                       <div className="flex flex-col items-end gap-1.5 shrink-0">
                         <StatusBadge status={s.status} />
                         <button
-                          onClick={() => { setEditingSpotlight(s); setSForm({ businessName: s.businessName, logoUrl: s.logoUrl || "", description: s.description, ctaLabel: s.ctaLabel, ctaUrl: s.ctaUrl, category: s.category || "" }); setSError(""); setSSuccess(false); setView("spotlight"); }}
+                          onClick={() => { setEditingSpotlight(s); setSForm({ businessName: profile.businessName, logoUrl: profile.logoUrl || s.logoUrl || "", description: profile.description || s.description, ctaLabel: s.ctaLabel, ctaUrl: profile.website || s.ctaUrl, category: profile.category || s.category || "" }); setSError(""); setSSuccess(false); setView("spotlight"); }}
                           className="text-xs text-green-700 hover:underline"
                         >
                           Edit
@@ -972,7 +1003,7 @@ function PortalContent() {
                         const s = profile.spotlights.find((x) => ["pending", "approved", "active"].includes(x.status));
                         if (s) {
                           setEditingSpotlight(s);
-                          setSForm({ businessName: s.businessName, logoUrl: s.logoUrl || "", description: s.description, ctaLabel: s.ctaLabel, ctaUrl: s.ctaUrl, category: s.category || "" });
+                          setSForm({ businessName: profile.businessName, logoUrl: profile.logoUrl || s.logoUrl || "", description: profile.description || s.description, ctaLabel: s.ctaLabel, ctaUrl: profile.website || s.ctaUrl, category: profile.category || s.category || "" });
                           setSError(""); setSNotice("");
                         }
                       }}

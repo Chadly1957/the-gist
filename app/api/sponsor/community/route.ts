@@ -31,17 +31,19 @@ export async function POST(req: NextRequest) {
   if (!trimmedDescription) {
     return NextResponse.json({ error: "Please add a one-line description." }, { status: 400 });
   }
-  if (trimmedDescription.length > 140) {
-    return NextResponse.json({ error: "Keep your description to 140 characters or less." }, { status: 400 });
+  if (trimmedDescription.length > 300) {
+    return NextResponse.json({ error: "Keep your description to 300 characters or less." }, { status: 400 });
   }
   // Directory category: optional at the API, required by the signup form.
   // Anything unrecognized is stored as null rather than rejected, so an old
   // client can never lose a signup over it.
   const validCategory = isPartnerCategory(category) ? category : null;
 
-  // One email can own several businesses: match the exact business so each
-  // business keeps its own profile (and portal). Same business reusing the
-  // same email reuses its profile.
+  // One submit creates/updates the PROFILE (single source of truth for
+  // the business's public info) and the listing together. A returning
+  // business re-submitting the form updates the profile's
+  // description/category too, so the portal and directory always show
+  // what the business last typed.
   let profile = await prisma.sponsorProfile.findFirst({
     where: {
       email: normalizedEmail,
@@ -56,33 +58,46 @@ export async function POST(req: NextRequest) {
         contactName: trimmedContact,
         email: normalizedEmail,
         website: normalizedWebsite,
+        description: trimmedDescription,
+        category: validCategory,
       },
+    });
+  } else {
+    profile = await prisma.sponsorProfile.update({
+      where: { id: profile.id },
+      data: { description: trimmedDescription, category: validCategory },
     });
   }
 
   // A returning business re-submitting the form (same email + business)
   // reuses its existing listing instead of stacking a duplicate in the
   // directory. The confirmation email below still goes out, so they get a
-  // fresh portal link either way.
+  // fresh portal link either way. The listing keeps a snapshot of the
+  // profile fields (legacy columns, see schema), updated here so it
+  // never drifts from the profile.
   const existingListing = await prisma.spotlightListing.findFirst({
     where: { sponsorId: profile.id },
     orderBy: { createdAt: "asc" },
     select: { id: true },
   });
+  const listingData = {
+    businessName: profile.businessName,
+    description: trimmedDescription,
+    ctaUrl: normalizedWebsite,
+    category: validCategory,
+  };
   const listing =
-    existingListing ??
-    (await prisma.spotlightListing.create({
-      data: {
-        sponsorId: profile.id,
-        businessName: trimmedBusiness,
-        description: trimmedDescription,
-        ctaUrl: normalizedWebsite,
-        ctaLabel: "Visit Website",
-        category: validCategory,
-        status: "active",
-        approvedAt: new Date(),
-      },
-    }));
+    existingListing
+      ? await prisma.spotlightListing.update({ where: { id: existingListing.id }, data: listingData })
+      : await prisma.spotlightListing.create({
+          data: {
+            sponsorId: profile.id,
+            ...listingData,
+            ctaLabel: "Visit Website",
+            status: "active",
+            approvedAt: new Date(),
+          },
+        });
 
   const appUrl = await getWorkspaceUrl();
   const portalUrl = `${appUrl}/sponsor/portal?token=${profile.magicToken}`;

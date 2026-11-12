@@ -65,6 +65,12 @@ export async function POST(req: NextRequest) {
       where: { status: { in: ["approved", "active"] } },
       orderBy: [{ lastShownAt: { sort: "asc", nulls: "first" } }, { shownCount: "asc" }],
       take: spotlightCount,
+      // Rotation picks the placement row; the business copy comes from
+      // the profile (single source of truth, unified 2026-11-12). The
+      // listing columns are legacy snapshots kept as a fallback.
+      include: {
+        sponsor: { select: { businessName: true, logoUrl: true, description: true, website: true } },
+      },
     }),
     prisma.adBooking.findMany({
       where: { date, status: "approved" },
@@ -79,11 +85,11 @@ export async function POST(req: NextRequest) {
   });
 
   const spotlights: SpotlightItem[] = rawSpotlights.map((s) => ({
-    businessName: s.businessName,
-    logoUrl: s.logoUrl,
-    description: s.description,
+    businessName: s.sponsor.businessName,
+    logoUrl: s.sponsor.logoUrl ?? s.logoUrl,
+    description: s.sponsor.description ?? s.description,
     ctaLabel: s.ctaLabel,
-    ctaUrl: s.ctaUrl,
+    ctaUrl: s.sponsor.website ?? s.ctaUrl,
   }));
 
   const presentingRaw = dateBookings.find((b) => b.type === "presenting");

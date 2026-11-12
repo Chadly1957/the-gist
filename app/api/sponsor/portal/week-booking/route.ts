@@ -71,6 +71,17 @@ export async function PATCH(req: NextRequest) {
     if (Object.keys(dayData).length > 0) {
       await tx.adBooking.updateMany({ where: { sponsorWeekBookingId: booking.id }, data: dayData });
     }
+    // The booking keeps its per-week ad snapshot (fulfillment and stats
+    // read it), but the business's logo and website live on the PROFILE
+    // (single source of truth, unified 2026-11-12), so an edit here
+    // updates the profile too. aboutText is ad copy, not the business
+    // description, so it stays on the booking only.
+    const profileData: { logoUrl?: string; website?: string | null } = {};
+    if (data.logoUrl !== undefined) profileData.logoUrl = data.logoUrl;
+    if (data.website !== undefined) profileData.website = data.website;
+    if (Object.keys(profileData).length > 0) {
+      await tx.sponsorProfile.update({ where: { id: profile.id }, data: profileData });
+    }
     return next;
   });
 

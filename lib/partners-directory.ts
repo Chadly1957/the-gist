@@ -21,12 +21,31 @@ export async function getPartnerDirectory() {
       category: true,
       createdAt: true,
       approvedAt: true,
+      // The listing is the placement row; the business copy comes from
+      // the profile (single source of truth, unified 2026-11-12). The
+      // listing columns are legacy snapshots kept as a fallback.
+      sponsor: {
+        select: { businessName: true, logoUrl: true, description: true, website: true, category: true },
+      },
     },
     orderBy: { createdAt: "desc" },
   });
 
+  // Read the business fields off the profile, falling back to the
+  // listing snapshot where the profile field is still empty. The
+  // sponsor relation is stripped back out so the returned rows keep
+  // exactly the shape callers already expect.
+  const mapped = rows.map(({ sponsor, ...r }) => ({
+    ...r,
+    businessName: sponsor.businessName,
+    logoUrl: sponsor.logoUrl ?? r.logoUrl,
+    description: sponsor.description ?? r.description,
+    ctaUrl: sponsor.website ?? r.ctaUrl,
+    category: sponsor.category ?? r.category,
+  }));
+
   const seen = new Set<string>();
-  const partners = rows.filter((r) => {
+  const partners = mapped.filter((r) => {
     const key = r.businessName.trim().toLowerCase();
     if (seen.has(key)) return false;
     seen.add(key);

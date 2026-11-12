@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import Link from "@/components/workspace/WorkspaceLink";
 import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
 import { workspaceFetch } from "@/lib/workspace-client";
@@ -106,10 +106,16 @@ export default function SponsorshipLanding() {
   const [openFaq, setOpenFaq] = useState<number | null>(null);
 
   // Hero free-listing form (creates the listing in this site's city).
-  const [hero, setHero] = useState({ businessName: "", contactName: "", email: "", website: "", category: "", description: "" });
+  // Logo upload lives inline here (same as the old community form): the
+  // single signup flow, so nobody has to fill everything out a second
+  // time just to add a logo.
+  const [hero, setHero] = useState({ businessName: "", contactName: "", email: "", website: "", category: "", description: "", subscribeNewsletter: false });
   const [heroBusy, setHeroBusy] = useState(false);
   const [heroError, setHeroError] = useState("");
   const [heroDone, setHeroDone] = useState(false);
+  const [heroLogoFile, setHeroLogoFile] = useState<File | null>(null);
+  const [heroPortalUrl, setHeroPortalUrl] = useState("");
+  const heroLogoRef = useRef<HTMLInputElement>(null);
 
   // Email-first gate in the hero card: returning businesses (anyone with
   // a sponsor profile in this city) get their portal link emailed instead
@@ -210,10 +216,40 @@ export default function SponsorshipLanding() {
       const res = await workspaceFetch("/api/sponsor/community", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...hero, subscribeNewsletter: false }),
+        body: JSON.stringify({ ...hero }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Could not create your listing.");
+      // Optional logo upload, then attach it to the PROFILE (single source
+      // of truth since the unification). A failed upload never fails the
+      // signup: the listing is live either way and the logo can be added
+      // from the portal.
+      if (heroLogoFile) {
+        try {
+          const fd = new FormData();
+          fd.append("file", heroLogoFile);
+          fd.append("token", data.token);
+          const upRes = await workspaceFetch("/api/sponsor/upload", { method: "POST", body: fd });
+          const upData = await upRes.json();
+          if (upRes.ok && upData.url) {
+            await workspaceFetch("/api/sponsor/spotlight", {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                token: data.token,
+                id: data.listingId,
+                businessName: hero.businessName,
+                description: hero.description,
+                ctaUrl: hero.website,
+                logoUrl: upData.url,
+              }),
+            });
+          }
+        } catch {
+          /* listing is live either way; logo can be added from the portal */
+        }
+      }
+      if (data.portalUrl) setHeroPortalUrl(data.portalUrl);
       setHeroDone(true);
     } catch (err) {
       setHeroError(err instanceof Error ? err.message : "Could not create your listing.");
@@ -303,9 +339,15 @@ export default function SponsorshipLanding() {
                   <Link href="/partners" className="px-4 py-2.5 rounded-xl text-white font-semibold text-sm" style={{ background: PINE_DARK }}>
                     See the directory
                   </Link>
-                  <Link href="/sponsor/community" className="px-4 py-2.5 rounded-xl font-semibold text-sm border" style={{ borderColor: BORDER }}>
-                    Add your logo
-                  </Link>
+                  {heroPortalUrl ? (
+                    <a href={`${heroPortalUrl}&view=spotlight`} className="px-4 py-2.5 rounded-xl font-semibold text-sm border" style={{ borderColor: BORDER }}>
+                      Add your logo
+                    </a>
+                  ) : (
+                    <span className="px-4 py-2.5 rounded-xl font-semibold text-sm border" style={{ borderColor: BORDER }}>
+                      Your portal link was emailed to you
+                    </span>
+                  )}
                 </div>
               </div>
             ) : gate === "email" ? (
@@ -366,9 +408,36 @@ export default function SponsorshipLanding() {
                     ))}
                   </select>
                   <div>
-                    <textarea required rows={2} maxLength={140} placeholder="One or two sentences about your business *" value={hero.description} onChange={(e) => setHero({ ...hero, description: e.target.value })} className={`${inputCls} resize-none`} style={inputStyle} />
-                    <p className="text-[11px] text-right" style={{ color: MUTED }}>{hero.description.length}/140</p>
+                    <textarea required rows={2} maxLength={300} placeholder="One or two sentences about your business *" value={hero.description} onChange={(e) => setHero({ ...hero, description: e.target.value })} className={`${inputCls} resize-none`} style={inputStyle} />
+                    <p className="text-[11px] text-right" style={{ color: MUTED }}>{hero.description.length}/300</p>
                   </div>
+                  <div>
+                    <label className="block text-xs font-semibold mb-1" style={{ color: MUTED }}>Logo <span className="font-normal">(optional, but strongly recommended)</span></label>
+                    <input ref={heroLogoRef} type="file" accept="image/png,image/jpeg" className="hidden"
+                      onChange={(e) => setHeroLogoFile(e.target.files?.[0] ?? null)} />
+                    {heroLogoFile ? (
+                      <div className="flex items-center gap-3 border rounded-xl p-3" style={{ borderColor: BORDER }}>
+                        <span className="text-sm truncate flex-1" style={{ color: INK }}>{heroLogoFile.name}</span>
+                        <button type="button" onClick={() => { setHeroLogoFile(null); if (heroLogoRef.current) heroLogoRef.current.value = ""; }}
+                          className="text-xs hover:underline" style={{ color: MUTED }}>Remove</button>
+                      </div>
+                    ) : (
+                      <button type="button" onClick={() => heroLogoRef.current?.click()}
+                        className="w-full border-2 border-dashed rounded-xl py-4 text-sm transition-colors hover:opacity-80"
+                        style={{ borderColor: BORDER, color: MUTED }}>
+                        Upload your logo (PNG or JPG, under 5MB)
+                      </button>
+                    )}
+                  </div>
+                  <label className="flex items-start gap-2.5 rounded-xl p-1 cursor-pointer">
+                    <input type="checkbox" checked={hero.subscribeNewsletter} onChange={(e) => setHero({ ...hero, subscribeNewsletter: e.target.checked })}
+                      className="mt-0.5 h-4 w-4" style={{ accentColor: PINE }} />
+                    <span className="text-sm" style={{ color: INK }}>
+                      <span className="font-semibold">Send me {workspace.name} free every morning</span>
+                      <br />
+                      <span className="text-xs" style={{ color: MUTED }}>Optional. One short email every morning, unsubscribe anytime.</span>
+                    </span>
+                  </label>
                   {heroError && <p className="text-sm text-red-600">{heroError}</p>}
                   <button type="submit" disabled={heroBusy} className="w-full py-3 rounded-xl text-white font-semibold text-sm disabled:opacity-50 hover:opacity-90" style={{ background: PINE }}>
                     {heroBusy ? "Creating your listing…" : "Get my free listing"}

@@ -16,7 +16,21 @@ export async function GET() {
     include: { sponsor: { select: { businessName: true, contactName: true, email: true } } },
   });
 
-  return NextResponse.json({ events });
+  // Which events are already on the Community Board (free admin upgrade):
+  // lets the admin view show "On the Board" instead of offering the
+  // upgrade twice. Board posts carry eventId for exactly this lookup.
+  const boardPosts = await prisma.boardPost.findMany({
+    where: { eventId: { in: events.map((e: { id: string }) => e.id) } },
+    select: { id: true, eventId: true },
+  });
+  const boardByEvent = new Map(boardPosts.map((p) => [p.eventId, p.id]));
+
+  return NextResponse.json({
+    events: events.map((e: { id: string }) => ({
+      ...e,
+      boardPostId: boardByEvent.get(e.id) ?? null,
+    })),
+  });
 }
 
 export async function POST(req: NextRequest) {

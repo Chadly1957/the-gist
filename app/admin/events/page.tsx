@@ -20,6 +20,9 @@ interface Event {
   createdAt: string;
   approvedAt: string | null;
   sponsor: { businessName: string; contactName: string; email: string } | null;
+  // Free Community Board upgrade (POST /api/admin/events/[id]/board):
+  // the Board post id when this event is already on the Board, else null.
+  boardPostId: string | null;
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -61,6 +64,9 @@ export default function AdminEventsPage() {
   const [scrapeError, setScrapeError] = useState("");
   const [scrapeWarnings, setScrapeWarnings] = useState<string[]>([]);
   const [scrapeFound, setScrapeFound] = useState<Record<string, boolean>>({});
+  const [boardSaving, setBoardSaving] = useState(false);
+  const [boardResult, setBoardResult] = useState<{ eventId: string; postId: string; expiresAt: string; already: boolean } | null>(null);
+  const [boardError, setBoardError] = useState<{ eventId: string; message: string } | null>(null);
 
   async function load() {
     const res = await workspaceFetch("/api/admin/events");
@@ -84,6 +90,25 @@ export default function AdminEventsPage() {
     if (!confirm("Delete this event?")) return;
     await workspaceFetch(`/api/admin/events/${id}`, { method: "DELETE" });
     setExpandedId(null);
+    await load();
+  }
+
+  // Free Community Board upgrade: create a $0, 7-day Board post from
+  // this event (auto-approved, no Stripe). Shows the created post with
+  // a link to view it on /board.
+  async function addToBoard(ev: Event) {
+    if (!confirm(`Add "${ev.title}" to the Community Board for free? It will run for 7 days.`)) return;
+    setBoardSaving(true);
+    setBoardError(null);
+    setBoardResult(null);
+    const res = await workspaceFetch(`/api/admin/events/${ev.id}/board`, { method: "POST" });
+    const data = await res.json().catch(() => ({}));
+    setBoardSaving(false);
+    if (!res.ok) {
+      setBoardError({ eventId: ev.id, message: data.error || "Could not add this event to the Board." });
+      return;
+    }
+    setBoardResult({ eventId: ev.id, postId: data.post.id, expiresAt: data.post.expiresAt, already: data.already });
     await load();
   }
 
@@ -432,7 +457,29 @@ export default function AdminEventsPage() {
                           className="px-3 py-1.5 text-red-500 hover:text-red-700 text-xs font-semibold">
                           Delete
                         </button>
+                        {ev.status !== "rejected" && (
+                          ev.boardPostId ? (
+                            <WorkspaceAnchor href="/board" className="px-3 py-1.5 bg-green-50 text-green-700 rounded-lg text-xs font-semibold">
+                              On the Board ✓
+                            </WorkspaceAnchor>
+                          ) : (
+                            <button onClick={() => addToBoard(ev)} disabled={boardSaving}
+                              className="px-3 py-1.5 bg-rose-600 text-white rounded-lg text-xs font-semibold hover:bg-rose-700 disabled:opacity-50">
+                              {boardSaving ? "Adding…" : "Add to Board — Free · 7 days"}
+                            </button>
+                          )
+                        )}
                       </div>
+                      {boardResult && boardResult.eventId === ev.id && (
+                        <p className="text-xs text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+                          {boardResult.already ? "Already on the Board." : "Added to the Community Board — free, runs 7 days."}{" "}
+                          <WorkspaceAnchor href="/board" className="underline font-semibold">View it on the Board →</WorkspaceAnchor>
+                          {boardResult.expiresAt && ` (runs until ${new Date(boardResult.expiresAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })})`}
+                        </p>
+                      )}
+                      {boardError && boardError.eventId === ev.id && (
+                        <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{boardError.message}</p>
+                      )}
                     </>
                   )}
                 </div>

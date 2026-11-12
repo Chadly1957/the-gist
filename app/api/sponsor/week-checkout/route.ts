@@ -185,6 +185,11 @@ export async function POST(req: NextRequest) {
                 contactName: trimmedContact,
                 email: normalizedEmail,
                 website: normalizedWebsite,
+                // A new profile created by a paid week carries the ad's
+                // logo as its canonical logo (single source of truth,
+                // unified 2026-11-12); aboutText stays on the booking
+                // only because it is ad copy, not the business description.
+                logoUrl: logoUrl || undefined,
               },
             });
           }
@@ -323,6 +328,11 @@ export async function POST(req: NextRequest) {
             contactName: trimmedContact,
             email: normalizedEmail,
             website: normalizedWebsite,
+            // A new profile created by a paid week carries the ad's
+            // logo as its canonical logo (single source of truth,
+            // unified 2026-11-12); aboutText stays on the booking
+            // only because it is ad copy, not the business description.
+            logoUrl: logoUrl || undefined,
           },
         });
       }

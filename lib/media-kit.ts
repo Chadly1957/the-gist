@@ -64,28 +64,26 @@ export interface MediaKitProfile {
 }
 
 // The logo a media kit should carry is the one readers already see.
-// A sponsor's logo lives on their public Community Partner listing
-// (SpotlightListing.logoUrl): the sponsor portal's listing flow writes
-// it there, and /partners + /local render it from there.
-// SponsorProfile.logoUrl is a separate field the portal never writes,
-// so it is usually empty even when the business has a directory logo,
-// which is why kits kept reporting "no logo on file" for sponsors
-// whose logos are plainly on the public directory. Resolution order
-// (listing first, mirroring getSponsorFeaturedCard in
-// lib/sponsor-kit.ts, with the profile field as a second chance):
-//   1. newest approved/active listing's logoUrl
-//   2. SponsorProfile.logoUrl
+// Since the 2026-11-12 unification, SponsorProfile is the single source
+// of truth for the business logo: the sponsor portal's listing flow
+// writes it there, and /partners + /local render it from there. The
+// listing's logoUrl is a legacy snapshot kept as a second chance.
+// Resolution order (profile first, mirroring getSponsorFeaturedCard in
+// lib/sponsor-kit.ts, with the listing snapshot as a fallback):
+//   1. SponsorProfile.logoUrl
+//   2. newest approved/active listing's logoUrl
 //   3. null: genuinely no logo anywhere, so the kit falls back to
 //      the business name and the preview note says so truthfully.
 export async function resolveMediaKitLogoUrl(
   profile: MediaKitProfile
 ): Promise<string | null> {
+  if (profile.logoUrl) return profile.logoUrl;
   const listing = await prisma.spotlightListing.findFirst({
     where: { sponsorId: profile.id, status: { in: ["approved", "active"] } },
     orderBy: { createdAt: "desc" },
     select: { logoUrl: true },
   });
-  return listing?.logoUrl || profile.logoUrl || null;
+  return listing?.logoUrl || null;
 }
 
 export interface BuiltMediaKit {

@@ -16,7 +16,9 @@ export const dynamic = "force-dynamic";
 // gets a card here, grouped by the category on its listing, alphabetical
 // inside each group, one card per business. Contact details from the
 // sponsor account are never selected or shown; a card carries only what
-// the listing itself carries (name, logo, description, link).
+// the business's profile carries (name, logo, description, link) — the
+// listing is the placement row, the profile is the source of truth
+// (unified 2026-11-12), and the listing columns are legacy snapshots.
 export default async function PartnersPage() {
   const ws = await getWorkspace();
 
@@ -31,14 +33,28 @@ export default async function PartnersPage() {
       ctaUrl: true,
       category: true,
       createdAt: true,
+      sponsor: {
+        select: { businessName: true, logoUrl: true, description: true, website: true, category: true },
+      },
     },
     orderBy: { createdAt: "desc" },
   });
 
+  // Read the business fields off the profile, falling back to the
+  // listing snapshot where the profile field is still empty.
+  const mapped = rows.map(({ sponsor, ...r }) => ({
+    ...r,
+    businessName: sponsor.businessName,
+    logoUrl: sponsor.logoUrl ?? r.logoUrl,
+    description: sponsor.description ?? r.description,
+    ctaUrl: sponsor.website ?? r.ctaUrl,
+    category: sponsor.category ?? r.category,
+  }));
+
   // One card per business: rows arrive newest first, so the first row seen
   // for a normalized business name is the one that renders.
   const seen = new Set<string>();
-  const partners = rows.filter((r) => {
+  const partners = mapped.filter((r) => {
     const key = r.businessName.trim().toLowerCase();
     if (seen.has(key)) return false;
     seen.add(key);
@@ -160,7 +176,7 @@ export default async function PartnersPage() {
             your neighbors every day.
           </p>
           <Link
-            href="/sponsor/community"
+            href="/sponsor#free-signup"
             className="inline-block px-5 py-2.5 bg-green-700 text-white rounded-lg font-semibold text-sm hover:bg-green-800"
           >
             Get your free listing
