@@ -7,7 +7,7 @@ import Link from "@/components/workspace/WorkspaceLink";
 import Logo from "@/components/Logo";
 import DealsOto from "@/components/DealsOto";
 import SponsorsMarquee from "@/components/SponsorsMarquee";
-import RecentIssues from "@/components/RecentIssues";
+import OriginalArticles from "@/components/OriginalArticles";
 import ProductsSection, { type ShopProduct } from "@/components/ProductsSection";
 import PhoneIssuePreview from "@/components/PhoneIssuePreview";
 import SiteHeader from "@/components/SiteHeader";
@@ -269,7 +269,7 @@ function CityLandingPage() {
           </div>
         </section>
 
-        <RecentIssues />
+        <OriginalArticles />
 
         <SponsorsMarquee
           band
