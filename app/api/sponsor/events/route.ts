@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { geocodeAndStoreEvent } from "@/lib/geocode";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = prisma as any;
@@ -49,6 +50,12 @@ export async function POST(req: NextRequest) {
       sponsorId: profile.id,
     },
   });
+
+  // Sponsor events are auto-approved, so pin them now. A missed lookup
+  // never fails the create; the nightly sweep retries.
+  if (event.location) {
+    await geocodeAndStoreEvent(event.id, event.location, event.workspaceId);
+  }
 
   return NextResponse.json({ event });
 }
