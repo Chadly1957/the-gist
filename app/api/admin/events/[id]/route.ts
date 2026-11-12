@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getAdminSession } from "@/lib/auth";
-import { geocodeAndStoreEvent } from "@/lib/geocode";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = prisma as any;
@@ -29,25 +28,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (body.url !== undefined) data.url = body.url?.trim() || null;
   if (body.cost !== undefined) data.cost = body.cost?.trim() || null;
 
-  const prev = await db.event.findUnique({
-    where: { id },
-    select: { location: true, status: true },
-  });
-
   const event = await db.event.update({ where: { id }, data });
-
-  // Pin newly approved (or relocated) events on the map. This never
-  // blocks or fails the approval itself: a missed lookup just leaves
-  // the event list-only, and the nightly sweep retries it.
-  if (event.status === "approved" && event.location) {
-    const locationChanged = prev?.location !== event.location;
-    if (event.latitude == null || event.longitude == null || locationChanged) {
-      await geocodeAndStoreEvent(event.id, event.location, event.workspaceId, {
-        force: locationChanged,
-      });
-    }
-  }
-
   return NextResponse.json({ event });
 }
 

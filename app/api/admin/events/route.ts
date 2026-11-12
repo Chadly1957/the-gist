@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getAdminSession } from "@/lib/auth";
-import { geocodeAndStoreEvent } from "@/lib/geocode";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = prisma as any;
@@ -44,12 +43,6 @@ export async function POST(req: NextRequest) {
       approvedAt: new Date(),
     },
   });
-
-  // Admin-created events are approved on the spot, so pin them now.
-  // A missed lookup never fails the create; the nightly sweep retries.
-  if (event.location) {
-    await geocodeAndStoreEvent(event.id, event.location, event.workspaceId);
-  }
 
   return NextResponse.json({ event });
 }
