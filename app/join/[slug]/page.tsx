@@ -24,7 +24,7 @@ export async function generateMetadata({
   }
   return {
     title: `Join ${workspace.name} — invited by ${profile.businessName}`,
-    description: `${profile.businessName} invites you to join ${workspace.name}, the free daily newsletter for ${workspace.area}.`,
+    description: `${profile.businessName} invites you to join ${workspace.name}, the free daily newsletter for ${workspace.area} IL.`,
     robots: { index: false, follow: true },
   };
 }

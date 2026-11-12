@@ -7,7 +7,7 @@ import Link from "@/components/workspace/WorkspaceLink";
 import Logo from "@/components/Logo";
 import DealsOto from "@/components/DealsOto";
 import SponsorsMarquee from "@/components/SponsorsMarquee";
-import RecentIssues from "@/components/RecentIssues";
+import OriginalArticles from "@/components/OriginalArticles";
 import ProductsSection, { type ShopProduct } from "@/components/ProductsSection";
 import PhoneIssuePreview from "@/components/PhoneIssuePreview";
 import SiteHeader from "@/components/SiteHeader";
@@ -25,6 +25,12 @@ function CityLandingPage() {
   const [message, setMessage] = useState("");
   const [subCount, setSubCount] = useState<number | null>(null);
   const [products, setProducts] = useState<ShopProduct[]>([]);
+
+  // Hero photo: the workspace's own image, falling back to the per-city
+  // default. Used both for the hero backdrop and as the phone preview's
+  // fallback when no latest issue loads.
+  const heroSrc = workspace.heroImageUrl ?? (brand === "effingham" ? "/hero-effingham.png" : "/hero-decatur.jpg");
+  const heroAlt = workspace.heroImageUrl ? `${workspace.name} hero image` : brand === "effingham" ? "Effingham County Courthouse" : "Historic Decatur pavilion";
 
   useEffect(() => {
     workspaceFetch("/api/subscriber-count")
@@ -84,88 +90,115 @@ function CityLandingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-white flex flex-col">
+    <div className="min-h-screen bg-[#f2f6f1] flex flex-col">
       <SiteHeader />
 
       <main className="flex-1">
-        {/* ── HERO ── */}
-        <section className="max-w-6xl mx-auto px-6 pt-10 pb-14 sm:pt-16 sm:pb-20 lg:pt-24 lg:pb-28">
-          <div className="grid lg:grid-cols-2 gap-12 lg:gap-20 items-center">
-            {/* Left: copy + form */}
-            <div>
-              {subCount !== null && subCount >= 10 && (
-                <div className="inline-flex items-center gap-2 bg-green-50 text-green-700 text-xs font-bold px-3 py-1.5 rounded-full mb-6 border border-green-100">
-                  <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block animate-pulse" />
-                  Join {subCount.toLocaleString()}+ {workspace.area} neighbors
-                </div>
-              )}
-
-              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-gray-900 leading-[1.08] tracking-tight mb-5 sm:mb-6">
-                If it&apos;s happening<br />
-                in {workspace.area},<br />
-                <span className="text-green-700">you&apos;ll hear it here first.</span>
-              </h1>
-
-              <p className="text-base sm:text-lg text-gray-500 leading-relaxed mb-8 sm:mb-10 max-w-md">
-                Start your morning with {workspace.name}, the one email that tells you what actually matters in {workspace.area} today.
-              </p>
-
-              {status === "success" ? (
-                <>
-                  <div className="flex items-start gap-4 bg-green-50 border border-green-100 rounded-2xl p-6 max-w-md">
-                    <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center shrink-0">
-                      <svg className="w-5 h-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                      </svg>
-                    </div>
-                    <div>
-                      <p className="font-bold text-gray-900 mb-0.5">You&apos;re subscribed!</p>
-                      <p className="text-sm text-gray-500">{message}</p>
-                    </div>
-                  </div>
-                  <DealsOto area={workspace.area} email={subscribedEmail} src="thankyou" />
-                </>
-              ) : (
-                <form onSubmit={handleSubmit} className="max-w-md space-y-3 w-full">
-                  <div className="flex flex-col sm:flex-row gap-2">
-                    <input
-                      type="email"
-                      placeholder="Your email address"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      required
-                      className="flex-1 px-4 py-3.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent placeholder:text-gray-400"
-                    />
-                    <button
-                      type="submit"
-                      disabled={status === "loading"}
-                      className="bg-green-700 hover:bg-green-800 text-white font-semibold px-5 py-3.5 rounded-xl text-sm transition-colors disabled:opacity-60 whitespace-nowrap w-full sm:w-auto"
-                    >
-                      {status === "loading" ? "…" : "Subscribe"}
-                    </button>
-                  </div>
-                  {status === "error" && (
-                    <p className="text-red-500 text-sm">{message}</p>
-                  )}
-                  <p className="text-xs text-gray-400">
-                    Free forever. No spam. Unsubscribe anytime.
-                  </p>
-                </form>
-              )}
-            </div>
-
-            {/* Right: phone preview of the latest issue (falls back to the hero photo) */}
-            <PhoneIssuePreview
-              heroSrc={workspace.heroImageUrl ?? (brand === "effingham" ? "/hero-effingham.png" : "/hero-decatur.jpg")}
-              heroAlt={workspace.heroImageUrl ? `${workspace.name} hero image` : brand === "effingham" ? "Effingham County Courthouse" : "Historic Decatur pavilion"}
+        {/* ── HERO: full-width photo with the signup card overlaid left ── */}
+        <section className="max-w-6xl mx-auto px-6 pt-6 sm:pt-10">
+          <div className="relative rounded-[2rem] overflow-hidden">
+            {/* Plain img (not next/image): the hero source can be a remote
+                branding URL, and this keeps the photo rendering zero-risk. */}
+            <img
+              src={heroSrc}
+              alt={heroAlt}
+              className="absolute inset-0 h-full w-full object-cover"
             />
+            <div className="relative px-4 py-8 sm:px-8 sm:py-12 lg:px-12 lg:py-16 min-h-[560px] sm:min-h-[620px] flex items-center">
+              <div className="w-full max-w-md rounded-3xl bg-white/95 p-6 sm:p-8 shadow-xl shadow-gray-900/10">
+                {subCount !== null && subCount >= 10 && (
+                  <div className="inline-flex items-center gap-2 bg-green-50 text-green-700 text-xs font-bold px-3 py-1.5 rounded-full mb-5 border border-green-100">
+                    <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block animate-pulse" />
+                    Join {subCount.toLocaleString()} {workspace.area} neighbors who get the free newsletter!
+                  </div>
+                )}
+
+                <h1 className="text-3xl sm:text-4xl font-extrabold text-gray-900 leading-[1.08] tracking-tight mb-4">
+                  If it&apos;s happening<br />
+                  in {workspace.area} IL,<br />
+                  <span className="text-green-700">you&apos;ll hear it here first.</span>
+                </h1>
+
+                <p className="text-base text-gray-500 leading-relaxed mb-7">
+                  Start your morning with {workspace.name}, the one email that tells you what actually matters in {workspace.area} today.
+                </p>
+
+                {status === "success" ? (
+                  <>
+                    <div className="flex items-start gap-4 bg-green-50 border border-green-100 rounded-2xl p-6">
+                      <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center shrink-0">
+                        <svg className="w-5 h-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                      </div>
+                      <div>
+                        <p className="font-bold text-gray-900 mb-0.5">You&apos;re subscribed!</p>
+                        <p className="text-sm text-gray-500">{message}</p>
+                      </div>
+                    </div>
+                    <DealsOto area={workspace.area} email={subscribedEmail} src="thankyou" />
+                  </>
+                ) : (
+                  <form onSubmit={handleSubmit} className="space-y-3 w-full">
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      <input
+                        type="email"
+                        placeholder="Your email address"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        required
+                        className="flex-1 px-4 py-3.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent placeholder:text-gray-400"
+                      />
+                      <button
+                        type="submit"
+                        disabled={status === "loading"}
+                        className="bg-green-700 hover:bg-green-800 text-white font-semibold px-5 py-3.5 rounded-xl text-sm transition-colors disabled:opacity-60 whitespace-nowrap w-full sm:w-auto"
+                      >
+                        {status === "loading" ? "…" : "Subscribe free"}
+                      </button>
+                    </div>
+                    {status === "error" && (
+                      <p className="text-red-500 text-sm">{message}</p>
+                    )}
+                    <p className="text-xs text-gray-400">
+                      Free forever. No spam. Unsubscribe anytime.
+                    </p>
+                  </form>
+                )}
+              </div>
+            </div>
           </div>
         </section>
 
-        <SponsorsMarquee />
+        {/* ── INTRO: what this is, and where to go ── */}
+        <section className="max-w-6xl mx-auto px-6 pt-14 sm:pt-20 pb-2 text-center">
+          <h2 className="text-3xl sm:text-4xl font-extrabold text-gray-900 tracking-tight mb-4">
+            All of {workspace.area}, in one place.
+          </h2>
+          <p className="text-gray-500 max-w-xl mx-auto leading-relaxed mb-8">
+            Local news, events, deals, and the businesses that make {workspace.area} home, pulled together every morning by people who live here.
+          </p>
+          <div className="flex flex-wrap justify-center gap-2.5">
+            <Link href="/articles" className="inline-flex items-center rounded-full border border-green-200 bg-white px-4 py-2 text-sm font-semibold text-green-800 hover:bg-green-50 transition-colors">
+              Local News
+            </Link>
+            <Link href="/events" className="inline-flex items-center rounded-full border border-green-200 bg-white px-4 py-2 text-sm font-semibold text-green-800 hover:bg-green-50 transition-colors">
+              Events
+            </Link>
+            <Link href="/deals" className="inline-flex items-center rounded-full border border-green-200 bg-white px-4 py-2 text-sm font-semibold text-green-800 hover:bg-green-50 transition-colors">
+              Deals
+            </Link>
+            <Link href="/partners" className="inline-flex items-center rounded-full border border-green-200 bg-white px-4 py-2 text-sm font-semibold text-green-800 hover:bg-green-50 transition-colors">
+              Business Directory
+            </Link>
+            <Link href="/board" className="inline-flex items-center rounded-full border border-green-200 bg-white px-4 py-2 text-sm font-semibold text-green-800 hover:bg-green-50 transition-colors">
+              Community Board
+            </Link>
+          </div>
+        </section>
 
-        {/* ── WHAT YOU GET ── */}
-        <section className="bg-gray-50 border-y border-gray-100 py-14 sm:py-20">
+        {/* ── WHAT YOU GET + phone preview of the latest issue ── */}
+        <section className="py-14 sm:py-20">
           <div className="max-w-6xl mx-auto px-6">
             <div className="text-center mb-12">
               <h2 className="text-3xl font-extrabold text-gray-900 mb-3 tracking-tight">
@@ -214,10 +247,82 @@ function CityLandingPage() {
                 </div>
               ))}
             </div>
+
+            {/* Phone preview, moved out of the hero: a peek inside the latest issue. */}
+            <div className="mt-12 rounded-[2rem] border border-gray-100 bg-white shadow-sm overflow-hidden">
+              <div className="grid lg:grid-cols-2 gap-10 items-center px-6 py-10 sm:px-10 sm:py-14">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-widest text-green-700 mb-3">Inside the email</p>
+                  <h3 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight mb-4">
+                    A peek at this morning&apos;s issue.
+                  </h3>
+                  <p className="text-gray-500 leading-relaxed mb-6">
+                    Every issue is short, local, and skimmable, the stories, events, and deals that matter in {workspace.area}, in about two minutes. Here is the latest one, live on your screen.
+                  </p>
+                  <Link href="/issues" className="text-sm font-semibold text-green-700 hover:underline">
+                    Browse all issues →
+                  </Link>
+                </div>
+                <PhoneIssuePreview heroSrc={heroSrc} heroAlt={heroAlt} />
+              </div>
+            </div>
           </div>
         </section>
 
-        <RecentIssues />
+        <OriginalArticles />
+
+        <SponsorsMarquee
+          band
+          eyebrow="Featured Partner"
+          heading="The local businesses behind The Gist"
+          copy={`Meet the ${workspace.area} businesses in our free directory, from neighborhood favorites to new finds.`}
+        />
+
+        {/* ── EXPLORE: events, deals, directory ── */}
+        <section className="pb-14 sm:pb-20">
+          <div className="max-w-6xl mx-auto px-6">
+            <div className="text-center mb-12">
+              <h2 className="text-3xl font-extrabold text-gray-900 mb-3 tracking-tight">
+                More to explore in {workspace.area}.
+              </h2>
+              <p className="text-gray-500 max-w-md mx-auto">
+                Events, deals, and local businesses, all in one place.
+              </p>
+            </div>
+            <div className="grid sm:grid-cols-3 gap-5">
+              <Link href="/events" className="group block bg-white rounded-2xl p-7 border border-gray-100 shadow-sm hover:border-green-200 hover:bg-green-50 transition-colors">
+                <div className="w-10 h-10 rounded-xl bg-green-50 text-green-700 flex items-center justify-center mb-5">
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                </div>
+                <h3 className="font-bold text-gray-900 mb-2 text-base group-hover:text-green-800 transition-colors">What&apos;s on in {workspace.area}</h3>
+                <p className="text-sm text-gray-500 leading-relaxed mb-4">Concerts, markets, fundraisers, and everything worth leaving the house for.</p>
+                <p className="text-sm text-green-700 font-medium">Browse events →</p>
+              </Link>
+              <Link href="/deals" className="group block bg-white rounded-2xl p-7 border border-gray-100 shadow-sm hover:border-green-200 hover:bg-green-50 transition-colors">
+                <div className="w-10 h-10 rounded-xl bg-green-50 text-green-700 flex items-center justify-center mb-5">
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                  </svg>
+                </div>
+                <h3 className="font-bold text-gray-900 mb-2 text-base group-hover:text-green-800 transition-colors">Save around {workspace.area}</h3>
+                <p className="text-sm text-gray-500 leading-relaxed mb-4">Local deals and discounts from {workspace.area} businesses, all in one book.</p>
+                <p className="text-sm text-green-700 font-medium">See the deals →</p>
+              </Link>
+              <Link href="/partners" className="group block bg-white rounded-2xl p-7 border border-gray-100 shadow-sm hover:border-green-200 hover:bg-green-50 transition-colors">
+                <div className="w-10 h-10 rounded-xl bg-green-50 text-green-700 flex items-center justify-center mb-5">
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                  </svg>
+                </div>
+                <h3 className="font-bold text-gray-900 mb-2 text-base group-hover:text-green-800 transition-colors">Find a local business</h3>
+                <p className="text-sm text-gray-500 leading-relaxed mb-4">The free directory of {workspace.area} businesses, from neighborhood favorites to new finds.</p>
+                <p className="text-sm text-green-700 font-medium">Browse the directory →</p>
+              </Link>
+            </div>
+          </div>
+        </section>
 
         <ProductsSection products={products} area={workspace.area} />
 
@@ -322,13 +427,13 @@ function CityLandingPage() {
         </section>
       </main>
 
-      {/* Footer */}
-      <footer className="border-t border-gray-100 py-8">
-        <div className="max-w-6xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <Logo className="h-8 sm:h-10 w-auto" />
-          </div>
-          <div className="flex items-center gap-6 text-xs text-gray-400">
+      {/* Footer: centered logo, tagline, links, copyright. No social
+          icons: the repo has no real Gist social URLs to link to. */}
+      <footer className="border-t border-green-900/10 py-10">
+        <div className="max-w-6xl mx-auto px-6 flex flex-col items-center text-center gap-5">
+          <Logo className="h-10 w-auto" />
+          <p className="text-sm text-gray-500">The daily newsletter for {workspace.area}.</p>
+          <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs text-gray-400">
             <Link href="/games" className="hover:text-gray-600 transition-colors">Games</Link>
             {products.length > 0 && (
               <Link href="/products" className="hover:text-gray-600 transition-colors">Shop</Link>
@@ -336,8 +441,8 @@ function CityLandingPage() {
             <Link href="/sponsor" className="hover:text-gray-600 transition-colors">Advertise</Link>
             <Link href="/policy" className="hover:text-gray-600 transition-colors">Policies</Link>
             <Link href="/unsubscribe" className="hover:text-gray-600 transition-colors">Unsubscribe</Link>
-            <span>&copy; {new Date().getFullYear()} {workspace.name}</span>
           </div>
+          <p className="text-xs text-gray-400">&copy; {new Date().getFullYear()} {workspace.name}</p>
         </div>
       </footer>
     </div>
@@ -347,4 +452,3 @@ function CityLandingPage() {
 export default function LandingPage() {
   return <CityLandingPage />;
 }
-

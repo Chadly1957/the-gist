@@ -20,7 +20,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const base = (await getWorkspaceUrl()).replace(/\/$/, "");
   const url = `${base}/local`;
   const cityState = workspaceCityState(workspace.area);
-  const title = `${workspace.area} Local Guide`;
+  const title = `${workspace.area} IL Local Guide`;
   const description = `Local businesses by category and evergreen guides for ${cityState}, from ${workspace.name}.`;
   return {
     title: `${title} | ${workspace.name}`,
@@ -58,7 +58,7 @@ export default async function LocalHubPage() {
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-10 sm:py-14">
         <div className="text-center mb-12">
           <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight mb-2">
-            {workspace.area} Local Guide
+            {workspace.area} IL Local Guide
           </h1>
           <p className="text-gray-600 leading-relaxed max-w-2xl mx-auto">
             Local businesses worth knowing in {cityState}, organized by what

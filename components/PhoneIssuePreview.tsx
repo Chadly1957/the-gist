@@ -187,10 +187,8 @@ export default function PhoneIssuePreview({
               <div aria-hidden className="absolute -left-[2px] top-44 h-14 w-[3px] rounded-full bg-gray-700" />
               <div aria-hidden className="absolute -right-[2px] top-32 h-16 w-[3px] rounded-full bg-gray-700" />
               <div className="relative overflow-hidden rounded-[38px] bg-white">
-                {/* Dynamic island */}
-                <div aria-hidden className="pointer-events-none absolute left-1/2 top-2 z-20 h-[22px] w-[90px] -translate-x-1/2 rounded-full bg-gray-950" />
                 {status === "loading" ? (
-                  <div className="h-[560px] animate-pulse bg-gray-100 p-4 pt-12">
+                  <div className="h-[560px] animate-pulse bg-gray-100 p-4 pt-4">
                     <div className="mb-3 h-5 w-3/4 rounded bg-gray-200" />
                     <div className="mb-6 h-3 w-1/2 rounded bg-gray-200" />
                     <div className="mb-3 h-24 rounded-xl bg-gray-200" />

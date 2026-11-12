@@ -7,7 +7,7 @@ import "./globals.css";
 export const dynamic = "force-dynamic";
 export async function generateMetadata(): Promise<Metadata> {
   const ws = await getWorkspace();
-  return { title: `${ws.name}: Your Daily Local Briefing`, description: `Your daily local briefing from ${ws.area}.`, openGraph: { title: ws.name, description: `Your daily local briefing from ${ws.area}.`, type: "website" } };
+  return { title: `${ws.name}: Your Daily Local Briefing`, description: `Your daily local briefing from ${ws.area} IL.`, openGraph: { title: ws.name, description: `Your daily local briefing from ${ws.area} IL.`, type: "website" } };
 }
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const workspace = await getWorkspace();

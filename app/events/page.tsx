@@ -99,7 +99,7 @@ export default async function EventsPage() {
       <div className="max-w-2xl mx-auto px-4 sm:px-6 py-10 sm:py-14">
         <div className="text-center mb-10">
           <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight mb-2">
-            What&apos;s Happening in {ws.area}
+            What&apos;s Happening in {ws.area} IL
           </h1>
           <p className="text-gray-500">
             Concerts, markets, trivia nights, and everything else going on around
