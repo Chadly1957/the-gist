@@ -10,7 +10,7 @@ import { workspaceFetch } from "@/lib/workspace-client";
 import { normalizeUrl } from "@/lib/url";
 import { PARTNER_CATEGORIES } from "@/lib/partner-categories";
 
-const MAX_DESC = 140;
+const MAX_DESC = 300;
 
 function CommunityContent() {
   const { workspace } = useWorkspace();

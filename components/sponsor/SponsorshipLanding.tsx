@@ -366,8 +366,8 @@ export default function SponsorshipLanding() {
                     ))}
                   </select>
                   <div>
-                    <textarea required rows={2} maxLength={140} placeholder="One or two sentences about your business *" value={hero.description} onChange={(e) => setHero({ ...hero, description: e.target.value })} className={`${inputCls} resize-none`} style={inputStyle} />
-                    <p className="text-[11px] text-right" style={{ color: MUTED }}>{hero.description.length}/140</p>
+                    <textarea required rows={2} maxLength={300} placeholder="One or two sentences about your business *" value={hero.description} onChange={(e) => setHero({ ...hero, description: e.target.value })} className={`${inputCls} resize-none`} style={inputStyle} />
+                    <p className="text-[11px] text-right" style={{ color: MUTED }}>{hero.description.length}/300</p>
                   </div>
                   {heroError && <p className="text-sm text-red-600">{heroError}</p>}
                   <button type="submit" disabled={heroBusy} className="w-full py-3 rounded-xl text-white font-semibold text-sm disabled:opacity-50 hover:opacity-90" style={{ background: PINE }}>

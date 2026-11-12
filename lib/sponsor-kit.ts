@@ -14,6 +14,7 @@ export interface SponsorProfileLite {
   email: string;
   website: string | null;
   logoUrl: string | null;
+  description: string | null;
 }
 
 const PROFILE_SELECT = {
@@ -23,6 +24,7 @@ const PROFILE_SELECT = {
   email: true,
   website: true,
   logoUrl: true,
+  description: true,
 } as const;
 
 // Resolve a /join/<slug> segment to a sponsor in this workspace.
@@ -54,7 +56,10 @@ export interface SponsorFeaturedCard {
 
 // The card shown beside the signup form on /join/<slug>: the sponsor's
 // public Community Partner listing when they have one (same public set
-// as /partners), falling back to the profile's own fields.
+// as /partners). The business copy comes from the PROFILE (single source
+// of truth, unified 2026-11-12); the listing only contributes its
+// placement-only field (ctaLabel), with its legacy snapshot columns as
+// a fallback where the profile field is still empty.
 export async function getSponsorFeaturedCard(
   profile: SponsorProfileLite
 ): Promise<SponsorFeaturedCard> {
@@ -62,7 +67,6 @@ export async function getSponsorFeaturedCard(
     where: { sponsorId: profile.id, status: { in: ["approved", "active"] } },
     orderBy: { createdAt: "desc" },
     select: {
-      businessName: true,
       logoUrl: true,
       description: true,
       ctaLabel: true,
@@ -71,17 +75,19 @@ export async function getSponsorFeaturedCard(
   });
   if (listing) {
     return {
-      businessName: listing.businessName,
-      logoUrl: listing.logoUrl,
-      description: listing.description,
+      businessName: profile.businessName,
+      logoUrl: profile.logoUrl ?? listing.logoUrl,
+      description: profile.description ?? listing.description,
       ctaLabel: listing.ctaLabel || "Visit Website",
-      ctaUrl: listing.ctaUrl || null,
+      ctaUrl: profile.website ?? listing.ctaUrl ?? null,
     };
   }
   return {
     businessName: profile.businessName,
     logoUrl: profile.logoUrl,
-    description: `A local business and proud Community Partner of this newsletter, right here in town.`,
+    description:
+      profile.description ??
+      `A local business and proud Community Partner of this newsletter, right here in town.`,
     ctaLabel: "Visit Website",
     ctaUrl: profile.website,
   };

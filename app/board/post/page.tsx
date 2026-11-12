@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, Suspense } from "react";
+import { useState, Suspense, useEffect, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "@/components/workspace/WorkspaceLink";
 import SiteHeader from "@/components/SiteHeader";
+import { workspaceFetch } from "@/lib/workspace-client";
 import {
   BOARD_CATEGORIES,
   BOARD_INTENTS,
@@ -32,6 +33,38 @@ function BoardPostForm() {
   const [runWeeks, setRunWeeks] = useState<number>(1);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [profilePrefilled, setProfilePrefilled] = useState(false);
+  const prefillTried = useRef(false);
+
+  // Prefill from the sponsor's PROFILE (?token=, linked from the sponsor
+  // portal): the business already gave us its name, link, email, phone
+  // and description, so they just write the post and pay. Event params
+  // (?title=&description=&link=) win where both are present, and the
+  // title is always the post's own (there is no post title on a
+  // profile), so it stays blank for them to write.
+  useEffect(() => {
+    const token = searchParams.get("token");
+    if (!token || prefillTried.current) return;
+    prefillTried.current = true;
+    (async () => {
+      try {
+        const res = await workspaceFetch(`/api/sponsor/portal?token=${encodeURIComponent(token)}`);
+        const data = await res.json().catch(() => ({}));
+        const p = data?.profile;
+        if (!p) return;
+        if (!searchParams.get("link") && p.website) setLinkUrl(p.website);
+        if (!searchParams.get("description") && p.description) {
+          setDescription(p.description.slice(0, 200));
+        }
+        if (p.email) setEmail((v) => v || p.email);
+        if (p.phone) setContactInfo((v) => v || p.phone);
+        if (p.businessName) setDisplayName((v) => v || p.businessName);
+        setProfilePrefilled(true);
+      } catch {
+        // Prefill is a convenience; the form still works blank.
+      }
+    })();
+  }, [searchParams]);
 
   const intentDef = boardIntentForKey(intent);
 
@@ -100,6 +133,12 @@ function BoardPostForm() {
           {cancelled && (
             <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-4">
               Checkout was cancelled. Your post was not saved and you were not charged.
+            </p>
+          )}
+
+          {profilePrefilled && (
+            <p className="text-xs text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2 mb-4">
+              Filled in from your sponsor profile — edit anything before posting.
             </p>
           )}
 

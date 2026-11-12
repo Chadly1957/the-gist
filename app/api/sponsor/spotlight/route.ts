@@ -46,6 +46,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "That category is not on the list." }, { status: 400 });
   }
 
+  // The profile is the single source of truth for the business's public
+  // info: the listing creation writes it there, and the listing itself
+  // keeps a snapshot of the same values (legacy columns, see schema).
+  await prisma.sponsorProfile.update({
+    where: { id: profile.id },
+    data: {
+      businessName: businessName.trim(),
+      description: description.trim(),
+      logoUrl: logoUrl?.trim() || null,
+      website: ctaUrl.trim(),
+      category: isPartnerCategory(category) ? category : null,
+    },
+  });
+
   const listing = await prisma.spotlightListing.create({
     data: {
       sponsorId: profile.id,
@@ -81,6 +95,28 @@ export async function PATCH(req: NextRequest) {
   if (category !== undefined && category !== null && !isPartnerCategory(category)) {
     return NextResponse.json({ error: "That category is not on the list." }, { status: 400 });
   }
+
+  // Edit writes the PROFILE (single source of truth) and keeps the
+  // listing's snapshot in sync (legacy columns, see schema). The
+  // category rule is shared: changes only when the caller sends the
+  // field, so flows that do not know about it (like the signup logo
+  // attach) can never wipe an existing category.
+  const profileData: {
+    businessName: string;
+    description: string;
+    website: string;
+    logoUrl: string | null;
+    category?: string | null;
+  } = {
+    businessName: businessName.trim(),
+    description: description.trim(),
+    website: ctaUrl.trim(),
+    logoUrl: logoUrl?.trim() || null,
+  };
+  if (category !== undefined) {
+    profileData.category = isPartnerCategory(category) ? category : null;
+  }
+  await prisma.sponsorProfile.update({ where: { id: profile.id }, data: profileData });
 
   const updated = await prisma.spotlightListing.update({
     where: { id },

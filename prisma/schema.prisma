@@ -261,6 +261,11 @@ model SponsorProfile {
   phone         String?
   website       String?
   logoUrl       String?
+  // Single source of truth for the business's public info (unified
+  // 2026-11-12): the directory listing, newsletter rotation, media kit
+  // and Board prefill all read description/category from here.
+  description   String?
+  category      String?
   magicToken    String               @unique @default(cuid())
   active        Boolean              @default(true)
   nurtureOptOut Boolean              @default(false)
@@ -397,6 +402,14 @@ model SponsorNurtureClick {
   @@index([sendId])
 }
 
+// A business's public Community Partner listing: a thin placement row.
+// The business fields below (businessName, logoUrl, description, ctaUrl,
+// category) are LEGACY snapshots, kept only so the columns stay non-null
+// until a follow-up migration drops them. Since the 2026-11-12
+// unification, SponsorProfile is the single source of truth and every
+// reader takes those fields from the profile instead. Writers keep the
+// snapshot in sync at creation/edit time so nothing that still reads a
+// snapshot can show stale info.
 model SpotlightListing {
   workspaceId        String                    @default("decatur")
   workspace          Workspace                 @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
@@ -1115,12 +1128,17 @@ model BoardPost {
   paidAt              DateTime?
   approvedAt          DateTime?
   expiresAt           DateTime?
+  // Admin-created free upgrade from an event (2026-11-12): the event this
+  // post was created from, so the admin view can show it as already on the
+  // Board and the route stays idempotent.
+  eventId             String?
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
 
   @@unique([id, workspaceId])
   @@index([workspaceId, status])
   @@index([workspaceId, approvedAt])
+  @@index([eventId])
 }
 
 model Mini {
