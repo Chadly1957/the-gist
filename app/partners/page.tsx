@@ -176,7 +176,7 @@ export default async function PartnersPage() {
             your neighbors every day.
           </p>
           <Link
-            href="/sponsor/community"
+            href="/sponsor#free-signup"
             className="inline-block px-5 py-2.5 bg-green-700 text-white rounded-lg font-semibold text-sm hover:bg-green-800"
           >
             Get your free listing

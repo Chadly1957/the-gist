@@ -347,6 +347,17 @@ function PortalContent() {
       .catch(() => setError("Failed to load. Please try again."))
       .finally(() => setLoading(false));
 
+    // Deep link into a portal section, e.g. the listing editor after
+    // signup (?view=spotlight). Unknown values are ignored. bookWeek
+    // below wins when both are present.
+    const viewParam = searchParams.get("view");
+    if (
+      viewParam &&
+      ["overview", "spotlight", "booking", "profile", "event", "billing", "editWeek", "coupons", "deals"].includes(viewParam)
+    ) {
+      setView(viewParam as View);
+    }
+
     // Renewal deep link: jump straight into booking with the suggested week.
     const bookWeek = searchParams.get("bookWeek");
     if (bookWeek) {
