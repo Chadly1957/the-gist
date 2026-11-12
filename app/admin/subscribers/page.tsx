@@ -50,9 +50,12 @@ export default function ListsPage() {
 
   const [search, setSearch] = useState("");
   const [importing, setImporting] = useState(false);
-  const [importResult, setImportResult] = useState<{ imported: number; skipped: number } | null>(null);
+  const [importResult, setImportResult] = useState<{ imported: number; skipped: number; issueSent?: number } | null>(null);
   const [importError, setImportError] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
+  const [sendingLatest, setSendingLatest] = useState(false);
+  const [latestResult, setLatestResult] = useState<{ sent: number; skipped: number } | null>(null);
+  const latestFileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     workspaceFetch("/api/admin/workspaces").then(async (r) => {
@@ -199,6 +202,47 @@ export default function ListsPage() {
     }
   }
 
+  // One-off: send the most recent issue to the emails in a CSV. Used for
+  // lists imported before the import route started auto-sending the latest
+  // issue. Only active subscribers in this workspace who haven't already
+  // received that issue get it, so re-running with the same file is safe.
+  async function handleLatestIssueFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setSendingLatest(true);
+    setLatestResult(null);
+    setImportError("");
+
+    try {
+      const text = await file.text();
+      const parsed = parseCSV(text);
+
+      if (parsed.length === 0) {
+        setImportError("No valid email addresses found in the file.");
+        return;
+      }
+
+      const res = await workspaceFetch("/api/admin/newsletter/send-latest", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ emails: parsed.map((p) => p.email) }),
+      });
+      const data = await res.json();
+
+      if (res.ok) {
+        setLatestResult({ sent: data.sent ?? 0, skipped: data.skipped ?? 0 });
+      } else {
+        setImportError(data.error || "Send failed.");
+      }
+    } catch {
+      setImportError("Failed to read file. Make sure it's a valid CSV.");
+    } finally {
+      setSendingLatest(false);
+      if (latestFileRef.current) latestFileRef.current.value = "";
+    }
+  }
+
   function exportCSV() {
     window.location.href = workspacePath("/api/admin/subscribers/export");
   }
@@ -274,6 +318,24 @@ export default function ListsPage() {
                 </svg>
                 {importing ? "Importing…" : "Import CSV"}
               </label>
+              <input
+                ref={latestFileRef}
+                type="file"
+                accept=".csv,.txt"
+                onChange={handleLatestIssueFile}
+                className="hidden"
+                id="latest-issue-upload"
+              />
+              <label
+                htmlFor="latest-issue-upload"
+                title="Send the most recent issue to the emails in a CSV"
+                className={`cursor-pointer flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors ${sendingLatest ? "opacity-60 pointer-events-none" : ""}`}
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
+                {sendingLatest ? "Sending…" : "Send latest issue"}
+              </label>
               <button
                 onClick={exportCSV}
                 className="flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
@@ -298,6 +360,13 @@ export default function ListsPage() {
         <div className="mb-4 p-3 bg-green-50 border border-green-100 rounded-lg text-sm text-green-700">
           Import complete: <strong>{importResult.imported}</strong> added
           {importResult.skipped > 0 && `, ${importResult.skipped} skipped (duplicates or invalid)`}
+          {importResult.issueSent ? ` · latest issue sending to ${importResult.issueSent} new subscriber${importResult.issueSent === 1 ? "" : "s"}` : ""}
+        </div>
+      )}
+      {latestResult && (
+        <div className="mb-4 p-3 bg-green-50 border border-green-100 rounded-lg text-sm text-green-700">
+          Latest issue sent to <strong>{latestResult.sent}</strong> subscriber{latestResult.sent === 1 ? "" : "s"}
+          {latestResult.skipped > 0 && `, ${latestResult.skipped} skipped (not subscribed or already received it)`}
         </div>
       )}
       {importError && (
@@ -309,7 +378,7 @@ export default function ListsPage() {
       {/* CSV format hint */}
       {listTab === "newsletter" && canImportExport && (
         <div className="mb-4 p-3 bg-blue-50 border border-blue-100 rounded-lg text-xs text-blue-700">
-          <strong>CSV format:</strong> Any CSV with an <code>email</code> column works. Optional <code>first_name</code> column is auto-detected. Headers are optional.
+          <strong>CSV format:</strong> Any CSV with an <code>email</code> column works. Optional <code>first_name</code> column is auto-detected. Headers are optional. New subscribers also receive the most recent issue.
         </div>
       )}
 
