@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 import SiteHeader from "@/components/SiteHeader";
 import Link from "@/components/workspace/WorkspaceLink";
 import EventsSubscribe from "@/components/EventsSubscribe";
@@ -15,11 +16,14 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 // Public dinner club page for this workspace: the DNNR dinner club.
-// Readers take a quiz and are matched into tables of six; DNNR books
-// the restaurant and the afterparty. First dinner is Thursday,
-// December 10, 2026 at 6:30 PM, then the second Thursday of every
-// month. A seat is $15.99 (dinner itself is pay-your-own), and each
-// dinner night needs at least 30 people signed up to run.
+// What it is: take a short quiz, get matched into a table of six,
+// show up for dinner and an afterparty. DNNR books the restaurant
+// and the afterparty. Booking runs entirely through the DNNR popup:
+// the "Book a seat" button below shows upcoming dates, runs the
+// quiz, matches your table, and reserves your seat. First dinner is
+// Thursday, December 10, 2026 at 6:30 PM, then the second Thursday
+// of every month. A seat is $15.99 (dinner itself is pay-your-own),
+// and each dinner night needs at least 30 people signed up to run.
 export default async function DinnerClubPage() {
   const ws = await getWorkspace();
 
@@ -35,10 +39,11 @@ export default async function DinnerClubPage() {
             Dinner Club in {ws.area} IL
           </h1>
           <p className="text-gray-500">
-            A monthly night out with good company. Take a short quiz, get
-            matched into a table of six, and show up for dinner and an
-            afterparty. We handle the matching and the booking, you just
-            bring yourself.
+            What is it? A monthly dinner with people you have not met yet.
+            Take a short quiz, get matched into a table of six, and show up
+            for dinner and an afterparty. DNNR books the restaurant and the
+            afterparty, so nobody has to organize anything. You just bring
+            yourself.
           </p>
           <div className="inline-block mt-6 bg-green-50 border border-green-100 rounded-2xl px-5 py-4 text-left">
             <p className="text-xs font-bold uppercase tracking-widest text-green-700">
@@ -53,28 +58,20 @@ export default async function DinnerClubPage() {
           </div>
         </div>
 
-        {/*
-          ============================================================
-          DNNR EMBED GOES HERE
-          Paste the DNNR embed code (script + container) inside this
-          section, replacing the placeholder box below. The embed
-          handles the quiz, the table matching, and seat registration.
-          Nothing else on this page needs to change.
-          ============================================================
-        */}
-        <div id="dnnr-embed" className="mb-10">
-          <h2 className="text-sm font-bold uppercase tracking-widest text-gray-500 mb-4 text-center">
+        <div id="dnnr-embed" className="mb-10 text-center">
+          <h2 className="text-sm font-bold uppercase tracking-widest text-gray-500 mb-4">
             Save your seat
           </h2>
-          <div className="border-2 border-dashed border-gray-300 rounded-2xl p-8 text-center">
-            <p className="font-bold text-gray-900 mb-1">
-              Registration opens here
-            </p>
-            <p className="text-sm text-gray-500 leading-relaxed">
-              The DNNR signup embed goes in this spot. It runs the quiz,
-              matches you into a table of six, and reserves your seat.
-            </p>
-          </div>
+          <button
+            data-dnnr-popup="thedinnerclub"
+            className="inline-block px-6 py-3 bg-green-700 text-white rounded-lg font-semibold hover:bg-green-800"
+          >
+            Book a seat
+          </button>
+          <p className="text-sm text-gray-500 mt-3">
+            See upcoming dates, take the short quiz, and get matched into
+            your table of six.
+          </p>
         </div>
 
         <h2 className="text-sm font-bold uppercase tracking-widest text-gray-500 mb-4">
@@ -134,17 +131,6 @@ export default async function DinnerClubPage() {
           </div>
         </div>
 
-        <div className="bg-green-50 border border-green-100 rounded-2xl p-5 mb-10">
-          <p className="text-xs font-bold uppercase tracking-widest text-green-700 mb-1">
-            Presenting sponsor
-          </p>
-          <p className="font-bold text-gray-900">Little Olive Daycare</p>
-          <p className="text-sm text-gray-600 mt-1 leading-relaxed">
-            Our presenting sponsor owns the afterparty, with signage,
-            handouts, and time to mingle with the whole group.
-          </p>
-        </div>
-
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-12">
           <div className="bg-green-50 border border-green-100 rounded-2xl p-5">
             <p className="font-bold text-gray-900 mb-1">Get this in your inbox</p>
@@ -168,6 +154,7 @@ export default async function DinnerClubPage() {
           </div>
         </div>
       </div>
+      <Script src="https://dnnr.io/matchmaker/embed.js" strategy="afterInteractive" />
     </div>
   );
 }
