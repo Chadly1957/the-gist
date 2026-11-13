@@ -136,6 +136,9 @@ export default function SiteHeader() {
                     <Link href="/events" onClick={() => setOpenDropdown(null)} className="block px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50">
                       Events
                     </Link>
+                    <Link href="/dinner-club" onClick={() => setOpenDropdown(null)} className="block px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50">
+                      Dinner Club
+                    </Link>
                     <Link href="/board" onClick={() => setOpenDropdown(null)} className="block px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50">
                       Board
                     </Link>
@@ -204,6 +207,9 @@ export default function SiteHeader() {
             </Link>
             <Link href="/events" onClick={() => setShowMenu(false)} className="block py-3 text-sm font-semibold text-gray-700 border-b border-gray-50">
               Events
+            </Link>
+            <Link href="/dinner-club" onClick={() => setShowMenu(false)} className="block py-3 text-sm font-semibold text-gray-700 border-b border-gray-50">
+              Dinner Club
             </Link>
             <Link href="/games" onClick={() => setShowMenu(false)} className="block py-3 text-sm font-semibold text-gray-700 border-b border-gray-50">
               Games
