@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import Image from "next/image";
-import Script from "next/script";
 import SiteHeader from "@/components/SiteHeader";
 import Link from "@/components/workspace/WorkspaceLink";
 import EventsSubscribe from "@/components/EventsSubscribe";
@@ -18,8 +17,8 @@ export async function generateMetadata(): Promise<Metadata> {
 
 // Public dinner club page for this workspace: a one-night dinner
 // for meeting new people and having fun. Dinner together, then an
-// afterparty with the whole group. Booking runs through the popup
-// attached to the "Book a seat" button below. The night is
+// afterparty with the whole group. The "Book a seat" button links
+// directly to the DNNR community page. The night is
 // Thursday, December 10, 2026 at 6 PM.
 export default async function DinnerClubPage() {
   const ws = await getWorkspace();
@@ -61,16 +60,18 @@ export default async function DinnerClubPage() {
           </div>
         </div>
 
-        <div id="dnnr-embed" className="mb-10 text-center">
+        <div className="mb-10 text-center">
           <h2 className="text-sm font-bold uppercase tracking-widest text-gray-500 mb-4">
             Save your seat
           </h2>
-          <button
-            data-dnnr-popup="thedinnerclub"
+          <a
+            href="https://thedinnerclub.dnnr.io/"
+            target="_blank"
+            rel="noopener noreferrer"
             className="inline-block px-6 py-3 bg-green-700 text-white rounded-lg font-semibold hover:bg-green-800"
           >
             Book a seat
-          </button>
+          </a>
           <p className="text-sm text-gray-500 mt-3">
             Save your seat and come meet someone new.
           </p>
@@ -120,7 +121,6 @@ export default async function DinnerClubPage() {
           </div>
         </div>
       </div>
-      <Script src="https://dnnr.io/matchmaker/embed.js" strategy="afterInteractive" />
     </div>
   );
 }
