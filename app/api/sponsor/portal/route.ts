@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getWeekBookingStats, shapePortalWeekBooking } from "@/lib/sponsor-week-stats";
+import { STARRED_LIVE_STATUSES, STARRED_MAX_SPOTS } from "@/lib/starred-board";
 
 export const dynamic = "force-dynamic";
 
@@ -146,6 +147,32 @@ export async function GET(req: NextRequest) {
     );
   }
 
+  // -- Starred Community Board subscriptions --------------------------------
+  // The profile's subscriptions (live ones drive the portal buy/manage UI)
+  // plus workspace availability for the "n of 5 left" state.
+  const starredRows = await prisma.starredBoardSubscription.findMany({
+    where: { sponsorId: profile.id },
+    include: { spotlight: { select: { businessName: true } } },
+    orderBy: { createdAt: "desc" },
+  });
+  const starredSubscriptions = starredRows.map((s) => ({
+    id: s.id,
+    spotlightId: s.spotlightId,
+    businessName: s.spotlight.businessName,
+    status: s.status,
+    startedAt: s.startedAt ? s.startedAt.toISOString() : null,
+    currentPeriodEnd: s.currentPeriodEnd ? s.currentPeriodEnd.toISOString() : null,
+    cancelAtPeriodEnd: s.cancelAtPeriodEnd,
+  }));
+  const starredTaken = await prisma.starredBoardSubscription.count({
+    where: { status: { in: [...STARRED_LIVE_STATUSES] } },
+  });
+  const starredAvailability = {
+    spotsTotal: STARRED_MAX_SPOTS,
+    spotsTaken: starredTaken,
+    spotsLeft: Math.max(0, STARRED_MAX_SPOTS - starredTaken),
+  };
+
   return NextResponse.json({
     profile,
     analytics: {
@@ -158,6 +185,8 @@ export async function GET(req: NextRequest) {
       bookingGameStats,
     },
     weekBookings,
+    starredSubscriptions,
+    starredAvailability,
   });
 }
 

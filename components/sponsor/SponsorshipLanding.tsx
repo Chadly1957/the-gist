@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "@/components/workspace/WorkspaceLink";
 import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
 import { workspaceFetch } from "@/lib/workspace-client";
@@ -8,9 +8,10 @@ import { PARTNER_CATEGORIES } from "@/lib/partner-categories";
 
 // Sponsorship landing page (October 2026 freemium restructure). Leads with
 // the free Business Directory listing: the signup form sits in the hero.
-// Paid offers are exactly two: the 7-Issue Featured Campaign and the
-// Presenting Partnership. Prices and market lines mirror the offer config
-// in lib/sponsor-weeks.ts (campaign) and the partnership brochure.
+// Paid offers are three: the Starred Community Board placement, the
+// 7-Issue Featured Campaign and the Presenting Partnership. Prices and
+// market lines mirror the offer config in lib/sponsor-weeks.ts (campaign)
+// and the partnership brochure.
 type Market = "decatur" | "effingham" | "both";
 type Interest = "free" | "campaign" | "partner";
 
@@ -116,6 +117,24 @@ export default function SponsorshipLanding() {
   const [heroLogoFile, setHeroLogoFile] = useState<File | null>(null);
   const [heroPortalUrl, setHeroPortalUrl] = useState("");
   const heroLogoRef = useRef<HTMLInputElement>(null);
+
+  // Starred Community Board add-on, shown right after the free signup
+  // (before the success panel) while the listing is fresh. Null once
+  // skipped or after the buyer leaves for Stripe Checkout.
+  const [heroAddOn, setHeroAddOn] = useState<null | { token: string; listingId: string }>(null);
+  const [heroAddOnBusy, setHeroAddOnBusy] = useState(false);
+  const [heroAddOnError, setHeroAddOnError] = useState("");
+
+  // Live Starred availability for this city (the "n of 5 left" badge on
+  // the Starred card). Null when the fetch fails; the card renders
+  // without the count rather than blocking the page.
+  const [starredAvail, setStarredAvail] = useState<{ spotsTotal: number; spotsTaken: number; spotsLeft: number } | null>(null);
+  useEffect(() => {
+    workspaceFetch("/api/starred/availability")
+      .then((r) => r.json())
+      .then((data) => { if (typeof data.spotsLeft === "number") setStarredAvail(data); })
+      .catch(() => {});
+  }, []);
 
   // Email-first gate in the hero card: returning businesses (anyone with
   // a sponsor profile in this city) get their portal link emailed instead
@@ -250,12 +269,51 @@ export default function SponsorshipLanding() {
         }
       }
       if (data.portalUrl) setHeroPortalUrl(data.portalUrl);
+      // Starred add-on step, before setup finishes: offer the $39.99/mo
+      // pinned placement while the listing is fresh. The free signup
+      // creates the listing as active, so it can be starred right away.
+      // Skipped silently when all 5 spots are taken or the check fails.
+      try {
+        const availRes = await workspaceFetch("/api/starred/availability");
+        const avail = await availRes.json();
+        if (availRes.ok && typeof avail.spotsLeft === "number" && avail.spotsLeft > 0) {
+          setHeroAddOn({ token: data.token, listingId: data.listingId });
+          return;
+        }
+      } catch {
+        /* fall through to the success panel */
+      }
       setHeroDone(true);
     } catch (err) {
       setHeroError(err instanceof Error ? err.message : "Could not create your listing.");
     } finally {
       setHeroBusy(false);
     }
+  }
+
+  async function submitStarredAddOn() {
+    if (!heroAddOn) return;
+    setHeroAddOnBusy(true);
+    setHeroAddOnError("");
+    try {
+      const res = await workspaceFetch("/api/sponsor/starred/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: heroAddOn.token, spotlightId: heroAddOn.listingId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Checkout failed.");
+      window.location.href = data.url;
+    } catch (err) {
+      setHeroAddOnError(err instanceof Error ? err.message : "Checkout failed.");
+    } finally {
+      setHeroAddOnBusy(false);
+    }
+  }
+
+  function skipStarredAddOn() {
+    setHeroAddOn(null);
+    setHeroDone(true);
   }
 
   async function submitLead(e: React.FormEvent) {
@@ -325,7 +383,24 @@ export default function SponsorshipLanding() {
 
           {/* Free signup form, top of the fold */}
           <div id="free-signup" className="rounded-[22px] border bg-white p-5 sm:p-6 shadow-[0_22px_65px_rgba(7,48,45,0.10)] scroll-mt-24" style={{ borderColor: BORDER }}>
-            {heroDone ? (
+            {heroAddOn ? (
+              <div className="text-center py-8">
+                <div className="w-12 h-12 rounded-full mx-auto mb-4 flex items-center justify-center" style={{ background: "#fef3c7", color: "#92400e" }}>
+                  <Check className="w-6 h-6" />
+                </div>
+                <h2 className="text-xl font-extrabold mb-2">Star this listing — $39.99/month</h2>
+                <p className="text-sm leading-relaxed mb-5" style={{ color: MUTED }}>
+                  Show up in every newsletter every day as a community spotlight, instead of once or twice a week with the free listing.
+                </p>
+                <button onClick={submitStarredAddOn} disabled={heroAddOnBusy} className="w-full py-3 rounded-xl text-white font-semibold text-sm disabled:opacity-50 hover:opacity-90 mb-3" style={{ background: "#b45309" }}>
+                  {heroAddOnBusy ? "Starting checkout…" : "Yes, star my listing →"}
+                </button>
+                {heroAddOnError && <p className="text-sm text-red-600 mb-3">{heroAddOnError}</p>}
+                <button onClick={skipStarredAddOn} className="text-sm font-semibold hover:underline" style={{ color: PINE_DARK }}>
+                  No thanks, keep my free listing
+                </button>
+              </div>
+            ) : heroDone ? (
               <div className="text-center py-8">
                 <div className="w-12 h-12 rounded-full mx-auto mb-4 flex items-center justify-center" style={{ background: MINT_BG, color: PINE }}>
                   <Check className="w-6 h-6" />
@@ -559,7 +634,7 @@ export default function SponsorshipLanding() {
           <div className="max-w-xl">
             <h2 className="text-3xl sm:text-5xl font-extrabold tracking-tight leading-tight mb-3">Ready for a bigger push?</h2>
             <p style={{ color: MUTED }} className="leading-relaxed">
-              Two straightforward opportunities. One for something happening now; the other for building recognition over time.
+              Three straightforward opportunities. One for showing up every day, one for something happening now, and the other for building recognition over time.
             </p>
           </div>
           <div>
@@ -579,7 +654,7 @@ export default function SponsorshipLanding() {
           </div>
         </div>
 
-        <div className="grid lg:grid-cols-2 gap-5 mt-8">
+        <div className="grid lg:grid-cols-3 gap-5 mt-8">
           {/* Campaign card */}
           <div className="rounded-[22px] border bg-white p-6 sm:p-8 flex flex-col" style={{ borderColor: BORDER }}>
             <div className="flex items-center justify-between mb-5">
@@ -613,6 +688,42 @@ export default function SponsorshipLanding() {
               <a href={campaignHref()} className="block text-center py-3.5 rounded-xl text-white font-semibold text-sm hover:opacity-90" style={{ background: PINE_DARK }}>
                 Plan my 7-issue campaign →
               </a>
+            )}
+          </div>
+
+          {/* Starred card */}
+          <div className="rounded-[22px] border bg-white p-6 sm:p-8 flex flex-col" style={{ borderColor: "#f59e0b" }}>
+            <div className="flex items-center justify-between mb-5">
+              <span className="text-[11px] font-bold tracking-[0.14em] px-3 py-1.5 rounded-full" style={{ background: "#fef3c7", color: "#92400e" }}>ONLY 5 SPOTS PER CITY</span>
+              <span className="text-xs" style={{ color: MUTED }}>{starredAvail ? `${starredAvail.spotsLeft} of 5 left` : "Monthly subscription"}</span>
+            </div>
+            <p className="text-[11px] font-bold tracking-[0.18em] mb-1" style={{ color: "#b45309" }}>SHOW UP EVERY DAY</p>
+            <h3 className="text-2xl font-extrabold mb-2">Starred Community Board</h3>
+            <p className="text-sm leading-relaxed mb-5" style={{ color: MUTED }}>
+              Your free listing, pinned at the top of the Community Board in every daily issue.
+            </p>
+            <p className="mb-1"><span className="text-5xl font-extrabold tracking-tight">$39.99</span> <span style={{ color: MUTED }}>/ month</span></p>
+            <p className="text-sm mb-6" style={{ color: MUTED }}>Billed monthly, per city. Cancel anytime.</p>
+            <ul className="space-y-2.5 text-sm flex-1 mb-7" style={{ color: INK }}>
+              {[
+                "Pinned at the top of the Community Board in every daily issue",
+                "Your logo, description and button, from your free listing",
+                "Tracked click-throughs to your website",
+                "Renews monthly; cancel anytime",
+              ].map((item) => (
+                <li key={item} className="flex gap-2.5"><span style={{ color: PINE }} className="mt-0.5 shrink-0"><Check /></span>{item}</li>
+              ))}
+            </ul>
+            {starredAvail && starredAvail.spotsLeft === 0 ? (
+              <span className="block text-center py-3.5 rounded-xl font-semibold text-sm border" style={{ borderColor: BORDER, color: MUTED }}>Sold out</span>
+            ) : heroPortalUrl ? (
+              <a href={`${heroPortalUrl}&view=spotlight`} className="block text-center py-3.5 rounded-xl text-white font-semibold text-sm hover:opacity-90" style={{ background: "#b45309" }}>
+                Star my business →
+              </a>
+            ) : (
+              <button onClick={() => scrollToId("free-signup")} className="block w-full text-center py-3.5 rounded-xl text-white font-semibold text-sm hover:opacity-90" style={{ background: "#b45309" }}>
+                Star my business →
+              </button>
             )}
           </div>
 
@@ -655,7 +766,9 @@ export default function SponsorshipLanding() {
           <strong style={{ color: INK }}>What&apos;s guaranteed?</strong> The placements described above, subject to available start
           dates and approved creative, not a fixed number of clicks, leads or customers. Partner category exclusivity
           applies only to the Presenting Partner program, not all advertising or independent editorial coverage. Campaign
-          pricing is per market, as shown above. The separate Community Board classifieds product is $5/week and
+          pricing is per market, as shown above. Starred Community Board spots are $39.99/month per city, limited to 5 per
+          city, and appear at the top of the Community Board block in every issue while the subscription is active.
+          The separate Community Board classifieds product is $5/week and
           does not include these newsletter placements.
         </p>
 

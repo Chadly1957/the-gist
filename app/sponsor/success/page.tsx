@@ -17,6 +17,9 @@ interface Status {
 function SuccessContent() {
   const searchParams = useSearchParams();
   const sessionId = searchParams.get("session_id");
+  // Starred Community Board checkout lands here with ?starred=1 (no
+  // session_id): show the starred confirmation instead of the week copy.
+  const isStarred = searchParams.get("starred") === "1";
   const [status, setStatus] = useState<Status | null>(null);
 
   useEffect(() => {
@@ -50,8 +53,12 @@ function SuccessContent() {
             <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
           </svg>
         </div>
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">You&apos;re booked!</h1>
-        {status?.paid ? (
+        <h1 className="text-2xl font-bold text-gray-900 mb-2">{isStarred ? "You're starred!" : "You're booked!"}</h1>
+        {isStarred ? (
+          <p className="text-gray-600 text-sm mb-6">
+            Your business is now pinned at the top of the Community Partners block in every daily issue.
+          </p>
+        ) : status?.paid ? (
           <p className="text-gray-600 text-sm mb-6">
             {status.businessName} is confirmed as a <span className="font-semibold">{status.tierLabel}</span> for the week of{" "}
             <span className="font-semibold">{status.weekLabel}</span>.
@@ -63,10 +70,20 @@ function SuccessContent() {
         )}
         <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mb-6 text-left text-sm text-gray-600 space-y-2">
           <p><span className="font-semibold text-gray-900">What happens next:</span></p>
-          <p>1. A confirmation email is on its way to you.</p>
-          <p>2. Chad writes your ad copy (or yours goes live as-is).</p>
-          <p>3. Your ad runs in every issue that week, Monday to Sunday.</p>
-          <p>4. You&apos;ll get a results report the following Monday.</p>
+          {isStarred ? (
+            <>
+              <p>1. Your listing shows at the top of the Community Partners block from the next issue.</p>
+              <p>2. It stays there every day while your $39.99/month subscription is active.</p>
+              <p>3. To cancel, reply to any Gist email — your spot runs to the end of its paid month.</p>
+            </>
+          ) : (
+            <>
+              <p>1. A confirmation email is on its way to you.</p>
+              <p>2. Chad writes your ad copy (or yours goes live as-is).</p>
+              <p>3. Your ad runs in every issue that week, Monday to Sunday.</p>
+              <p>4. You&apos;ll get a results report the following Monday.</p>
+            </>
+          )}
         </div>
         <Link href="/sponsor" className="block w-full bg-green-700 hover:bg-green-800 text-white text-sm font-semibold py-3 rounded-xl transition-colors">
           Back to Sponsorships

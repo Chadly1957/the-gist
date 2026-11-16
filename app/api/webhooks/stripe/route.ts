@@ -357,6 +357,134 @@ async function fulfillBoardPost(workspaceId: string, session: Stripe.Checkout.Se
   }
 }
 
+// Starred Community Board: the checkout route creates the subscription
+// row as pending_payment; fulfillment flips it to active on
+// checkout.session.completed, so the spot shows from the next issue.
+// Idempotent: re-delivered events no-op. The paid-through date is read
+// off the subscription here (not only on the first invoice.paid) because
+// the two events can arrive in either order.
+async function fulfillStarredBoard(stripe: Stripe, workspaceId: string, session: Stripe.Checkout.Session) {
+  const existing =
+    (await basePrisma.starredBoardSubscription.findFirst({
+      where: { stripeSessionId: session.id },
+      select: { id: true, status: true },
+    })) ??
+    (session.metadata?.spotlightId
+      ? await basePrisma.starredBoardSubscription.findFirst({
+          where: { workspaceId, spotlightId: session.metadata.spotlightId, status: "pending_payment" },
+          select: { id: true, status: true },
+        })
+      : null);
+  if (!existing) {
+    if (session.payment_status === "paid") {
+      console.error(`Starred payment captured but no subscription row for session ${session.id}`);
+    }
+    return;
+  }
+  if (existing.status !== "pending_payment") return;
+  const subscriptionId = typeof session.subscription === "string" ? session.subscription : null;
+  const customerId = typeof session.customer === "string" ? session.customer : null;
+  let periodEnd: Date | null = null;
+  if (subscriptionId) {
+    try {
+      const stripeSub = await stripe.subscriptions.retrieve(subscriptionId);
+      periodEnd = subscriptionPeriodEnd(stripeSub);
+    } catch (err) {
+      console.error(`Starred fulfillment could not load subscription ${subscriptionId}; paid-through date unset.`, err);
+    }
+  }
+  await basePrisma.starredBoardSubscription.update({
+    where: { id: existing.id },
+    data: {
+      status: "active",
+      startedAt: new Date(),
+      stripeSubscriptionId: subscriptionId ?? undefined,
+      stripeCustomerId: customerId ?? undefined,
+      stripeSessionId: session.id,
+      ...(periodEnd ? { currentPeriodEnd: periodEnd } : {}),
+    },
+  });
+}
+
+// Starred Community Board lifecycle: invoice.paid activates (and syncs
+// the paid-through date), invoice.payment_failed flags past_due, a
+// subscription deleted at period end marks cancelled, updated syncs
+// status + cancelAtPeriodEnd. Returns true when the event belonged to a
+// starred subscription (handled), false to fall through.
+async function handleStarredBoardEvent(event: Stripe.Event, stripe: Stripe): Promise<boolean> {
+  const obj = event.data.object as unknown as Record<string, unknown>;
+  let subscriptionId: string | null = null;
+  if (event.type.startsWith("customer.subscription")) {
+    subscriptionId = typeof obj.id === "string" ? obj.id : null;
+  } else {
+    // invoice.* events: the subscription id has lived in different places
+    // across Stripe API versions; check both shapes (same as the book handler).
+    if (typeof obj.subscription === "string") subscriptionId = obj.subscription;
+    const parent = obj.parent as
+      | { subscription_details?: { subscription?: string } }
+      | undefined;
+    if (!subscriptionId && typeof parent?.subscription_details?.subscription === "string") {
+      subscriptionId = parent.subscription_details.subscription;
+    }
+  }
+  if (!subscriptionId) return false;
+
+  const sub = await basePrisma.starredBoardSubscription.findUnique({
+    where: { stripeSubscriptionId: subscriptionId },
+    include: { spotlight: { select: { businessName: true } } },
+  });
+  if (!sub) return false;
+
+  if (event.type === "invoice.paid") {
+    // A renewal (or the first payment) landed: re-sync the paid-through
+    // date from Stripe so a cancelled-at-period-end spot stops on time.
+    let periodEnd: Date | null = null;
+    try {
+      const stripeSub = await stripe.subscriptions.retrieve(subscriptionId);
+      periodEnd = subscriptionPeriodEnd(stripeSub);
+    } catch (err) {
+      console.error(`Starred renewal paid for subscription ${subscriptionId} but its state could not be loaded; paid-through date unchanged.`, err);
+    }
+    await basePrisma.starredBoardSubscription.update({
+      where: { id: sub.id },
+      data: { status: "active", ...(periodEnd ? { currentPeriodEnd: periodEnd } : {}) },
+    });
+  } else if (event.type === "invoice.payment_failed") {
+    await basePrisma.starredBoardSubscription.update({
+      where: { id: sub.id },
+      data: { status: "past_due" },
+    });
+    console.error(
+      `Starred Community Board payment failed: ${sub.spotlight.businessName}, subscription ${subscriptionId}`
+    );
+  } else if (event.type === "customer.subscription.deleted") {
+    await basePrisma.starredBoardSubscription.update({
+      where: { id: sub.id },
+      data: { status: "cancelled", cancelledAt: new Date(), cancelAtPeriodEnd: false },
+    });
+  } else if (event.type === "customer.subscription.updated") {
+    const stripeSub = event.data.object as Stripe.Subscription;
+    const status =
+      stripeSub.status === "active" || stripeSub.status === "trialing"
+        ? "active"
+        : stripeSub.status === "past_due"
+          ? "past_due"
+          : stripeSub.status === "canceled"
+            ? "cancelled"
+            : sub.status;
+    const periodEnd = subscriptionPeriodEnd(stripeSub);
+    await basePrisma.starredBoardSubscription.update({
+      where: { id: sub.id },
+      data: {
+        status,
+        ...(periodEnd ? { currentPeriodEnd: periodEnd } : {}),
+        cancelAtPeriodEnd: stripeSub.cancel_at_period_end,
+      },
+    });
+  }
+  return true;
+}
+
 // Product orders: the checkout route creates the ProductOrder row as
 // pending_payment; fulfillment just flips it to paid. Idempotent: re-delivered
 // events no-op. If the pending row is missing (edge case), create it from
@@ -592,6 +720,8 @@ export async function POST(req: NextRequest) {
   ) {
     const handled = await handlePartnershipEvent(event);
     if (handled) return NextResponse.json({ received: true, partnership: true });
+    const starredHandled = await handleStarredBoardEvent(event, stripe);
+    if (starredHandled) return NextResponse.json({ received: true, starredBoard: true });
     const bookHandled = await handleCouponBookSubscriptionEvent(event, stripe);
     if (bookHandled) return NextResponse.json({ received: true, couponBook: true });
     // Not a partnership or book event: fall through to normal handling.
@@ -629,6 +759,8 @@ export async function POST(req: NextRequest) {
       await fulfillProductOrder(workspaceId, session);
     } else if (session.metadata?.kind === "board_post") {
       await fulfillBoardPost(workspaceId, session);
+    } else if (session.metadata?.kind === "starred_board") {
+      await fulfillStarredBoard(stripe, workspaceId, session);
     } else if (session.metadata?.kind === "deals_mini") {
       await fulfillMiniPurchase(workspaceId, session);
     } else if (session.metadata?.kind === "coupon_book_upgrade") {
@@ -656,6 +788,9 @@ export async function POST(req: NextRequest) {
         : { workspaceId, stripeSessionId: sessionId, status: "pending_payment" },
     });
     await basePrisma.adBooking.deleteMany({
+      where: { workspaceId, stripeSessionId: sessionId, status: "pending_payment" },
+    });
+    await basePrisma.starredBoardSubscription.deleteMany({
       where: { workspaceId, stripeSessionId: sessionId, status: "pending_payment" },
     });
     await basePrisma.tip.deleteMany({

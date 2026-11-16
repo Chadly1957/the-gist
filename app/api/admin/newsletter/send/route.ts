@@ -8,6 +8,7 @@ import { renderTemplate, Block, SpotlightItem, PresentingSponsorItem, Presenting
 import { resolveProductSpotlightItems } from "@/lib/products";
 import { resolveGuideSpotlightItems } from "@/lib/minis";
 import { getActiveBoardPosts } from "@/lib/board";
+import { STARRED_MAX_SPOTS, STARRED_SHOWING_STATUSES } from "@/lib/starred-board";
 import { fetchWeatherSnapshot, WeatherSnapshot } from "@/lib/weather";
 import { getEmailClient, htmlToText } from "@/lib/email";
 import { signTrackingUrl } from "@/lib/tracking";
@@ -91,9 +92,29 @@ export async function POST(req: NextRequest) {
   dateEnd.setDate(dateEnd.getDate() + 30);
   const dateEndStr = dateEnd.toISOString().split("T")[0];
 
+  // Starred Community Board placements ($39.99/mo, max 5): pinned at the
+  // top of the Community Partners block in every issue, in first-come
+  // (startedAt) order. Fetched first so the rotating query can exclude
+  // their listing ids — a starred business must never appear twice in
+  // the same issue. The scoped prisma client limits this to the request
+  // workspace, like the rotating query below.
+  const rawStarred = await prisma.starredBoardSubscription.findMany({
+    where: { status: { in: [...STARRED_SHOWING_STATUSES] } },
+    orderBy: { startedAt: "asc" },
+    take: STARRED_MAX_SPOTS,
+    include: {
+      spotlight: {
+        include: {
+          sponsor: { select: { businessName: true, logoUrl: true, description: true, website: true } },
+        },
+      },
+    },
+  });
+  const starredSpotlightIds = rawStarred.map((r) => r.spotlightId);
+
   const [rawSpotlights, dateBookings] = await Promise.all([
     prisma.spotlightListing.findMany({
-      where: { status: { in: ["approved", "active"] } },
+      where: { status: { in: ["approved", "active"] }, id: { notIn: starredSpotlightIds } },
       orderBy: [{ lastShownAt: { sort: "asc", nulls: "first" } }, { shownCount: "asc" }],
       take: spotlightCount,
       // Rotation picks the placement row; the business copy comes from
@@ -116,13 +137,26 @@ export async function POST(req: NextRequest) {
   });
   const events: EventItem[] = rawEvents;
 
-  const spotlights: SpotlightItem[] = rawSpotlights.map((s) => ({
-    businessName: s.sponsor.businessName,
-    logoUrl: s.sponsor.logoUrl ?? s.logoUrl,
-    description: s.sponsor.description ?? s.description,
-    ctaLabel: s.ctaLabel,
-    ctaUrl: s.sponsor.website ?? s.ctaUrl,
-  }));
+  // Starred cards first, then the rotating five; same mapping for both
+  // (profile is the single source of truth, listing columns are the
+  // fallback). With 0 starred sold this is exactly the old array.
+  const spotlights: SpotlightItem[] = [
+    ...rawStarred.map((r) => ({
+      businessName: r.spotlight.sponsor.businessName,
+      logoUrl: r.spotlight.sponsor.logoUrl ?? r.spotlight.logoUrl,
+      description: r.spotlight.sponsor.description ?? r.spotlight.description,
+      ctaLabel: r.spotlight.ctaLabel,
+      ctaUrl: r.spotlight.sponsor.website ?? r.spotlight.ctaUrl,
+      starred: true,
+    })),
+    ...rawSpotlights.map((s) => ({
+      businessName: s.sponsor.businessName,
+      logoUrl: s.sponsor.logoUrl ?? s.logoUrl,
+      description: s.sponsor.description ?? s.description,
+      ctaLabel: s.ctaLabel,
+      ctaUrl: s.sponsor.website ?? s.ctaUrl,
+    })),
+  ];
 
   const presentingRaw = dateBookings.find((b) => b.type === "presenting");
   const presentingSponsor: PresentingSponsorItem | null = presentingRaw
@@ -426,7 +460,9 @@ export async function POST(req: NextRequest) {
     ]);
   }
 
-  // Record spotlight appearances and update rotation counters
+  // Record spotlight appearances and update rotation counters.
+  // Starred shows are recorded exactly like rotating shows so the
+  // portal's impression counts stay honest.
   await Promise.all([
     ...rawSpotlights.map((s) =>
       prisma.spotlightListing.update({
@@ -437,6 +473,17 @@ export async function POST(req: NextRequest) {
     ...rawSpotlights.map((s) =>
       prisma.newsletterSendSpotlight.create({
         data: { newsletterSendId: newsletterSend.id, spotlightId: s.id },
+      })
+    ),
+    ...rawStarred.map((r) =>
+      prisma.spotlightListing.update({
+        where: { id: r.spotlightId },
+        data: { lastShownAt: new Date(), shownCount: { increment: 1 } },
+      })
+    ),
+    ...rawStarred.map((r) =>
+      prisma.newsletterSendSpotlight.create({
+        data: { newsletterSendId: newsletterSend.id, spotlightId: r.spotlightId },
       })
     ),
   ]);

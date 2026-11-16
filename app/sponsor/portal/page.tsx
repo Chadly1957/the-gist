@@ -25,6 +25,22 @@ interface Spotlight {
   createdAt: string;
 }
 
+interface StarredSubscription {
+  id: string;
+  spotlightId: string;
+  businessName: string;
+  status: string;
+  startedAt: string | null;
+  currentPeriodEnd: string | null;
+  cancelAtPeriodEnd: boolean;
+}
+
+interface StarredAvailability {
+  spotsTotal: number;
+  spotsTaken: number;
+  spotsLeft: number;
+}
+
 interface Booking {
   id: string;
   type: string;
@@ -211,6 +227,12 @@ function PortalContent() {
   const [wShowPreview, setWShowPreview] = useState(false);
   const wFileRef = useRef<HTMLInputElement>(null);
 
+  // Starred Community Board ($39.99/mo, max 5 per city)
+  const [starredSubs, setStarredSubs] = useState<StarredSubscription[]>([]);
+  const [starredAvail, setStarredAvail] = useState<StarredAvailability | null>(null);
+  const [starredBusy, setStarredBusy] = useState(false);
+  const [starredError, setStarredError] = useState("");
+
   // Billing
   const [payments, setPayments] = useState<Payment[] | null>(null);
   const [billingLoading, setBillingLoading] = useState(false);
@@ -326,9 +348,45 @@ function PortalContent() {
           setProfile(data.profile);
           setAnalytics(data.analytics ?? null);
           setWeekBookings(data.weekBookings ?? []);
+          setStarredSubs(data.starredSubscriptions ?? []);
+          setStarredAvail(data.starredAvailability ?? null);
         }
       })
       .catch(() => {});
+  }
+
+  // Live Starred subscription for a listing, if it has one.
+  function starredFor(spotlightId: string): StarredSubscription | undefined {
+    return starredSubs.find(
+      (s) => s.spotlightId === spotlightId && ["pending_payment", "active", "past_due"].includes(s.status)
+    );
+  }
+
+  function formatStarredDate(iso: string | null): string {
+    if (!iso) return "";
+    return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+  }
+
+  // Star a listing: same pattern as WeekBookingFlow — POST to the
+  // checkout route, then send the buyer to the Stripe Checkout URL.
+  async function starListing(spotlightId: string) {
+    if (!token) return;
+    setStarredBusy(true);
+    setStarredError("");
+    try {
+      const res = await workspaceFetch("/api/sponsor/starred/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token, spotlightId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Checkout failed.");
+      window.location.href = data.url;
+    } catch (err) {
+      setStarredError(err instanceof Error ? err.message : "Checkout failed.");
+    } finally {
+      setStarredBusy(false);
+    }
   }
 
   useEffect(() => {
@@ -341,6 +399,8 @@ function PortalContent() {
           setProfile(data.profile);
           setAnalytics(data.analytics ?? null);
           setWeekBookings(data.weekBookings ?? []);
+          setStarredSubs(data.starredSubscriptions ?? []);
+          setStarredAvail(data.starredAvailability ?? null);
           setSForm((f) => ({ ...f, businessName: data.profile.businessName }));
         }
       })
@@ -898,6 +958,19 @@ function PortalContent() {
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold text-gray-800">{s.businessName}</p>
                         <p className="text-xs text-gray-400" title={s.description}>{truncateWords(s.description, 90)}</p>
+                        {(() => {
+                          const st = starredFor(s.id);
+                          if (!st) return null;
+                          return (
+                            <p className="text-xs font-medium text-amber-700 mt-0.5">
+                              {st.status === "past_due"
+                                ? "Starred · payment past due — update payment via your Stripe invoice email"
+                                : st.cancelAtPeriodEnd
+                                  ? `Starred · cancelling, runs to ${formatStarredDate(st.currentPeriodEnd)}`
+                                  : `Starred · Active — renews ${formatStarredDate(st.currentPeriodEnd)}`}
+                            </p>
+                          );
+                        })()}
                       </div>
                       <div className="flex flex-col items-end gap-1.5 shrink-0">
                         <StatusBadge status={s.status} />
@@ -982,6 +1055,46 @@ function PortalContent() {
           <div>
             <h1 className="text-2xl font-bold text-gray-900 mb-1">{editingSpotlight ? "Edit Listing" : "Community Partners"}</h1>
             <p className="text-sm text-gray-500 mb-6">{editingSpotlight ? "Update your listing details below." : "Free rotating placement in every newsletter. Your logo also feeds the homepage marquee — upload a good one."}</p>
+
+            {/* Starred Community Board: pin this listing at the top of the
+                Community Partners block in every issue ($39.99/mo). */}
+            {(() => {
+              const target = editingSpotlight ?? profile.spotlights.find((x) => ["pending", "approved", "active"].includes(x.status));
+              if (!target) return null;
+              const st = starredFor(target.id);
+              const canStar = target.status === "approved" || target.status === "active";
+              const soldOut = starredAvail !== null && starredAvail.spotsLeft === 0;
+              return (
+                <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-4">
+                  <p className="text-sm font-semibold text-amber-900">Starred Community Board — $39.99/month</p>
+                  <p className="text-xs text-amber-800 mt-0.5">Pinned at the top of the Community Partners block in every daily issue, instead of rotating once or twice a week.</p>
+                  {st ? (
+                    <p className="text-xs font-medium text-amber-900 mt-2">
+                      {st.status === "past_due"
+                        ? "Starred — payment past due. Update payment via your Stripe invoice email; your spot keeps showing while Stripe retries."
+                        : st.cancelAtPeriodEnd
+                          ? `Starred — active since ${formatStarredDate(st.startedAt)}, cancelling, runs to ${formatStarredDate(st.currentPeriodEnd)}.`
+                          : `Starred — active since ${formatStarredDate(st.startedAt)}${st.currentPeriodEnd ? `, renews ${formatStarredDate(st.currentPeriodEnd)}` : ""}.`}
+                    </p>
+                  ) : !canStar ? (
+                    <p className="text-xs text-amber-800 mt-2">Once your listing is approved you can star it here.</p>
+                  ) : soldOut ? (
+                    <p className="text-xs font-medium text-amber-900 mt-2">Sold out — all 5 starred spots are taken.</p>
+                  ) : (
+                    <>
+                      <button type="button" onClick={() => starListing(target.id)} disabled={starredBusy} className="mt-2 px-3 py-2 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white text-xs font-semibold rounded-lg">
+                        {starredBusy ? "Starting checkout…" : "Star this listing — $39.99/mo"}
+                      </button>
+                      {starredAvail && (
+                        <p className="text-xs text-amber-800 mt-1.5">{starredAvail.spotsLeft} of {starredAvail.spotsTotal} starred spots left in this city.</p>
+                      )}
+                    </>
+                  )}
+                  {st && <p className="text-xs text-amber-700 mt-1.5">To cancel, reply to any Gist email or contact Chad. Your spot keeps showing through the end of your paid month.</p>}
+                  {starredError && <p className="text-xs text-red-600 mt-2">{starredError}</p>}
+                </div>
+              );
+            })()}
 
             {sSuccess ? (
               <div className="bg-green-50 border border-green-100 rounded-xl p-6 text-center">
@@ -1211,7 +1324,7 @@ function PortalContent() {
         {view === "billing" && (
           <div>
             <h1 className="text-2xl font-bold text-gray-900 mb-1">Payment History</h1>
-            <p className="text-sm text-gray-500 mb-6">Every payment for your sponsorship weeks, with receipts.</p>
+            <p className="text-sm text-gray-500 mb-6">Every payment for your sponsorships, with receipts.</p>
 
             {billingLoading && <p className="text-sm text-gray-500 py-8 text-center">Loading payments…</p>}
             {billingError && <p className="text-sm text-red-600 py-4">{billingError}</p>}
