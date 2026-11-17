@@ -34,7 +34,7 @@ function personalizeBody(
   return body
     .replaceAll("{{BUSINESS_NAME}}", profile.businessName)
     .replaceAll("{{CONTACT_NAME}}", profile.contactName)
-    .replaceAll("{{PORTAL_URL}}", `${appUrl}/sponsor/portal?token=${profile.magicToken}`);
+    .replaceAll("{{PORTAL_URL}}", `${appUrl}/sponsor/portal?token=${profile.magicToken}&view=spotlight`);
 }
 
 export async function POST(req: NextRequest) {

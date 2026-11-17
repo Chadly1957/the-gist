@@ -327,6 +327,7 @@ function AdminSponsorsContent() {
   const [workspaceName, setWorkspaceName] = useState("");
   const [workspaceArea, setWorkspaceArea] = useState("");
   const [copiedJoinId, setCopiedJoinId] = useState<string | null>(null);
+  const [copiedUpgradeId, setCopiedUpgradeId] = useState<string | null>(null);
   const [kitTarget, setKitTarget] = useState<Profile | null>(null);
   const [kitTo, setKitTo] = useState("");
   const [kitSubject, setKitSubject] = useState("");
@@ -343,6 +344,20 @@ function AdminSponsorsContent() {
       await navigator.clipboard.writeText(p.joinUrl);
       setCopiedJoinId(p.id);
       setTimeout(() => setCopiedJoinId((cur) => (cur === p.id ? null : cur)), 2000);
+    } catch {
+      // Clipboard unavailable (permissions); the URL is visible to copy by hand.
+    }
+  }
+
+  async function copyUpgradeUrl(p: Profile) {
+    // Land the sponsor on the upgrade boxes, not the overview. The admin
+    // API portalUrl already carries &view=spotlight; only append when it
+    // is missing so the param never doubles up.
+    const url = p.portalUrl.includes("view=spotlight") ? p.portalUrl : `${p.portalUrl}&view=spotlight`;
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopiedUpgradeId(p.id);
+      setTimeout(() => setCopiedUpgradeId((cur) => (cur === p.id ? null : cur)), 2000);
     } catch {
       // Clipboard unavailable (permissions); the URL is visible to copy by hand.
     }
@@ -1332,7 +1347,7 @@ function AdminSponsorsContent() {
                               Delete
                             </button>
                           </div>
-                          <WorkspaceAnchor href={`/sponsor/portal?token=${s.sponsor.magicToken}`} target="_blank" rel="noopener noreferrer"
+                          <WorkspaceAnchor href={`/sponsor/portal?token=${s.sponsor.magicToken}&view=spotlight`} target="_blank" rel="noopener noreferrer"
                             className="text-xs text-green-700 underline">
                             Open sponsor portal ↗
                           </WorkspaceAnchor>
@@ -1629,6 +1644,10 @@ function AdminSponsorsContent() {
                       className="text-xs text-green-700 border border-green-200 rounded-lg px-3 py-1.5 hover:bg-green-50 whitespace-nowrap">
                       Open Portal ↗
                     </WorkspaceAnchor>
+                    <button onClick={() => copyUpgradeUrl(p)}
+                      className="text-xs text-green-700 border border-green-200 rounded-lg px-3 py-1.5 hover:bg-green-50 whitespace-nowrap">
+                      {copiedUpgradeId === p.id ? "Copied ✓" : "Copy upgrade link"}
+                    </button>
                     <button onClick={() => deleteProfile(p)}
                       className="text-xs text-red-500 hover:text-red-700 px-3 py-1.5 whitespace-nowrap font-semibold">
                       Delete

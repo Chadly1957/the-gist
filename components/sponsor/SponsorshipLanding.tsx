@@ -781,9 +781,14 @@ export default function SponsorshipLanding() {
                 Go premium →
               </a>
             ) : (
-              <button onClick={() => scrollToId("free-signup")} className="block w-full text-center py-3.5 rounded-xl text-white font-semibold text-sm hover:opacity-90" style={{ background: "#b45309" }}>
-                Go premium →
-              </button>
+              <>
+                <button onClick={() => scrollToId("free-signup")} className="block w-full text-center py-3.5 rounded-xl text-white font-semibold text-sm hover:opacity-90" style={{ background: "#b45309" }}>
+                  Start with your email →
+                </button>
+                <p className="text-xs text-center mt-2" style={{ color: MUTED }}>
+                  Already have a free listing? We&apos;ll email your upgrade link.
+                </p>
+              </>
             )}
           </div>
 
@@ -817,9 +822,14 @@ export default function SponsorshipLanding() {
                 Star my business →
               </a>
             ) : (
-              <button onClick={() => scrollToId("free-signup")} className="block w-full text-center py-3.5 rounded-xl text-white font-semibold text-sm hover:opacity-90" style={{ background: "#b45309" }}>
-                Star my business →
-              </button>
+              <>
+                <button onClick={() => scrollToId("free-signup")} className="block w-full text-center py-3.5 rounded-xl text-white font-semibold text-sm hover:opacity-90" style={{ background: "#b45309" }}>
+                  Start with your email →
+                </button>
+                <p className="text-xs text-center mt-2" style={{ color: MUTED }}>
+                  Already have a free listing? We&apos;ll email your upgrade link.
+                </p>
+              </>
             )}
           </div>
 

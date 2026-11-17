@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
     profiles[0].contactName,
     profiles.map((p) => ({
       businessName: p.businessName,
-      portalUrl: `${appUrl}/sponsor/portal?token=${p.magicToken}`,
+      portalUrl: `${appUrl}/sponsor/portal?token=${p.magicToken}&view=spotlight`,
     }))
   );
 
