@@ -35,6 +35,7 @@ model Workspace {
   sponsorProfileRows          SponsorProfile[]
   spotlightListingRows        SpotlightListing[]
   starredBoardSubscriptionRows StarredBoardSubscription[]
+  premiumDirectorySubscriptionRows PremiumDirectorySubscription[]
   adBookingRows               AdBooking[]
   sponsorWeekRows             SponsorWeek[]
   sponsorHoldRows             SponsorHold[]
@@ -274,6 +275,7 @@ model SponsorProfile {
   createdAt     DateTime             @default(now())
   spotlights    SpotlightListing[]
   starredBoardSubscriptions StarredBoardSubscription[]
+  premiumDirectorySubscriptions PremiumDirectorySubscription[]
   bookings      AdBooking[]
   weekBookings  SponsorWeekBooking[]
   events        Event[]
@@ -432,6 +434,7 @@ model SpotlightListing {
   approvedAt         DateTime?
   sendAppearances    NewsletterSendSpotlight[]
   starredSubscriptions StarredBoardSubscription[]
+  premiumDirectorySubscriptions PremiumDirectorySubscription[]
 
   @@unique([id, workspaceId])
   @@index([workspaceId])
@@ -452,6 +455,38 @@ model StarredBoardSubscription {
   sponsor              SponsorProfile   @relation(fields: [sponsorId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
   status               String           @default("pending_payment") // pending_payment | active | past_due | cancelled
   monthlyAmountCents   Int              @default(3999)
+  stripeCustomerId     String?
+  stripeSubscriptionId String?          @unique
+  stripeSessionId      String?          @unique
+  startedAt            DateTime?
+  currentPeriodEnd     DateTime?
+  cancelAtPeriodEnd    Boolean          @default(false) // admin-cancelled; spot keeps showing until currentPeriodEnd, then the subscription is deleted and status flips to cancelled
+  cancelledAt          DateTime?        // when the cancel was requested (admin), not when the spot stops showing
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+
+  @@unique([id, workspaceId])
+  @@index([workspaceId, status])
+  @@index([workspaceId, spotlightId])
+  @@index([spotlightId])
+  @@index([stripeCustomerId])
+}
+
+// A business's paid Premium Directory placement ($19.99/mo, unlimited
+// spots per workspace): the listing is pinned at the top of the Partners
+// directory page (/partners) while the subscription is live. Premium
+// state is derived from this row, so it cannot drift out of sync with
+// the listing; no `premium` boolean on SpotlightListing.
+model PremiumDirectorySubscription {
+  workspaceId          String           @default("decatur")
+  workspace            Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  id                   String           @id @default(cuid())
+  spotlightId          String
+  spotlight            SpotlightListing @relation(fields: [spotlightId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
+  sponsorId            String
+  sponsor              SponsorProfile   @relation(fields: [sponsorId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
+  status               String           @default("pending_payment") // pending_payment | active | past_due | cancelled
+  monthlyAmountCents   Int              @default(1999)
   stripeCustomerId     String?
   stripeSubscriptionId String?          @unique
   stripeSessionId      String?          @unique

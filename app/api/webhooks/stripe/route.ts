@@ -241,6 +241,135 @@ async function handlePartnershipEvent(event: Stripe.Event): Promise<boolean> {
   return true;
 }
 
+
+// Premium Directory Placement: the checkout route creates the subscription
+// row as pending_payment; fulfillment flips it to active on
+// checkout.session.completed, so the spot shows at the top of /partners
+// from that moment. Idempotent: re-delivered events no-op. The
+// paid-through date is read off the subscription here (not only on the
+// first invoice.paid) because the two events can arrive in either order.
+async function fulfillPremiumDirectory(stripe: Stripe, workspaceId: string, session: Stripe.Checkout.Session) {
+  const existing =
+    (await basePrisma.premiumDirectorySubscription.findFirst({
+      where: { stripeSessionId: session.id },
+      select: { id: true, status: true },
+    })) ??
+    (session.metadata?.spotlightId
+      ? await basePrisma.premiumDirectorySubscription.findFirst({
+          where: { workspaceId, spotlightId: session.metadata.spotlightId, status: "pending_payment" },
+          select: { id: true, status: true },
+        })
+      : null);
+  if (!existing) {
+    if (session.payment_status === "paid") {
+      console.error(`Premium payment captured but no subscription row for session ${session.id}`);
+    }
+    return;
+  }
+  if (existing.status !== "pending_payment") return;
+  const subscriptionId = typeof session.subscription === "string" ? session.subscription : null;
+  const customerId = typeof session.customer === "string" ? session.customer : null;
+  let periodEnd: Date | null = null;
+  if (subscriptionId) {
+    try {
+      const stripeSub = await stripe.subscriptions.retrieve(subscriptionId);
+      periodEnd = subscriptionPeriodEnd(stripeSub);
+    } catch (err) {
+      console.error(`Premium fulfillment could not load subscription ${subscriptionId}; paid-through date unset.`, err);
+    }
+  }
+  await basePrisma.premiumDirectorySubscription.update({
+    where: { id: existing.id },
+    data: {
+      status: "active",
+      startedAt: new Date(),
+      stripeSubscriptionId: subscriptionId ?? undefined,
+      stripeCustomerId: customerId ?? undefined,
+      stripeSessionId: session.id,
+      ...(periodEnd ? { currentPeriodEnd: periodEnd } : {}),
+    },
+  });
+}
+
+// Premium Directory Placement lifecycle: invoice.paid activates (and syncs
+// the paid-through date), invoice.payment_failed flags past_due, a
+// subscription deleted at period end marks cancelled, updated syncs
+// status + cancelAtPeriodEnd. Returns true when the event belonged to a
+// premium subscription (handled), false to fall through.
+async function handlePremiumDirectoryEvent(event: Stripe.Event, stripe: Stripe): Promise<boolean> {
+  const obj = event.data.object as unknown as Record<string, unknown>;
+  let subscriptionId: string | null = null;
+  if (event.type.startsWith("customer.subscription")) {
+    subscriptionId = typeof obj.id === "string" ? obj.id : null;
+  } else {
+    // invoice.* events: the subscription id has lived in different places
+    // across Stripe API versions; check both shapes (same as the book handler).
+    if (typeof obj.subscription === "string") subscriptionId = obj.subscription;
+    const parent = obj.parent as
+      | { subscription_details?: { subscription?: string } }
+      | undefined;
+    if (!subscriptionId && typeof parent?.subscription_details?.subscription === "string") {
+      subscriptionId = parent.subscription_details.subscription;
+    }
+  }
+  if (!subscriptionId) return false;
+
+  const sub = await basePrisma.premiumDirectorySubscription.findUnique({
+    where: { stripeSubscriptionId: subscriptionId },
+    include: { spotlight: { select: { businessName: true } } },
+  });
+  if (!sub) return false;
+
+  if (event.type === "invoice.paid") {
+    // A renewal (or the first payment) landed: re-sync the paid-through
+    // date from Stripe so a cancelled-at-period-end spot stops on time.
+    let periodEnd: Date | null = null;
+    try {
+      const stripeSub = await stripe.subscriptions.retrieve(subscriptionId);
+      periodEnd = subscriptionPeriodEnd(stripeSub);
+    } catch (err) {
+      console.error(`Premium renewal paid for subscription ${subscriptionId} but its state could not be loaded; paid-through date unchanged.`, err);
+    }
+    await basePrisma.premiumDirectorySubscription.update({
+      where: { id: sub.id },
+      data: { status: "active", ...(periodEnd ? { currentPeriodEnd: periodEnd } : {}) },
+    });
+  } else if (event.type === "invoice.payment_failed") {
+    await basePrisma.premiumDirectorySubscription.update({
+      where: { id: sub.id },
+      data: { status: "past_due" },
+    });
+    console.error(
+      `Premium Directory payment failed: ${sub.spotlight.businessName}, subscription ${subscriptionId}`
+    );
+  } else if (event.type === "customer.subscription.deleted") {
+    await basePrisma.premiumDirectorySubscription.update({
+      where: { id: sub.id },
+      data: { status: "cancelled", cancelledAt: new Date(), cancelAtPeriodEnd: false },
+    });
+  } else if (event.type === "customer.subscription.updated") {
+    const stripeSub = event.data.object as Stripe.Subscription;
+    const status =
+      stripeSub.status === "active" || stripeSub.status === "trialing"
+        ? "active"
+        : stripeSub.status === "past_due"
+          ? "past_due"
+          : stripeSub.status === "canceled"
+            ? "cancelled"
+            : sub.status;
+    const periodEnd = subscriptionPeriodEnd(stripeSub);
+    await basePrisma.premiumDirectorySubscription.update({
+      where: { id: sub.id },
+      data: {
+        status,
+        ...(periodEnd ? { currentPeriodEnd: periodEnd } : {}),
+        cancelAtPeriodEnd: stripeSub.cancel_at_period_end,
+      },
+    });
+  }
+  return true;
+}
+
 // Deals book subscription lifecycle (annual billing, 2026-10-29). Runs after
 // the partnership handler: finds the book purchase by its Stripe
 // subscription id and keeps the row's paid-through state in sync. Returns
@@ -722,6 +851,8 @@ export async function POST(req: NextRequest) {
     if (handled) return NextResponse.json({ received: true, partnership: true });
     const starredHandled = await handleStarredBoardEvent(event, stripe);
     if (starredHandled) return NextResponse.json({ received: true, starredBoard: true });
+    const premiumHandled = await handlePremiumDirectoryEvent(event, stripe);
+    if (premiumHandled) return NextResponse.json({ received: true, premiumDirectory: true });
     const bookHandled = await handleCouponBookSubscriptionEvent(event, stripe);
     if (bookHandled) return NextResponse.json({ received: true, couponBook: true });
     // Not a partnership or book event: fall through to normal handling.
@@ -761,6 +892,8 @@ export async function POST(req: NextRequest) {
       await fulfillBoardPost(workspaceId, session);
     } else if (session.metadata?.kind === "starred_board") {
       await fulfillStarredBoard(stripe, workspaceId, session);
+    } else if (session.metadata?.kind === "premium_directory") {
+      await fulfillPremiumDirectory(stripe, workspaceId, session);
     } else if (session.metadata?.kind === "deals_mini") {
       await fulfillMiniPurchase(workspaceId, session);
     } else if (session.metadata?.kind === "coupon_book_upgrade") {
@@ -791,6 +924,9 @@ export async function POST(req: NextRequest) {
       where: { workspaceId, stripeSessionId: sessionId, status: "pending_payment" },
     });
     await basePrisma.starredBoardSubscription.deleteMany({
+      where: { workspaceId, stripeSessionId: sessionId, status: "pending_payment" },
+    });
+    await basePrisma.premiumDirectorySubscription.deleteMany({
       where: { workspaceId, stripeSessionId: sessionId, status: "pending_payment" },
     });
     await basePrisma.tip.deleteMany({

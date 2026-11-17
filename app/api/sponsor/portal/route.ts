@@ -173,6 +173,23 @@ export async function GET(req: NextRequest) {
     spotsLeft: Math.max(0, STARRED_MAX_SPOTS - starredTaken),
   };
 
+  // -- Premium Directory subscriptions --------------------------------------
+  // The profile's subscriptions (live ones drive the portal buy/manage UI).
+  const premiumRows = await prisma.premiumDirectorySubscription.findMany({
+    where: { sponsorId: profile.id },
+    include: { spotlight: { select: { businessName: true } } },
+    orderBy: { createdAt: "desc" },
+  });
+  const premiumSubscriptions = premiumRows.map((s) => ({
+    id: s.id,
+    spotlightId: s.spotlightId,
+    businessName: s.spotlight.businessName,
+    status: s.status,
+    startedAt: s.startedAt ? s.startedAt.toISOString() : null,
+    currentPeriodEnd: s.currentPeriodEnd ? s.currentPeriodEnd.toISOString() : null,
+    cancelAtPeriodEnd: s.cancelAtPeriodEnd,
+  }));
+
   return NextResponse.json({
     profile,
     analytics: {
@@ -187,6 +204,7 @@ export async function GET(req: NextRequest) {
     weekBookings,
     starredSubscriptions,
     starredAvailability,
+    premiumSubscriptions,
   });
 }
 

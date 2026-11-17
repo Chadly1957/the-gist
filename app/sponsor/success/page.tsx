@@ -20,6 +20,9 @@ function SuccessContent() {
   // Starred Community Board checkout lands here with ?starred=1 (no
   // session_id): show the starred confirmation instead of the week copy.
   const isStarred = searchParams.get("starred") === "1";
+  // Premium Directory checkout lands here with ?premium=1 (no
+  // session_id): show the premium confirmation instead of the week copy.
+  const isPremium = searchParams.get("premium") === "1";
   const [status, setStatus] = useState<Status | null>(null);
 
   useEffect(() => {
@@ -53,10 +56,14 @@ function SuccessContent() {
             <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
           </svg>
         </div>
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">{isStarred ? "You're starred!" : "You're booked!"}</h1>
+        <h1 className="text-2xl font-bold text-gray-900 mb-2">{isStarred ? "You're starred!" : isPremium ? "You're premium!" : "You're booked!"}</h1>
         {isStarred ? (
           <p className="text-gray-600 text-sm mb-6">
             Your business is now pinned at the top of the Community Partners block in every daily issue.
+          </p>
+        ) : isPremium ? (
+          <p className="text-gray-600 text-sm mb-6">
+            Your business is now pinned at the top of the Partners directory.
           </p>
         ) : status?.paid ? (
           <p className="text-gray-600 text-sm mb-6">
@@ -74,6 +81,12 @@ function SuccessContent() {
             <>
               <p>1. Your listing shows at the top of the Community Partners block from the next issue.</p>
               <p>2. It stays there every day while your $39.99/month subscription is active.</p>
+              <p>3. To cancel, reply to any Gist email — your spot runs to the end of its paid month.</p>
+            </>
+          ) : isPremium ? (
+            <>
+              <p>1. Your listing shows at the top of the Partners directory from now.</p>
+              <p>2. It stays there while your $19.99/month subscription is active.</p>
               <p>3. To cancel, reply to any Gist email — your spot runs to the end of its paid month.</p>
             </>
           ) : (

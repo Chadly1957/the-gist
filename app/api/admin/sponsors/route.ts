@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { getAdminSession } from "@/lib/auth";
 import { sponsorSlug } from "@/lib/sponsor-slug";
 import { STARRED_LIVE_STATUSES, STARRED_MAX_SPOTS } from "@/lib/starred-board";
+import { PREMIUM_LIVE_STATUSES } from "@/lib/premium-directory";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +13,7 @@ export async function GET() {
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   try {
-    const [spotlights, bookings, profiles, kitSends, starredRows] = await Promise.all([
+    const [spotlights, bookings, profiles, kitSends, starredRows, premiumRows] = await Promise.all([
       prisma.spotlightListing.findMany({
         orderBy: { createdAt: "desc" },
         include: { sponsor: { select: { businessName: true, contactName: true, email: true, magicToken: true } } },
@@ -35,6 +36,12 @@ export async function GET() {
       // workspace count for the "Starred n/5" counter.
       prisma.starredBoardSubscription.findMany({
         where: { status: { in: [...STARRED_LIVE_STATUSES] } },
+        select: { id: true, spotlightId: true, status: true, startedAt: true, currentPeriodEnd: true, cancelAtPeriodEnd: true },
+      }),
+      // Premium Directory: live subscriptions per listing, plus the
+      // workspace count for the "Premium n" counter.
+      prisma.premiumDirectorySubscription.findMany({
+        where: { status: { in: [...PREMIUM_LIVE_STATUSES] } },
         select: { id: true, spotlightId: true, status: true, startedAt: true, currentPeriodEnd: true, cancelAtPeriodEnd: true },
       }),
     ]);
@@ -63,14 +70,30 @@ export async function GET() {
       }
     }
 
+    const premiumBySpotlight = new Map<string, {
+      id: string; status: string; startedAt: string | null; currentPeriodEnd: string | null; cancelAtPeriodEnd: boolean;
+    }>();
+    for (const row of premiumRows) {
+      if (!premiumBySpotlight.has(row.spotlightId)) {
+        premiumBySpotlight.set(row.spotlightId, {
+          id: row.id,
+          status: row.status,
+          startedAt: row.startedAt ? row.startedAt.toISOString() : null,
+          currentPeriodEnd: row.currentPeriodEnd ? row.currentPeriodEnd.toISOString() : null,
+          cancelAtPeriodEnd: row.cancelAtPeriodEnd,
+        });
+      }
+    }
+
     const workspace = await getWorkspace();
 
     return NextResponse.json({
       workspaceName: workspace.name,
       workspaceArea: workspace.area,
-      spotlights: spotlights.map((s) => ({ ...s, starred: starredBySpotlight.get(s.id) ?? null })),
+      spotlights: spotlights.map((s) => ({ ...s, starred: starredBySpotlight.get(s.id) ?? null, premium: premiumBySpotlight.get(s.id) ?? null })),
       starredCount: starredRows.length,
       starredMax: STARRED_MAX_SPOTS,
+      premiumCount: premiumRows.length,
       bookings,
       profiles: profiles.map((p) => ({
         ...p,

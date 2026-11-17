@@ -8,10 +8,10 @@ import { PARTNER_CATEGORIES } from "@/lib/partner-categories";
 
 // Sponsorship landing page (October 2026 freemium restructure). Leads with
 // the free Business Directory listing: the signup form sits in the hero.
-// Paid offers are three: the Starred Community Board placement, the
-// 7-Issue Featured Campaign and the Presenting Partnership. Prices and
-// market lines mirror the offer config in lib/sponsor-weeks.ts (campaign)
-// and the partnership brochure.
+// Paid offers are four: the Starred Community Board placement, the
+// Premium Directory Placement, the 7-Issue Featured Campaign and the
+// Presenting Partnership. Prices and market lines mirror the offer
+// config in lib/sponsor-weeks.ts (campaign) and the partnership brochure.
 type Market = "decatur" | "effingham" | "both";
 type Interest = "free" | "campaign" | "partner";
 
@@ -135,6 +135,14 @@ export default function SponsorshipLanding() {
       .then((data) => { if (typeof data.spotsLeft === "number") setStarredAvail(data); })
       .catch(() => {});
   }, []);
+
+  // Premium Directory add-on, shown right after the free signup
+  // (before the success panel) while the listing is fresh. Null once
+  // skipped or after the buyer leaves for Stripe Checkout. Spots are
+  // unlimited, so the add-on always shows: no availability check.
+  const [heroPremiumAddOn, setHeroPremiumAddOn] = useState<null | { token: string; listingId: string }>(null);
+  const [heroPremiumAddOnBusy, setHeroPremiumAddOnBusy] = useState(false);
+  const [heroPremiumAddOnError, setHeroPremiumAddOnError] = useState("");
 
   // Email-first gate in the hero card: returning businesses (anyone with
   // a sponsor profile in this city) get their portal link emailed instead
@@ -269,10 +277,11 @@ export default function SponsorshipLanding() {
         }
       }
       if (data.portalUrl) setHeroPortalUrl(data.portalUrl);
-      // Starred add-on step, before setup finishes: offer the $39.99/mo
+      // Starred add-on step first, before setup finishes: offer the $39.99/mo
       // pinned placement while the listing is fresh. The free signup
       // creates the listing as active, so it can be starred right away.
-      // Skipped silently when all 5 spots are taken or the check fails.
+      // Skipped silently when all 5 spots are taken or the check fails,
+      // falling through to the Premium add-on below.
       try {
         const availRes = await workspaceFetch("/api/starred/availability");
         const avail = await availRes.json();
@@ -281,9 +290,13 @@ export default function SponsorshipLanding() {
           return;
         }
       } catch {
-        /* fall through to the success panel */
+        /* fall through to the Premium add-on */
       }
-      setHeroDone(true);
+      // Premium add-on step: offer the $19.99/mo pinned directory
+      // placement while the listing is fresh. The free signup creates
+      // the listing as active, so it can go premium right away.
+      setHeroPremiumAddOn({ token: data.token, listingId: data.listingId });
+      return;
     } catch (err) {
       setHeroError(err instanceof Error ? err.message : "Could not create your listing.");
     } finally {
@@ -312,7 +325,39 @@ export default function SponsorshipLanding() {
   }
 
   function skipStarredAddOn() {
+    // Starred skipped: offer the Premium add-on next instead of
+    // finishing, so both upsells are seen before setup completes.
+    const addOn = heroAddOn;
     setHeroAddOn(null);
+    if (addOn) {
+      setHeroPremiumAddOn({ token: addOn.token, listingId: addOn.listingId });
+    } else {
+      setHeroDone(true);
+    }
+  }
+
+  async function submitPremiumAddOn() {
+    if (!heroPremiumAddOn) return;
+    setHeroPremiumAddOnBusy(true);
+    setHeroPremiumAddOnError("");
+    try {
+      const res = await workspaceFetch("/api/sponsor/premium/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: heroPremiumAddOn.token, spotlightId: heroPremiumAddOn.listingId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Checkout failed.");
+      window.location.href = data.url;
+    } catch (err) {
+      setHeroPremiumAddOnError(err instanceof Error ? err.message : "Checkout failed.");
+    } finally {
+      setHeroPremiumAddOnBusy(false);
+    }
+  }
+
+  function skipPremiumAddOn() {
+    setHeroPremiumAddOn(null);
     setHeroDone(true);
   }
 
@@ -397,6 +442,23 @@ export default function SponsorshipLanding() {
                 </button>
                 {heroAddOnError && <p className="text-sm text-red-600 mb-3">{heroAddOnError}</p>}
                 <button onClick={skipStarredAddOn} className="text-sm font-semibold hover:underline" style={{ color: PINE_DARK }}>
+                  No thanks, keep my free listing
+                </button>
+              </div>
+            ) : heroPremiumAddOn ? (
+              <div className="text-center py-8">
+                <div className="w-12 h-12 rounded-full mx-auto mb-4 flex items-center justify-center" style={{ background: "#fef3c7", color: "#92400e" }}>
+                  <Check className="w-6 h-6" />
+                </div>
+                <h2 className="text-xl font-extrabold mb-2">Go premium — $19.99/month</h2>
+                <p className="text-sm leading-relaxed mb-5" style={{ color: MUTED }}>
+                  Pinned at the top of the Partners directory so neighbors find you first, instead of listed alphabetically in your category.
+                </p>
+                <button onClick={submitPremiumAddOn} disabled={heroPremiumAddOnBusy} className="w-full py-3 rounded-xl text-white font-semibold text-sm disabled:opacity-50 hover:opacity-90 mb-3" style={{ background: "#b45309" }}>
+                  {heroPremiumAddOnBusy ? "Starting checkout…" : "Yes, make my listing premium →"}
+                </button>
+                {heroPremiumAddOnError && <p className="text-sm text-red-600 mb-3">{heroPremiumAddOnError}</p>}
+                <button onClick={skipPremiumAddOn} className="text-sm font-semibold hover:underline" style={{ color: PINE_DARK }}>
                   No thanks, keep my free listing
                 </button>
               </div>
@@ -634,7 +696,7 @@ export default function SponsorshipLanding() {
           <div className="max-w-xl">
             <h2 className="text-3xl sm:text-5xl font-extrabold tracking-tight leading-tight mb-3">Ready for a bigger push?</h2>
             <p style={{ color: MUTED }} className="leading-relaxed">
-              Three straightforward opportunities. One for showing up every day, one for something happening now, and the other for building recognition over time.
+              Four straightforward opportunities. One for showing up every day, one for standing out in the directory, one for something happening now, and the other for building recognition over time.
             </p>
           </div>
           <div>
@@ -688,6 +750,40 @@ export default function SponsorshipLanding() {
               <a href={campaignHref()} className="block text-center py-3.5 rounded-xl text-white font-semibold text-sm hover:opacity-90" style={{ background: PINE_DARK }}>
                 Plan my 7-issue campaign →
               </a>
+            )}
+          </div>
+
+          {/* Premium card */}
+          <div className="rounded-[22px] border bg-white p-6 sm:p-8 flex flex-col" style={{ borderColor: "#f59e0b" }}>
+            <div className="flex items-center justify-between mb-5">
+              <span className="text-[11px] font-bold tracking-[0.14em] px-3 py-1.5 rounded-full" style={{ background: "#fef3c7", color: "#92400e" }}>UNLIMITED SPOTS</span>
+              <span className="text-xs" style={{ color: MUTED }}>Monthly subscription</span>
+            </div>
+            <p className="text-[11px] font-bold tracking-[0.18em] mb-1" style={{ color: "#b45309" }}>STAND OUT IN THE DIRECTORY</p>
+            <h3 className="text-2xl font-extrabold mb-2">Premium Directory Placement</h3>
+            <p className="text-sm leading-relaxed mb-5" style={{ color: MUTED }}>
+              Your free listing, pinned at the top of the Partners directory, above every category.
+            </p>
+            <p className="mb-1"><span className="text-5xl font-extrabold tracking-tight">$19.99</span> <span style={{ color: MUTED }}>/ month</span></p>
+            <p className="text-sm mb-6" style={{ color: MUTED }}>Billed monthly. Cancel anytime.</p>
+            <ul className="space-y-2.5 text-sm flex-1 mb-7" style={{ color: INK }}>
+              {[
+                "Pinned at the top of the Partners directory, above every category",
+                "Your logo, description and button, from your free listing",
+                "Shows on the public directory for as long as you're subscribed",
+                "Renews monthly; cancel anytime",
+              ].map((item) => (
+                <li key={item} className="flex gap-2.5"><span style={{ color: PINE }} className="mt-0.5 shrink-0"><Check /></span>{item}</li>
+              ))}
+            </ul>
+            {heroPortalUrl ? (
+              <a href={`${heroPortalUrl}&view=spotlight`} className="block text-center py-3.5 rounded-xl text-white font-semibold text-sm hover:opacity-90" style={{ background: "#b45309" }}>
+                Go premium →
+              </a>
+            ) : (
+              <button onClick={() => scrollToId("free-signup")} className="block w-full text-center py-3.5 rounded-xl text-white font-semibold text-sm hover:opacity-90" style={{ background: "#b45309" }}>
+                Go premium →
+              </button>
             )}
           </div>
 
@@ -768,6 +864,8 @@ export default function SponsorshipLanding() {
           applies only to the Presenting Partner program, not all advertising or independent editorial coverage. Campaign
           pricing is per market, as shown above. Starred Community Board spots are $39.99/month per city, limited to 5 per
           city, and appear at the top of the Community Board block in every issue while the subscription is active.
+          Premium Directory spots are $19.99/month per city, unlimited spots, and
+          appear at the top of the Partners directory while the subscription is active.
           The separate Community Board classifieds product is $5/week and
           does not include these newsletter placements.
         </p>
