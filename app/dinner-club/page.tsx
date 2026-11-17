@@ -43,7 +43,7 @@ export default async function DinnerClubPage() {
           <div className="inline-block mt-6 bg-green-50 border border-green-100 rounded-2xl px-5 py-5 text-center">
             <Image
               src="/the-gist-dinner-club.png"
-              alt="The Dinner Club: meet new people, make new connections, have fun! Thursday, December 10 at 6 PM, secret afterparty starts at 8 PM."
+              alt="The Dinner Club: meet new people, make new connections, have fun! Thursday, December 10 at 6:00 PM, secret after-party starts at 7:30 PM. Presented by The Little Olive Branch Daycare."
               width={4317}
               height={4317}
               className="w-full max-w-[320px] h-auto rounded-xl mx-auto"
@@ -124,3 +124,4 @@ export default async function DinnerClubPage() {
     </div>
   );
 }
+
