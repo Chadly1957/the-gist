@@ -97,7 +97,7 @@ export async function GET() {
       bookings,
       profiles: profiles.map((p) => ({
         ...p,
-        portalUrl: `${appUrl}/sponsor/portal?token=${p.magicToken}`,
+        portalUrl: `${appUrl}/sponsor/portal?token=${p.magicToken}&view=spotlight`,
         joinUrl: `${appUrl}/join/${sponsorSlug(p)}`,
         lastKitSentAt: lastKitBySponsor.get(p.id) ?? null,
       })),

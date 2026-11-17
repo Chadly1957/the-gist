@@ -439,6 +439,77 @@ function PortalContent() {
     }
   }
 
+  // Starred + Premium upgrade boxes for one listing, shared by the
+  // overview and the Community Partners (spotlight) view so the two
+  // can't drift apart. Same rules in both places: a pending listing
+  // can't buy yet, sold-out Starred shows sold out, an active
+  // subscription shows its status instead of a buy button.
+  function renderUpgradeBoxes(target: Spotlight | null | undefined) {
+    if (!target) return null;
+    const st = starredFor(target.id);
+    const pm = premiumFor(target.id);
+    const canStar = target.status === "approved" || target.status === "active";
+    const canGoPremium = target.status === "approved" || target.status === "active";
+    const soldOut = starredAvail !== null && starredAvail.spotsLeft === 0;
+    return (
+      <>
+    {/* Starred Community Board: pin this listing at the top of the
+        Community Partners block in every issue ($39.99/mo). */}
+        <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-4">
+          <p className="text-sm font-semibold text-amber-900">Starred Community Board — $39.99/month</p>
+          <p className="text-xs text-amber-800 mt-0.5">Pinned at the top of the Community Partners block in every daily issue, instead of rotating once or twice a week.</p>
+          {st ? (
+            <p className="text-xs font-medium text-amber-900 mt-2">
+              {st.status === "past_due"
+                ? "Starred — payment past due. Update payment via your Stripe invoice email; your spot keeps showing while Stripe retries."
+                : st.cancelAtPeriodEnd
+                  ? `Starred — active since ${formatStarredDate(st.startedAt)}, cancelling, runs to ${formatStarredDate(st.currentPeriodEnd)}.`
+                  : `Starred — active since ${formatStarredDate(st.startedAt)}${st.currentPeriodEnd ? `, renews ${formatStarredDate(st.currentPeriodEnd)}` : ""}.`}
+            </p>
+          ) : !canStar ? (
+            <p className="text-xs text-amber-800 mt-2">Once your listing is approved you can star it here.</p>
+          ) : soldOut ? (
+            <p className="text-xs font-medium text-amber-900 mt-2">Sold out — all 5 starred spots are taken.</p>
+          ) : (
+            <>
+              <button type="button" onClick={() => starListing(target.id)} disabled={starredBusy} className="mt-2 px-3 py-2 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white text-xs font-semibold rounded-lg">
+                {starredBusy ? "Starting checkout…" : "Star this listing — $39.99/mo"}
+              </button>
+              {starredAvail && (
+                <p className="text-xs text-amber-800 mt-1.5">{starredAvail.spotsLeft} of {starredAvail.spotsTotal} starred spots left in this city.</p>
+              )}
+            </>
+          )}
+          {st && <p className="text-xs text-amber-700 mt-1.5">To cancel, reply to any Gist email or contact Chad. Your spot keeps showing through the end of your paid month.</p>}
+          {starredError && <p className="text-xs text-red-600 mt-2">{starredError}</p>}
+        </div>
+    {/* Premium Directory Placement: pin this listing at the top of
+        the Partners directory (/partners) for $19.99/mo. */}
+        <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-4">
+          <p className="text-sm font-semibold text-amber-900">Premium Directory Placement — $19.99/month</p>
+          <p className="text-xs text-amber-800 mt-0.5">Pinned at the top of the Partners directory so neighbors find you first, instead of listed alphabetically in your category.</p>
+          {pm ? (
+            <p className="text-xs font-medium text-amber-900 mt-2">
+              {pm.status === "past_due"
+                ? "Premium — payment past due. Update payment via your Stripe invoice email; your spot keeps showing while Stripe retries."
+                : pm.cancelAtPeriodEnd
+                  ? `Premium — active since ${formatPremiumDate(pm.startedAt)}, cancelling, runs to ${formatPremiumDate(pm.currentPeriodEnd)}.`
+                  : `Premium — active since ${formatPremiumDate(pm.startedAt)}${pm.currentPeriodEnd ? `, renews ${formatPremiumDate(pm.currentPeriodEnd)}` : ""}.`}
+            </p>
+          ) : !canGoPremium ? (
+            <p className="text-xs text-amber-800 mt-2">Once your listing is approved you can go premium here.</p>
+          ) : (
+            <button type="button" onClick={() => makePremium(target.id)} disabled={premiumBusy} className="mt-2 px-3 py-2 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white text-xs font-semibold rounded-lg">
+              {premiumBusy ? "Starting checkout…" : "Make premium — $19.99/mo"}
+            </button>
+          )}
+          {pm && <p className="text-xs text-amber-700 mt-1.5">To cancel, reply to any Gist email or contact Chad. Your spot keeps showing through the end of your paid month.</p>}
+          {premiumError && <p className="text-xs text-red-600 mt-2">{premiumError}</p>}
+        </div>
+      </>
+    );
+  }
+
   useEffect(() => {
     if (!token) { setError("No portal link provided."); setLoading(false); return; }
     workspaceFetch(`/api/sponsor/portal?token=${encodeURIComponent(token)}`)
@@ -998,6 +1069,8 @@ function PortalContent() {
               </div>
             )}
 
+            {renderUpgradeBoxes(profile.spotlights.find((x) => ["pending", "approved", "active"].includes(x.status)))}
+
             {/* Spotlights */}
             {profile.spotlights.length > 0 && (
               <div>
@@ -1120,77 +1193,7 @@ function PortalContent() {
             <h1 className="text-2xl font-bold text-gray-900 mb-1">{editingSpotlight ? "Edit Listing" : "Community Partners"}</h1>
             <p className="text-sm text-gray-500 mb-6">{editingSpotlight ? "Update your listing details below." : "Free rotating placement in every newsletter. Your logo also feeds the homepage marquee — upload a good one."}</p>
 
-            {/* Starred Community Board: pin this listing at the top of the
-                Community Partners block in every issue ($39.99/mo). */}
-            {(() => {
-              const target = editingSpotlight ?? profile.spotlights.find((x) => ["pending", "approved", "active"].includes(x.status));
-              if (!target) return null;
-              const st = starredFor(target.id);
-              const canStar = target.status === "approved" || target.status === "active";
-              const soldOut = starredAvail !== null && starredAvail.spotsLeft === 0;
-              return (
-                <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-4">
-                  <p className="text-sm font-semibold text-amber-900">Starred Community Board — $39.99/month</p>
-                  <p className="text-xs text-amber-800 mt-0.5">Pinned at the top of the Community Partners block in every daily issue, instead of rotating once or twice a week.</p>
-                  {st ? (
-                    <p className="text-xs font-medium text-amber-900 mt-2">
-                      {st.status === "past_due"
-                        ? "Starred — payment past due. Update payment via your Stripe invoice email; your spot keeps showing while Stripe retries."
-                        : st.cancelAtPeriodEnd
-                          ? `Starred — active since ${formatStarredDate(st.startedAt)}, cancelling, runs to ${formatStarredDate(st.currentPeriodEnd)}.`
-                          : `Starred — active since ${formatStarredDate(st.startedAt)}${st.currentPeriodEnd ? `, renews ${formatStarredDate(st.currentPeriodEnd)}` : ""}.`}
-                    </p>
-                  ) : !canStar ? (
-                    <p className="text-xs text-amber-800 mt-2">Once your listing is approved you can star it here.</p>
-                  ) : soldOut ? (
-                    <p className="text-xs font-medium text-amber-900 mt-2">Sold out — all 5 starred spots are taken.</p>
-                  ) : (
-                    <>
-                      <button type="button" onClick={() => starListing(target.id)} disabled={starredBusy} className="mt-2 px-3 py-2 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white text-xs font-semibold rounded-lg">
-                        {starredBusy ? "Starting checkout…" : "Star this listing — $39.99/mo"}
-                      </button>
-                      {starredAvail && (
-                        <p className="text-xs text-amber-800 mt-1.5">{starredAvail.spotsLeft} of {starredAvail.spotsTotal} starred spots left in this city.</p>
-                      )}
-                    </>
-                  )}
-                  {st && <p className="text-xs text-amber-700 mt-1.5">To cancel, reply to any Gist email or contact Chad. Your spot keeps showing through the end of your paid month.</p>}
-                  {starredError && <p className="text-xs text-red-600 mt-2">{starredError}</p>}
-                </div>
-              );
-            })()}
-
-            {/* Premium Directory Placement: pin this listing at the top of
-                the Partners directory (/partners) for $19.99/mo. */}
-            {(() => {
-              const target = editingSpotlight ?? profile.spotlights.find((x) => ["pending", "approved", "active"].includes(x.status));
-              if (!target) return null;
-              const pm = premiumFor(target.id);
-              const canGoPremium = target.status === "approved" || target.status === "active";
-              return (
-                <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-4">
-                  <p className="text-sm font-semibold text-amber-900">Premium Directory Placement — $19.99/month</p>
-                  <p className="text-xs text-amber-800 mt-0.5">Pinned at the top of the Partners directory so neighbors find you first, instead of listed alphabetically in your category.</p>
-                  {pm ? (
-                    <p className="text-xs font-medium text-amber-900 mt-2">
-                      {pm.status === "past_due"
-                        ? "Premium — payment past due. Update payment via your Stripe invoice email; your spot keeps showing while Stripe retries."
-                        : pm.cancelAtPeriodEnd
-                          ? `Premium — active since ${formatPremiumDate(pm.startedAt)}, cancelling, runs to ${formatPremiumDate(pm.currentPeriodEnd)}.`
-                          : `Premium — active since ${formatPremiumDate(pm.startedAt)}${pm.currentPeriodEnd ? `, renews ${formatPremiumDate(pm.currentPeriodEnd)}` : ""}.`}
-                    </p>
-                  ) : !canGoPremium ? (
-                    <p className="text-xs text-amber-800 mt-2">Once your listing is approved you can go premium here.</p>
-                  ) : (
-                    <button type="button" onClick={() => makePremium(target.id)} disabled={premiumBusy} className="mt-2 px-3 py-2 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white text-xs font-semibold rounded-lg">
-                      {premiumBusy ? "Starting checkout…" : "Make premium — $19.99/mo"}
-                    </button>
-                  )}
-                  {pm && <p className="text-xs text-amber-700 mt-1.5">To cancel, reply to any Gist email or contact Chad. Your spot keeps showing through the end of your paid month.</p>}
-                  {premiumError && <p className="text-xs text-red-600 mt-2">{premiumError}</p>}
-                </div>
-              );
-            })()}
+            {renderUpgradeBoxes(editingSpotlight ?? profile.spotlights.find((x) => ["pending", "approved", "active"].includes(x.status)))}
 
             {sSuccess ? (
               <div className="bg-green-50 border border-green-100 rounded-xl p-6 text-center">
