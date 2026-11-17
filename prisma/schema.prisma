@@ -34,6 +34,7 @@ model Workspace {
   linkClickRows               LinkClick[]
   sponsorProfileRows          SponsorProfile[]
   spotlightListingRows        SpotlightListing[]
+  starredBoardSubscriptionRows StarredBoardSubscription[]
   adBookingRows               AdBooking[]
   sponsorWeekRows             SponsorWeek[]
   sponsorHoldRows             SponsorHold[]
@@ -272,6 +273,7 @@ model SponsorProfile {
   notes         String?
   createdAt     DateTime             @default(now())
   spotlights    SpotlightListing[]
+  starredBoardSubscriptions StarredBoardSubscription[]
   bookings      AdBooking[]
   weekBookings  SponsorWeekBooking[]
   events        Event[]
@@ -429,9 +431,42 @@ model SpotlightListing {
   createdAt          DateTime                  @default(now())
   approvedAt         DateTime?
   sendAppearances    NewsletterSendSpotlight[]
+  starredSubscriptions StarredBoardSubscription[]
 
   @@unique([id, workspaceId])
   @@index([workspaceId])
+}
+
+// A business's paid Starred Community Board placement ($39.99/mo,
+// max 5 per workspace): the listing is pinned at the top of the
+// Community Partners block in every daily issue while the subscription
+// is live. Starred state is derived from this row, so it cannot drift
+// out of sync with the listing; no `starred` boolean on SpotlightListing.
+model StarredBoardSubscription {
+  workspaceId          String           @default("decatur")
+  workspace            Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  id                   String           @id @default(cuid())
+  spotlightId          String
+  spotlight            SpotlightListing @relation(fields: [spotlightId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
+  sponsorId            String
+  sponsor              SponsorProfile   @relation(fields: [sponsorId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
+  status               String           @default("pending_payment") // pending_payment | active | past_due | cancelled
+  monthlyAmountCents   Int              @default(3999)
+  stripeCustomerId     String?
+  stripeSubscriptionId String?          @unique
+  stripeSessionId      String?          @unique
+  startedAt            DateTime?
+  currentPeriodEnd     DateTime?
+  cancelAtPeriodEnd    Boolean          @default(false) // admin-cancelled; spot keeps showing until currentPeriodEnd, then the subscription is deleted and status flips to cancelled
+  cancelledAt          DateTime?        // when the cancel was requested (admin), not when the spot stops showing
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+
+  @@unique([id, workspaceId])
+  @@index([workspaceId, status])
+  @@index([workspaceId, spotlightId])
+  @@index([spotlightId])
+  @@index([stripeCustomerId])
 }
 
 model AdBooking {

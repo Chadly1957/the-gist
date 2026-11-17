@@ -27,6 +27,7 @@ interface Spotlight {
   lastShownAt: string | null;
   createdAt: string;
   sponsor: { businessName: string; contactName: string; email: string; magicToken: string };
+  starred: { id: string; status: string; startedAt: string | null; currentPeriodEnd: string | null; cancelAtPeriodEnd: boolean } | null;
 }
 
 interface Booking {
@@ -515,11 +516,16 @@ function AdminSponsorsContent() {
   // Pricing state
   const [prices, setPrices] = useState({
     sponsorship_price_spotlight: "Free",
+    sponsorship_price_starred: "$39.99/month",
     sponsorship_price_in_article: "$15/day",
     sponsorship_price_presenting: "$25/day",
   });
   const [priceSaving, setPriceSaving] = useState(false);
   const [priceSaved, setPriceSaved] = useState(false);
+
+  // Starred Community Board count for this workspace (from /api/admin/sponsors).
+  const [starredCount, setStarredCount] = useState(0);
+  const [starredMax, setStarredMax] = useState(5);
 
   async function load() {
     setLoading(true);
@@ -531,6 +537,8 @@ function AdminSponsorsContent() {
       const data = await sponsorRes.json();
       const settingsData = await settingsRes.json();
       setSpotlights(data.spotlights || []);
+      setStarredCount(typeof data.starredCount === "number" ? data.starredCount : 0);
+      setStarredMax(typeof data.starredMax === "number" ? data.starredMax : 5);
       setBookings(data.bookings || []);
       setProfiles(data.profiles || []);
       setWorkspaceName(data.workspaceName || "");
@@ -776,8 +784,21 @@ function AdminSponsorsContent() {
   }
 
   async function deleteSpotlight(id: string) {
+    const s = spotlights.find((x) => x.id === id);
+    if (s?.starred) {
+      alert("Cancel the Starred subscription first — this listing has a live Starred placement.");
+      return;
+    }
     if (!confirm("Delete this spotlight listing?")) return;
     await workspaceFetch(`/api/admin/sponsors/spotlight/${id}`, { method: "DELETE" });
+    load();
+  }
+
+  // Cancel a Starred subscription (admin-only): the spot keeps showing
+  // through the end of its paid month, then stops. No proration.
+  async function cancelStarred(id: string) {
+    if (!confirm("Cancel this Starred subscription? The spot keeps showing through the end of its paid month.")) return;
+    await workspaceFetch(`/api/admin/starred/${id}/cancel`, { method: "POST" });
     load();
   }
 
@@ -898,6 +919,11 @@ function AdminSponsorsContent() {
             {t.id === "spotlights" && spotlights.filter((s) => s.status === "pending").length > 0 && (
               <span className="ml-1.5 bg-orange-100 text-orange-700 text-xs font-bold px-1.5 py-0.5 rounded-full">
                 {spotlights.filter((s) => s.status === "pending").length}
+              </span>
+            )}
+            {t.id === "spotlights" && (
+              <span className="ml-1.5 bg-amber-100 text-amber-800 text-xs font-bold px-1.5 py-0.5 rounded-full" title="Starred Community Board spots sold in this city">
+                Starred {starredCount}/{starredMax}
               </span>
             )}
             {t.id === "bookings" && bookings.filter((b) => b.status === "pending_review").length > 0 && (
@@ -1151,6 +1177,11 @@ function AdminSponsorsContent() {
                       <div className="flex items-center gap-2 flex-wrap mb-0.5">
                         <p className="text-sm font-semibold text-gray-800">{s.businessName}</p>
                         <StatusBadge status={s.status} />
+                        {s.starred && (
+                          <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-amber-100 text-amber-800" title={s.starred.cancelAtPeriodEnd ? `Cancelling — runs to ${s.starred.currentPeriodEnd ? new Date(s.starred.currentPeriodEnd).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "end of paid month"}` : `Renews ${s.starred.currentPeriodEnd ? new Date(s.starred.currentPeriodEnd).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : ""}`}>
+                            ★ STARRED{s.starred.status === "past_due" ? " · PAST DUE" : s.starred.cancelAtPeriodEnd ? " · CANCELLING" : ""}
+                          </span>
+                        )}
                       </div>
                       <p className="text-xs text-gray-500 mb-1">{s.description}</p>
                       <p className="text-xs text-gray-400">
@@ -1246,6 +1277,17 @@ function AdminSponsorsContent() {
                               className="px-3 py-1.5 border border-gray-200 text-gray-600 rounded-lg text-xs font-semibold hover:bg-gray-100">
                               Visit Site ↗
                             </WorkspaceAnchor>
+                            {s.starred && !s.starred.cancelAtPeriodEnd && (
+                              <button onClick={() => cancelStarred(s.starred!.id)}
+                                className="px-3 py-1.5 border border-amber-300 text-amber-800 rounded-lg text-xs font-semibold hover:bg-amber-50">
+                                Cancel Starred
+                              </button>
+                            )}
+                            {s.starred?.cancelAtPeriodEnd && (
+                              <span className="px-3 py-1.5 text-amber-800 text-xs font-semibold">
+                                Cancelling — runs to {s.starred.currentPeriodEnd ? new Date(s.starred.currentPeriodEnd).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "end of paid month"}
+                              </span>
+                            )}
                             <button onClick={() => deleteSpotlight(s.id)} className="px-3 py-1.5 text-red-500 hover:text-red-700 text-xs font-semibold">
                               Delete
                             </button>
@@ -2014,6 +2056,7 @@ function AdminSponsorsContent() {
               <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
                 {[
                   { key: "sponsorship_price_spotlight", label: "Community Partners", hint: 'e.g. "Free"' },
+                  { key: "sponsorship_price_starred", label: "Starred Community Board", hint: 'e.g. "$39.99/month"' },
                   { key: "sponsorship_price_in_article", label: "Standard Sponsorship", hint: 'e.g. "$15/day"' },
                   { key: "sponsorship_price_presenting", label: "Presenting Sponsor", hint: 'e.g. "$25/day"' },
                 ].map(({ key, label, hint }) => (

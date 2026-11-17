@@ -40,6 +40,7 @@ export interface SpotlightItem {
   description: string;
   ctaLabel: string;
   ctaUrl: string;
+  starred?: boolean; // true only for Starred Community Board rows, pinned above the rotating five
 }
 
 // A live Gist Board post for the newsletter board section. Fields arrive
@@ -300,8 +301,11 @@ function renderSpotlight(items: SpotlightItem[], tracking?: TrackingConfig): str
   if (items.length === 0) return "";
   const cards = items.map((s) => {
     const ctaUrl = trackedUrl(tracking, s.ctaUrl, "spotlight", s.businessName);
+    // Starred cards get a gold border and a STARRED PARTNER eyebrow so
+    // readers can tell the paid pinned placement from the rotating five.
+    const border = s.starred ? "#f59e0b" : "#e5e7eb";
     return `
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid #e5e7eb;border-radius:8px;margin-bottom:12px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid ${border};border-radius:8px;margin-bottom:12px;">
       <tr>
         <td width="88" valign="top" style="padding:14px 0 14px 14px;">
           ${s.logoUrl
@@ -309,6 +313,7 @@ function renderSpotlight(items: SpotlightItem[], tracking?: TrackingConfig): str
             : `<div style="width:72px;height:72px;border-radius:6px;background:#f3f4f6;border:1px solid #e5e7eb;"></div>`}
         </td>
         <td valign="middle" style="padding:14px;">
+          ${s.starred ? `<div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#b45309;font-family:sans-serif;margin-bottom:2px;">Starred Partner</div>` : ""}
           <div style="font-size:14px;font-weight:700;color:#111827;font-family:sans-serif;margin-bottom:4px;">${s.businessName}</div>
           <div style="font-size:13px;color:#4b5563;line-height:1.5;font-family:sans-serif;margin-bottom:10px;">${s.description}</div>
           <a href="${ctaUrl}" style="display:inline-block;background:#166534;color:#ffffff;padding:7px 14px;border-radius:4px;text-decoration:none;font-size:12px;font-family:sans-serif;font-weight:600;white-space:nowrap;">${s.ctaLabel}</a>
