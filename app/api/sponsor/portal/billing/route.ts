@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import Stripe from "stripe";
 import { formatWeekRange, WEEK_TIERS, isValidTier } from "@/lib/sponsor-weeks";
 import { STARRED_PRICE_CENTS, STARRED_SHOWING_STATUSES } from "@/lib/starred-board";
+import { PREMIUM_PRICE_CENTS, PREMIUM_SHOWING_STATUSES } from "@/lib/premium-directory";
 
 export const dynamic = "force-dynamic";
 
@@ -105,7 +106,63 @@ export async function GET(req: NextRequest) {
     });
   }
 
-  // Newest payment first across both kinds.
+  // Premium Directory subscriptions: one row per live subscription
+  // ($19.99/mo) with the next billing date and the latest paid invoice's
+  // receipt URL, fetched on demand like the week-booking receipts above.
+  // A failure just yields null for that row's receipt.
+  const premiumSubs = await prisma.premiumDirectorySubscription.findMany({
+    where: { sponsorId: profile.id, status: { in: [...PREMIUM_SHOWING_STATUSES] } },
+    include: { spotlight: { select: { businessName: true } } },
+    orderBy: { startedAt: "desc" },
+  });
+  for (const s of premiumSubs) {
+    let receiptUrl: string | null = null;
+    let lastPaidAt: Date = s.startedAt ?? s.createdAt;
+    if (stripe && s.stripeSubscriptionId) {
+      try {
+        const invoices = await stripe.invoices.list({
+          subscription: s.stripeSubscriptionId,
+          status: "paid",
+          limit: 1,
+          expand: ["data.payments.data.payment.payment_intent", "data.payments.data.payment.charge"],
+        });
+        const inv = invoices.data[0];
+        if (inv) {
+          // Receipt URL lives on the payment: a standalone charge carries
+          // receipt_url directly; a PaymentIntent carries it on its first
+          // charge (same pattern as the week-booking receipts above).
+          const payment = inv.payments?.data?.[0]?.payment;
+          if (payment) {
+            if (payment.type === "charge" && payment.charge && typeof payment.charge !== "string") {
+              receiptUrl = payment.charge.receipt_url ?? null;
+            } else if (payment.type === "payment_intent" && payment.payment_intent && typeof payment.payment_intent !== "string") {
+              const pi = payment.payment_intent as unknown as {
+                charges?: { data?: { receipt_url?: string | null }[] };
+              };
+              receiptUrl = pi.charges?.data?.[0]?.receipt_url ?? null;
+            }
+          }
+          const paidAt = inv.status_transitions?.paid_at ?? inv.created;
+          if (typeof paidAt === "number" && paidAt > 0) lastPaidAt = new Date(paidAt * 1000);
+        }
+      } catch (err) {
+        console.error(`Billing receipt lookup failed for premium subscription ${s.id}:`, err);
+      }
+    }
+    const renews = s.currentPeriodEnd
+      ? s.currentPeriodEnd.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+      : null;
+    payments.push({
+      id: `premium-${s.id}`,
+      paidAt: lastPaidAt.toISOString(),
+      weekLabel: "Premium Directory Placement",
+      tierLabel: renews ? `Monthly · renews ${renews}` : "Monthly subscription",
+      amountCents: PREMIUM_PRICE_CENTS,
+      receiptUrl,
+    });
+  }
+
+  // Newest payment first across all kinds.
   payments.sort((a, b) => (b.paidAt || "").localeCompare(a.paidAt || ""));
 
   return NextResponse.json({ payments });

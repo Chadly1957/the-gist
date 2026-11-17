@@ -41,6 +41,16 @@ interface StarredAvailability {
   spotsLeft: number;
 }
 
+interface PremiumSubscription {
+  id: string;
+  spotlightId: string;
+  businessName: string;
+  status: string;
+  startedAt: string | null;
+  currentPeriodEnd: string | null;
+  cancelAtPeriodEnd: boolean;
+}
+
 interface Booking {
   id: string;
   type: string;
@@ -190,6 +200,11 @@ function PortalContent() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
   const [weekBookings, setWeekBookings] = useState<WeekBooking[]>([]);
+
+  // Premium Directory Placement ($19.99/mo, unlimited spots)
+  const [premiumSubs, setPremiumSubs] = useState<PremiumSubscription[]>([]);
+  const [premiumBusy, setPremiumBusy] = useState(false);
+  const [premiumError, setPremiumError] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [view, setView] = useState<View>("overview");
@@ -350,6 +365,7 @@ function PortalContent() {
           setWeekBookings(data.weekBookings ?? []);
           setStarredSubs(data.starredSubscriptions ?? []);
           setStarredAvail(data.starredAvailability ?? null);
+          setPremiumSubs(data.premiumSubscriptions ?? []);
         }
       })
       .catch(() => {});
@@ -389,6 +405,40 @@ function PortalContent() {
     }
   }
 
+  // Live Premium subscription for a listing, if it has one.
+  function premiumFor(spotlightId: string): PremiumSubscription | undefined {
+    return premiumSubs.find(
+      (s) => s.spotlightId === spotlightId && ["pending_payment", "active", "past_due"].includes(s.status)
+    );
+  }
+
+  function formatPremiumDate(iso: string | null): string {
+    if (!iso) return "";
+    return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+  }
+
+  // Make a listing premium: same pattern as WeekBookingFlow — POST to the
+  // checkout route, then send the buyer to the Stripe Checkout URL.
+  async function makePremium(spotlightId: string) {
+    if (!token) return;
+    setPremiumBusy(true);
+    setPremiumError("");
+    try {
+      const res = await workspaceFetch("/api/sponsor/premium/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token, spotlightId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Checkout failed.");
+      window.location.href = data.url;
+    } catch (err) {
+      setPremiumError(err instanceof Error ? err.message : "Checkout failed.");
+    } finally {
+      setPremiumBusy(false);
+    }
+  }
+
   useEffect(() => {
     if (!token) { setError("No portal link provided."); setLoading(false); return; }
     workspaceFetch(`/api/sponsor/portal?token=${encodeURIComponent(token)}`)
@@ -401,6 +451,7 @@ function PortalContent() {
           setWeekBookings(data.weekBookings ?? []);
           setStarredSubs(data.starredSubscriptions ?? []);
           setStarredAvail(data.starredAvailability ?? null);
+          setPremiumSubs(data.premiumSubscriptions ?? []);
           setSForm((f) => ({ ...f, businessName: data.profile.businessName }));
         }
       })
@@ -971,6 +1022,19 @@ function PortalContent() {
                             </p>
                           );
                         })()}
+                        {(() => {
+                          const pm = premiumFor(s.id);
+                          if (!pm) return null;
+                          return (
+                            <p className="text-xs font-medium text-amber-700 mt-0.5">
+                              {pm.status === "past_due"
+                                ? "Premium · payment past due — update payment via your Stripe invoice email"
+                                : pm.cancelAtPeriodEnd
+                                  ? `Premium · cancelling, runs to ${formatPremiumDate(pm.currentPeriodEnd)}`
+                                  : `Premium · Active — renews ${formatPremiumDate(pm.currentPeriodEnd)}`}
+                            </p>
+                          );
+                        })()}
                       </div>
                       <div className="flex flex-col items-end gap-1.5 shrink-0">
                         <StatusBadge status={s.status} />
@@ -1092,6 +1156,38 @@ function PortalContent() {
                   )}
                   {st && <p className="text-xs text-amber-700 mt-1.5">To cancel, reply to any Gist email or contact Chad. Your spot keeps showing through the end of your paid month.</p>}
                   {starredError && <p className="text-xs text-red-600 mt-2">{starredError}</p>}
+                </div>
+              );
+            })()}
+
+            {/* Premium Directory Placement: pin this listing at the top of
+                the Partners directory (/partners) for $19.99/mo. */}
+            {(() => {
+              const target = editingSpotlight ?? profile.spotlights.find((x) => ["pending", "approved", "active"].includes(x.status));
+              if (!target) return null;
+              const pm = premiumFor(target.id);
+              const canGoPremium = target.status === "approved" || target.status === "active";
+              return (
+                <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-4">
+                  <p className="text-sm font-semibold text-amber-900">Premium Directory Placement — $19.99/month</p>
+                  <p className="text-xs text-amber-800 mt-0.5">Pinned at the top of the Partners directory so neighbors find you first, instead of listed alphabetically in your category.</p>
+                  {pm ? (
+                    <p className="text-xs font-medium text-amber-900 mt-2">
+                      {pm.status === "past_due"
+                        ? "Premium — payment past due. Update payment via your Stripe invoice email; your spot keeps showing while Stripe retries."
+                        : pm.cancelAtPeriodEnd
+                          ? `Premium — active since ${formatPremiumDate(pm.startedAt)}, cancelling, runs to ${formatPremiumDate(pm.currentPeriodEnd)}.`
+                          : `Premium — active since ${formatPremiumDate(pm.startedAt)}${pm.currentPeriodEnd ? `, renews ${formatPremiumDate(pm.currentPeriodEnd)}` : ""}.`}
+                    </p>
+                  ) : !canGoPremium ? (
+                    <p className="text-xs text-amber-800 mt-2">Once your listing is approved you can go premium here.</p>
+                  ) : (
+                    <button type="button" onClick={() => makePremium(target.id)} disabled={premiumBusy} className="mt-2 px-3 py-2 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white text-xs font-semibold rounded-lg">
+                      {premiumBusy ? "Starting checkout…" : "Make premium — $19.99/mo"}
+                    </button>
+                  )}
+                  {pm && <p className="text-xs text-amber-700 mt-1.5">To cancel, reply to any Gist email or contact Chad. Your spot keeps showing through the end of your paid month.</p>}
+                  {premiumError && <p className="text-xs text-red-600 mt-2">{premiumError}</p>}
                 </div>
               );
             })()}

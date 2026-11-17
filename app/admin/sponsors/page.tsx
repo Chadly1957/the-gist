@@ -28,6 +28,7 @@ interface Spotlight {
   createdAt: string;
   sponsor: { businessName: string; contactName: string; email: string; magicToken: string };
   starred: { id: string; status: string; startedAt: string | null; currentPeriodEnd: string | null; cancelAtPeriodEnd: boolean } | null;
+  premium: { id: string; status: string; startedAt: string | null; currentPeriodEnd: string | null; cancelAtPeriodEnd: boolean } | null;
 }
 
 interface Booking {
@@ -517,6 +518,7 @@ function AdminSponsorsContent() {
   const [prices, setPrices] = useState({
     sponsorship_price_spotlight: "Free",
     sponsorship_price_starred: "$39.99/month",
+    sponsorship_price_premium: "$19.99/month",
     sponsorship_price_in_article: "$15/day",
     sponsorship_price_presenting: "$25/day",
   });
@@ -526,6 +528,9 @@ function AdminSponsorsContent() {
   // Starred Community Board count for this workspace (from /api/admin/sponsors).
   const [starredCount, setStarredCount] = useState(0);
   const [starredMax, setStarredMax] = useState(5);
+
+  // Premium Directory count for this workspace (from /api/admin/sponsors).
+  const [premiumCount, setPremiumCount] = useState(0);
 
   async function load() {
     setLoading(true);
@@ -539,6 +544,7 @@ function AdminSponsorsContent() {
       setSpotlights(data.spotlights || []);
       setStarredCount(typeof data.starredCount === "number" ? data.starredCount : 0);
       setStarredMax(typeof data.starredMax === "number" ? data.starredMax : 5);
+      setPremiumCount(typeof data.premiumCount === "number" ? data.premiumCount : 0);
       setBookings(data.bookings || []);
       setProfiles(data.profiles || []);
       setWorkspaceName(data.workspaceName || "");
@@ -789,6 +795,10 @@ function AdminSponsorsContent() {
       alert("Cancel the Starred subscription first — this listing has a live Starred placement.");
       return;
     }
+    if (s?.premium) {
+      alert("Cancel the Premium subscription first — this listing has a live Premium placement.");
+      return;
+    }
     if (!confirm("Delete this spotlight listing?")) return;
     await workspaceFetch(`/api/admin/sponsors/spotlight/${id}`, { method: "DELETE" });
     load();
@@ -799,6 +809,15 @@ function AdminSponsorsContent() {
   async function cancelStarred(id: string) {
     if (!confirm("Cancel this Starred subscription? The spot keeps showing through the end of its paid month.")) return;
     await workspaceFetch(`/api/admin/starred/${id}/cancel`, { method: "POST" });
+    load();
+  }
+
+  // Cancel a Premium subscription (admin-only): the spot keeps showing
+  // at the top of /partners through the end of its paid month, then drops
+  // back to its category section. No proration.
+  async function cancelPremium(id: string) {
+    if (!confirm("Cancel this Premium subscription? The spot keeps showing through the end of its paid month.")) return;
+    await workspaceFetch(`/api/admin/premium/${id}/cancel`, { method: "POST" });
     load();
   }
 
@@ -914,6 +933,11 @@ function AdminSponsorsContent() {
             {t.id === "weekly" && copyQueue.length > 0 && (
               <span className="ml-1.5 bg-orange-100 text-orange-700 text-xs font-bold px-1.5 py-0.5 rounded-full">
                 {copyQueue.length}
+              </span>
+            )}
+            {t.id === "spotlights" && (
+              <span className="ml-1.5 bg-amber-100 text-amber-800 text-xs font-bold px-1.5 py-0.5 rounded-full" title="Premium Directory spots sold in this city">
+                Premium {premiumCount}
               </span>
             )}
             {t.id === "spotlights" && spotlights.filter((s) => s.status === "pending").length > 0 && (
@@ -1182,6 +1206,11 @@ function AdminSponsorsContent() {
                             ★ STARRED{s.starred.status === "past_due" ? " · PAST DUE" : s.starred.cancelAtPeriodEnd ? " · CANCELLING" : ""}
                           </span>
                         )}
+                        {s.premium && (
+                          <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-amber-100 text-amber-800" title={s.premium.cancelAtPeriodEnd ? `Cancelling — runs to ${s.premium.currentPeriodEnd ? new Date(s.premium.currentPeriodEnd).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "end of paid month"}` : `Renews ${s.premium.currentPeriodEnd ? new Date(s.premium.currentPeriodEnd).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : ""}`}>
+                            ◆ PREMIUM{s.premium.status === "past_due" ? " · PAST DUE" : s.premium.cancelAtPeriodEnd ? " · CANCELLING" : ""}
+                          </span>
+                        )}
                       </div>
                       <p className="text-xs text-gray-500 mb-1">{s.description}</p>
                       <p className="text-xs text-gray-400">
@@ -1286,6 +1315,17 @@ function AdminSponsorsContent() {
                             {s.starred?.cancelAtPeriodEnd && (
                               <span className="px-3 py-1.5 text-amber-800 text-xs font-semibold">
                                 Cancelling — runs to {s.starred.currentPeriodEnd ? new Date(s.starred.currentPeriodEnd).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "end of paid month"}
+                              </span>
+                            )}
+                            {s.premium && !s.premium.cancelAtPeriodEnd && (
+                              <button onClick={() => cancelPremium(s.premium!.id)}
+                                className="px-3 py-1.5 border border-amber-300 text-amber-800 rounded-lg text-xs font-semibold hover:bg-amber-50">
+                                Cancel Premium
+                              </button>
+                            )}
+                            {s.premium?.cancelAtPeriodEnd && (
+                              <span className="px-3 py-1.5 text-amber-800 text-xs font-semibold">
+                                Cancelling — runs to {s.premium.currentPeriodEnd ? new Date(s.premium.currentPeriodEnd).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "end of paid month"}
                               </span>
                             )}
                             <button onClick={() => deleteSpotlight(s.id)} className="px-3 py-1.5 text-red-500 hover:text-red-700 text-xs font-semibold">
@@ -2057,6 +2097,7 @@ function AdminSponsorsContent() {
                 {[
                   { key: "sponsorship_price_spotlight", label: "Community Partners", hint: 'e.g. "Free"' },
                   { key: "sponsorship_price_starred", label: "Starred Community Board", hint: 'e.g. "$39.99/month"' },
+                  { key: "sponsorship_price_premium", label: "Premium Directory Placement", hint: 'e.g. "$19.99/month"' },
                   { key: "sponsorship_price_in_article", label: "Standard Sponsorship", hint: 'e.g. "$15/day"' },
                   { key: "sponsorship_price_presenting", label: "Presenting Sponsor", hint: 'e.g. "$25/day"' },
                 ].map(({ key, label, hint }) => (
