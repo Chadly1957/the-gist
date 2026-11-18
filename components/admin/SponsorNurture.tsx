@@ -411,7 +411,7 @@ function NurtureEditor(props: {
         {readOnly && <span className="text-[11px] font-bold px-2 py-1 rounded-full bg-green-100 text-green-700">SENT (READ-ONLY)</span>}
       </div>
       <p className="text-xs text-gray-400 mb-5">
-        Merge tags: <code>{"{{businessName}}"}</code> and <code>{"{{contactName}}"}</code> fill in per business in the subject, headings, and text.
+        Merge tags: <code>{"{{businessName}}"}</code> and <code>{"{{contactName}}"}</code> fill in per business in the subject, headings, and text. <code>{"{{portalUrl}}"}</code> links each business to its own sponsor portal, and works in headings, text, and button links.
       </p>
 
       {notice && <p className="text-sm text-green-700 bg-green-50 border border-green-200 rounded-xl px-4 py-3 mb-4">{notice}</p>}
@@ -534,3 +534,4 @@ function NurtureEditor(props: {
     </div>
   );
 }
+

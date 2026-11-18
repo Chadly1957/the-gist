@@ -76,11 +76,12 @@ export function starterBlocks(): NurtureBlock[] {
 
 export function applyMergeTags(
   text: string,
-  recipient: { businessName: string; contactName: string }
+  recipient: { businessName: string; contactName: string; portalUrl?: string }
 ): string {
   return text
     .replaceAll("{{businessName}}", recipient.businessName)
-    .replaceAll("{{contactName}}", recipient.contactName);
+    .replaceAll("{{contactName}}", recipient.contactName)
+    .replaceAll("{{portalUrl}}", recipient.portalUrl ?? "");
 }
 
 export const NURTURE_AUDIENCES = ["free", "all", "past"] as const;
@@ -101,3 +102,4 @@ export interface NurtureRecipient {
   email: string;
   magicToken: string;
 }
+

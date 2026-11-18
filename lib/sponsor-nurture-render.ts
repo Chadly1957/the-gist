@@ -46,7 +46,7 @@ function tracked(url: string, label: string, ctx: NurtureRenderContext): string 
 }
 
 function renderBlock(block: NurtureBlock, ctx: NurtureRenderContext): string {
-  const recipient = { businessName: ctx.businessName, contactName: ctx.contactName };
+  const recipient = { businessName: ctx.businessName, contactName: ctx.contactName, portalUrl: ctx.portalUrl };
   switch (block.type) {
     case "heading":
       return `<h2 style="margin: 0 0 14px; color: #111827; font-size: 22px; line-height: 1.3;">${escapeHtml(applyMergeTags(block.text || "", recipient))}</h2>`;
@@ -61,14 +61,16 @@ function renderBlock(block: NurtureBlock, ctx: NurtureRenderContext): string {
     case "image": {
       if (!block.url) return "";
       const img = `<img src="${escapeHtml(abs(block.url, ctx))}" alt="${escapeHtml(block.alt || "")}" style="display: block; width: 100%; max-width: 552px; height: auto; border-radius: 10px;" />`;
-      const wrapped = block.linkUrl
-        ? `<a href="${escapeHtml(tracked(block.linkUrl, "image", ctx))}" target="_blank" rel="noopener noreferrer">${img}</a>`
+      const linkUrl = block.linkUrl ? applyMergeTags(block.linkUrl, recipient) : "";
+      const wrapped = linkUrl
+        ? `<a href="${escapeHtml(tracked(linkUrl, "image", ctx))}" target="_blank" rel="noopener noreferrer">${img}</a>`
         : img;
       return `<div style="margin: 0 0 18px;">${wrapped}</div>`;
     }
     case "button": {
       if (!block.linkUrl) return "";
-      return `<p style="margin: 6px 0 20px; text-align: center;"><a href="${escapeHtml(tracked(block.linkUrl, "button", ctx))}" target="_blank" rel="noopener noreferrer" style="display: inline-block; background: ${ctx.brandColor}; color: #ffffff; padding: 13px 26px; border-radius: 10px; text-decoration: none; font-weight: 600; font-size: 15px;">${escapeHtml(block.label || "Learn more")}</a></p>`;
+      const linkUrl = applyMergeTags(block.linkUrl, recipient);
+      return `<p style="margin: 6px 0 20px; text-align: center;"><a href="${escapeHtml(tracked(linkUrl, "button", ctx))}" target="_blank" rel="noopener noreferrer" style="display: inline-block; background: ${ctx.brandColor}; color: #ffffff; padding: 13px 26px; border-radius: 10px; text-decoration: none; font-weight: 600; font-size: 15px;">${escapeHtml(block.label || "Learn more")}</a></p>`;
     }
     case "divider":
       return `<hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;" />`;
@@ -108,3 +110,4 @@ export function renderNurtureEmail(blocks: NurtureBlock[], ctx: NurtureRenderCon
 export function renderNurtureSubject(subject: string, recipient: { businessName: string; contactName: string }): string {
   return applyMergeTags(subject || "", recipient);
 }
+
