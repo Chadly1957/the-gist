@@ -1005,6 +1005,12 @@ export default function SponsorshipLanding() {
             <Eyebrow>Straight answers</Eyebrow>
             <h2 className="text-3xl sm:text-5xl font-extrabold tracking-tight leading-tight mb-3">Good questions, answered.</h2>
             <p style={{ color: MUTED }}>No confusing packages or fine-print surprises. Here&apos;s how the opportunities work.</p>
+            <p className="mt-5 text-sm" style={{ color: MUTED }}>
+              Questions first?{" "}
+              <Link href="/book" className="font-semibold underline hover:opacity-80" style={{ color: PINE }}>
+                Book a 30-minute call with Chad
+              </Link>
+            </p>
           </div>
           <div className="space-y-3">
             {FAQS.map((f, i) => (
