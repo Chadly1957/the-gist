@@ -171,6 +171,9 @@ export default function SiteHeader() {
                     <Link href="/sponsor" onClick={() => setOpenDropdown(null)} className="block px-4 py-2.5 text-sm font-semibold text-green-700 hover:bg-gray-50">
                       Advertise
                     </Link>
+                    <Link href="/book" onClick={() => setOpenDropdown(null)} className="block px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50">
+                      Book a Call
+                    </Link>
                     <button
                       onClick={() => { setOpenDropdown(null); setShowSponsorLogin(true); setSponsorLoginStatus("idle"); setSponsorLoginEmail(""); }}
                       className="block w-full text-left px-4 py-2.5 text-sm font-semibold text-gray-500 hover:bg-gray-50"
@@ -227,6 +230,9 @@ export default function SiteHeader() {
             )}
             <Link href="/sponsor" onClick={() => setShowMenu(false)} className="block py-3 text-sm font-semibold text-green-700 border-b border-gray-50">
               Advertise
+            </Link>
+            <Link href="/book" onClick={() => setShowMenu(false)} className="block py-3 text-sm font-semibold text-gray-700 border-b border-gray-50">
+              Book a Call
             </Link>
             <button
               onClick={() => { setShowMenu(false); setShowSponsorLogin(true); setSponsorLoginStatus("idle"); setSponsorLoginEmail(""); }}
