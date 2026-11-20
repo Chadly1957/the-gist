@@ -98,6 +98,26 @@ interface WeekAvail {
   tiers: TierAvailability[];
 }
 
+interface SponsorInvoiceRow {
+  id: string;
+  kind: string;
+  amountCents: number;
+  status: string;
+  hostedInvoiceUrl: string | null;
+  stripeSubscriptionId: string | null;
+  bookingId: string | null;
+  spotlightId: string | null;
+  createdAt: string;
+  paidAt: string | null;
+  sponsor: { businessName: string; contactName: string; email: string };
+}
+
+const INVOICE_KIND_LABELS: Record<string, string> = {
+  premium_directory: "Premium Directory",
+  starred_board: "Starred Community Board",
+  sponsor_week: "7-Issue Featured Campaign",
+};
+
 // "MMM d - MMM d" for a Monday weekStart, e.g. "Sep 28 - Oct 2".
 function formatWeekLabel(weekStart: string) {
   const [y, m, d] = weekStart.split("-").map(Number);
@@ -119,11 +139,19 @@ const STATUS_COLORS: Record<string, string> = {
   expired: "bg-gray-100 text-gray-500",
   rejected: "bg-red-50 text-red-600",
   completed: "bg-gray-100 text-gray-500",
+  // SponsorInvoice statuses (Invoices tab).
+  open: "bg-orange-50 text-orange-700",
+  paid: "bg-green-50 text-green-700",
+  void: "bg-gray-100 text-gray-500",
+  cancelled: "bg-gray-100 text-gray-500",
+  uncollectible: "bg-red-50 text-red-600",
 };
 
 const STATUS_LABELS: Record<string, string> = {
   pending_review: "Pending Review",
   pending_payment: "Awaiting Payment",
+  open: "Sent · Awaiting Payment",
+  void: "Void",
 };
 
 function StatusBadge({ status }: { status: string }) {
@@ -239,7 +267,7 @@ function BookingsCalendar({
 
 function AdminSponsorsContent() {
   const searchParams = useSearchParams();
-  const validTabs = ["weekly", "spotlights", "bookings", "profiles", "nurture", "pricing"] as const;
+  const validTabs = ["weekly", "spotlights", "invoices", "bookings", "profiles", "nurture", "pricing"] as const;
   const initialTab = validTabs.includes(searchParams.get("tab") as (typeof validTabs)[number])
     ? (searchParams.get("tab") as (typeof validTabs)[number])
     : "weekly";
@@ -547,15 +575,26 @@ function AdminSponsorsContent() {
   // Premium Directory count for this workspace (from /api/admin/sponsors).
   const [premiumCount, setPremiumCount] = useState(0);
 
+  // Admin-sent sponsor invoices (Invoices tab + Send invoice modal).
+  const [invoices, setInvoices] = useState<SponsorInvoiceRow[]>([]);
+  const [invoiceTarget, setInvoiceTarget] = useState<{ sponsorId: string; spotlightId?: string; businessName: string } | null>(null);
+  const [invoiceForm, setInvoiceForm] = useState({ kind: "premium_directory", weekStart: "" });
+  const [invoiceSubmitting, setInvoiceSubmitting] = useState(false);
+  const [invoiceError, setInvoiceError] = useState<string | null>(null);
+  const [invoiceOk, setInvoiceOk] = useState<string | null>(null);
+
   async function load() {
     setLoading(true);
     try {
-      const [sponsorRes, settingsRes] = await Promise.all([
+      const [sponsorRes, settingsRes, invoicesRes] = await Promise.all([
         workspaceFetch("/api/admin/sponsors"),
         workspaceFetch("/api/admin/settings"),
+        workspaceFetch("/api/admin/sponsors/invoices"),
       ]);
       const data = await sponsorRes.json();
       const settingsData = await settingsRes.json();
+      const invoicesData = await invoicesRes.json().catch(() => ({}));
+      setInvoices(Array.isArray(invoicesData.invoices) ? invoicesData.invoices : []);
       setSpotlights(data.spotlights || []);
       setStarredCount(typeof data.starredCount === "number" ? data.starredCount : 0);
       setStarredMax(typeof data.starredMax === "number" ? data.starredMax : 5);
@@ -836,6 +875,62 @@ function AdminSponsorsContent() {
     load();
   }
 
+  // Send invoice modal: opened from a Spotlights row (monthly items
+  // attach to that listing) or a Profiles row (the sponsor's first
+  // listing is used for monthly items).
+  function openInvoiceModal(target: { sponsorId: string; spotlightId?: string; businessName: string }) {
+    setInvoiceTarget(target);
+    setInvoiceForm({ kind: "premium_directory", weekStart: weekAvail[0]?.weekStart || "" });
+    setInvoiceError(null);
+    setInvoiceOk(null);
+  }
+
+  async function submitInvoice() {
+    if (!invoiceTarget) return;
+    if (invoiceForm.kind === "sponsor_week" && !invoiceForm.weekStart) {
+      setInvoiceError("Pick the campaign start week.");
+      return;
+    }
+    setInvoiceSubmitting(true);
+    setInvoiceError(null);
+    try {
+      const res = await workspaceFetch("/api/admin/sponsors/invoices", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sponsorId: invoiceTarget.sponsorId,
+          spotlightId: invoiceTarget.spotlightId,
+          kind: invoiceForm.kind,
+          weekStart: invoiceForm.kind === "sponsor_week" ? invoiceForm.weekStart : undefined,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setInvoiceError(data.error || "Could not send the invoice.");
+        return;
+      }
+      setInvoiceOk(`Invoice sent to ${data.invoiceSentTo || "the sponsor"}. It turns on automatically when they pay.`);
+      await load();
+    } catch {
+      setInvoiceError("Network error.");
+    } finally {
+      setInvoiceSubmitting(false);
+    }
+  }
+
+  // Cancel an unpaid admin-sent invoice: voids/releases whatever it was
+  // holding (campaign slot, Starred cap spot, duplicate guard).
+  async function cancelInvoice(id: string) {
+    if (!confirm("Cancel this unpaid invoice? Whatever it was holding (a campaign slot or Starred spot) is released.")) return;
+    const res = await workspaceFetch(`/api/admin/sponsors/invoices/${id}/cancel`, { method: "POST" });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      alert(data.error || "Could not cancel the invoice.");
+      return;
+    }
+    load();
+  }
+
   function startEditSpotlight(s: Spotlight) {
     setEditingSpotlightId(s.id);
     setSpotlightForm({
@@ -937,6 +1032,7 @@ function AdminSponsorsContent() {
         {([
           { id: "weekly", label: "Weekly Packages" },
           { id: "spotlights", label: "Spotlights" },
+          { id: "invoices", label: "Invoices" },
           { id: "bookings", label: "Bookings" },
           { id: "profiles", label: "Profiles" },
           { id: "nurture", label: "Nurture" },
@@ -1343,6 +1439,10 @@ function AdminSponsorsContent() {
                                 Cancelling — runs to {s.premium.currentPeriodEnd ? new Date(s.premium.currentPeriodEnd).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "end of paid month"}
                               </span>
                             )}
+                            <button onClick={() => openInvoiceModal({ sponsorId: s.sponsorId, spotlightId: s.id, businessName: s.businessName })}
+                              className="px-3 py-1.5 border border-green-200 text-green-700 rounded-lg text-xs font-semibold hover:bg-green-50">
+                              Send invoice
+                            </button>
                             <button onClick={() => deleteSpotlight(s.id)} className="px-3 py-1.5 text-red-500 hover:text-red-700 text-xs font-semibold">
                               Delete
                             </button>
@@ -1360,6 +1460,48 @@ function AdminSponsorsContent() {
                       )}
                     </div>
                   )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* INVOICES */}
+          {tab === "invoices" && (
+            <div className="space-y-3">
+              <p className="text-sm text-gray-500">
+                Invoices sent from this panel. Stripe emails each invoice to the business (7 days to pay);
+                what they paid for turns on automatically when the invoice is paid. Monthly items keep
+                invoicing monthly, like a subscription bought on the site.
+              </p>
+              {invoices.length === 0 && <p className="text-sm text-gray-400">No invoices sent yet. Use “Send invoice” on a Spotlights or Profiles row.</p>}
+              {invoices.map((inv) => (
+                <div key={inv.id} className="bg-white rounded-xl border border-gray-200 p-4 flex flex-wrap items-center gap-4">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap mb-0.5">
+                      <p className="text-sm font-semibold text-gray-800">{inv.sponsor.businessName}</p>
+                      <StatusBadge status={inv.status} />
+                    </div>
+                    <p className="text-xs text-gray-500">
+                      {INVOICE_KIND_LABELS[inv.kind] || inv.kind} · ${(inv.amountCents / 100).toFixed(2)}{inv.kind === "sponsor_week" ? "" : "/mo"}
+                      {" · "}Sent {new Date(inv.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                      {inv.paidAt ? ` · Paid ${new Date(inv.paidAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}` : ""}
+                    </p>
+                    <p className="text-xs text-gray-400">{inv.sponsor.contactName} ({inv.sponsor.email})</p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                    {inv.hostedInvoiceUrl && (
+                      <a href={inv.hostedInvoiceUrl} target="_blank" rel="noopener noreferrer"
+                        className="text-xs text-green-700 border border-green-200 rounded-lg px-3 py-1.5 hover:bg-green-50 whitespace-nowrap">
+                        View invoice ↗
+                      </a>
+                    )}
+                    {(inv.status === "open" || inv.status === "draft") && (
+                      <button onClick={() => cancelInvoice(inv.id)}
+                        className="text-xs text-red-500 hover:text-red-700 px-3 py-1.5 whitespace-nowrap font-semibold">
+                        Cancel invoice
+                      </button>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
@@ -1648,6 +1790,10 @@ function AdminSponsorsContent() {
                       className="text-xs text-green-700 border border-green-200 rounded-lg px-3 py-1.5 hover:bg-green-50 whitespace-nowrap">
                       {copiedUpgradeId === p.id ? "Copied ✓" : "Copy upgrade link"}
                     </button>
+                    <button onClick={() => openInvoiceModal({ sponsorId: p.id, businessName: p.businessName })}
+                      className="text-xs text-green-700 border border-green-200 rounded-lg px-3 py-1.5 hover:bg-green-50 whitespace-nowrap">
+                      Send Invoice
+                    </button>
                     <button onClick={() => deleteProfile(p)}
                       className="text-xs text-red-500 hover:text-red-700 px-3 py-1.5 whitespace-nowrap font-semibold">
                       Delete
@@ -1655,6 +1801,73 @@ function AdminSponsorsContent() {
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+
+          {/* SEND INVOICE MODAL */}
+          {invoiceTarget !== null && (
+            <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={(e) => { if (e.target === e.currentTarget) setInvoiceTarget(null); }}>
+              <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <h2 className="text-base font-bold text-gray-900">Send invoice</h2>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      To {invoiceTarget.businessName}. Stripe emails the invoice (7 days to pay);
+                      the item turns on automatically when they pay.
+                    </p>
+                  </div>
+                  <button onClick={() => setInvoiceTarget(null)} className="text-gray-400 hover:text-gray-600 text-lg leading-none shrink-0">✕</button>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Item</label>
+                  <select
+                    value={invoiceForm.kind}
+                    onChange={(e) => setInvoiceForm((f) => ({ ...f, kind: e.target.value }))}
+                    className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                  >
+                    <option value="premium_directory">Premium Directory — $19.99/mo</option>
+                    <option value="starred_board">Starred Community Board — $39.99/mo</option>
+                    <option value="sponsor_week">7-Issue Featured Campaign — priced per city</option>
+                  </select>
+                  {(invoiceForm.kind === "premium_directory" || invoiceForm.kind === "starred_board") && (
+                    <p className="text-xs text-gray-400 mt-1">
+                      Billed monthly by invoice, like a subscription. Paying the first invoice turns it on.
+                    </p>
+                  )}
+                </div>
+
+                {invoiceForm.kind === "sponsor_week" && (
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">Campaign start week</label>
+                    <select value={invoiceForm.weekStart} onChange={(e) => setInvoiceForm((f) => ({ ...f, weekStart: e.target.value }))}
+                      className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500">
+                      <option value="">Pick a week…</option>
+                      {weekAvail.map((w) => (
+                        <option key={w.weekStart} value={w.weekStart}>{formatWeekLabel(w.weekStart)}</option>
+                      ))}
+                    </select>
+                    <p className="text-xs text-gray-400 mt-1">
+                      The run is held for this business while the invoice is unpaid. The ad copy starts
+                      from their listing; you finalize it before the run goes live.
+                    </p>
+                  </div>
+                )}
+
+                {invoiceError && <p className="text-sm text-red-600">{invoiceError}</p>}
+                {invoiceOk && <p className="text-sm text-green-700">{invoiceOk}</p>}
+
+                <div className="flex gap-2">
+                  <button onClick={submitInvoice} disabled={invoiceSubmitting}
+                    className="px-4 py-2 text-sm font-medium bg-green-700 text-white rounded-lg hover:bg-green-800 disabled:opacity-50">
+                    {invoiceSubmitting ? "Sending..." : "Send invoice"}
+                  </button>
+                  <button onClick={() => setInvoiceTarget(null)}
+                    className="px-4 py-2 text-sm font-medium border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-100">
+                    Close
+                  </button>
+                </div>
+              </div>
             </div>
           )}
 

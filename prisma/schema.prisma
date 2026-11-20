@@ -36,6 +36,7 @@ model Workspace {
   spotlightListingRows        SpotlightListing[]
   starredBoardSubscriptionRows StarredBoardSubscription[]
   premiumDirectorySubscriptionRows PremiumDirectorySubscription[]
+  sponsorInvoiceRows          SponsorInvoice[]
   adBookingRows               AdBooking[]
   sponsorWeekRows             SponsorWeek[]
   sponsorHoldRows             SponsorHold[]
@@ -276,6 +277,7 @@ model SponsorProfile {
   spotlights    SpotlightListing[]
   starredBoardSubscriptions StarredBoardSubscription[]
   premiumDirectorySubscriptions PremiumDirectorySubscription[]
+  invoices      SponsorInvoice[]
   bookings      AdBooking[]
   weekBookings  SponsorWeekBooking[]
   events        Event[]
@@ -435,6 +437,7 @@ model SpotlightListing {
   sendAppearances    NewsletterSendSpotlight[]
   starredSubscriptions StarredBoardSubscription[]
   premiumDirectorySubscriptions PremiumDirectorySubscription[]
+  invoices           SponsorInvoice[]
 
   @@unique([id, workspaceId])
   @@index([workspaceId])
@@ -502,6 +505,41 @@ model PremiumDirectorySubscription {
   @@index([workspaceId, spotlightId])
   @@index([spotlightId])
   @@index([stripeCustomerId])
+}
+
+// One row per invoice an admin sends a sponsor from the admin panel
+// (Admin > Sponsors > Invoices). Monthly items (Premium Directory,
+// Starred Community Board) are billed as send_invoice subscriptions:
+// this row tracks the FIRST invoice, the activation-relevant one, while
+// renewals live on the subscription rows. Campaign invoices are one-off
+// Stripe invoices linked to a pending SponsorWeekBooking (bookingId).
+// Status mirrors the Stripe invoice status (draft | open | paid | void
+// | uncollectible), plus a local "cancelled" for monthly rows whose
+// subscription was cancelled before the first invoice was paid.
+model SponsorInvoice {
+  workspaceId          String            @default("decatur")
+  workspace            Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  id                   String            @id @default(cuid())
+  sponsorId            String
+  sponsor              SponsorProfile    @relation(fields: [sponsorId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
+  spotlightId          String?
+  spotlight            SpotlightListing? @relation(fields: [spotlightId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
+  kind                 String // premium_directory | starred_board | sponsor_week
+  amountCents          Int
+  stripeInvoiceId      String            @unique
+  stripeCustomerId     String
+  stripeSubscriptionId String?
+  bookingId            String?
+  status               String            @default("open") // draft | open | paid | void | uncollectible | cancelled
+  hostedInvoiceUrl     String?
+  createdAt            DateTime          @default(now())
+  paidAt               DateTime?
+
+  @@unique([id, workspaceId])
+  @@index([workspaceId, status])
+  @@index([workspaceId, sponsorId])
+  @@index([stripeCustomerId])
+  @@index([stripeSubscriptionId])
 }
 
 model AdBooking {

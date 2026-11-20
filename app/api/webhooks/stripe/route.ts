@@ -332,8 +332,16 @@ async function handlePremiumDirectoryEvent(event: Stripe.Event, stripe: Stripe):
     }
     await basePrisma.premiumDirectorySubscription.update({
       where: { id: sub.id },
-      data: { status: "active", ...(periodEnd ? { currentPeriodEnd: periodEnd } : {}) },
+      data: {
+        status: "active",
+        // Invoice-billed subscriptions (admin-sent) never pass through
+        // checkout fulfillment, so the first invoice.paid is what sets
+        // their start date.
+        ...(sub.startedAt ? {} : { startedAt: new Date() }),
+        ...(periodEnd ? { currentPeriodEnd: periodEnd } : {}),
+      },
     });
+    await markSponsorInvoicePaid(obj.id);
   } else if (event.type === "invoice.payment_failed") {
     await basePrisma.premiumDirectorySubscription.update({
       where: { id: sub.id },
@@ -576,8 +584,16 @@ async function handleStarredBoardEvent(event: Stripe.Event, stripe: Stripe): Pro
     }
     await basePrisma.starredBoardSubscription.update({
       where: { id: sub.id },
-      data: { status: "active", ...(periodEnd ? { currentPeriodEnd: periodEnd } : {}) },
+      data: {
+        status: "active",
+        // Invoice-billed subscriptions (admin-sent) never pass through
+        // checkout fulfillment, so the first invoice.paid is what sets
+        // their start date.
+        ...(sub.startedAt ? {} : { startedAt: new Date() }),
+        ...(periodEnd ? { currentPeriodEnd: periodEnd } : {}),
+      },
     });
+    await markSponsorInvoicePaid(obj.id);
   } else if (event.type === "invoice.payment_failed") {
     await basePrisma.starredBoardSubscription.update({
       where: { id: sub.id },
@@ -611,6 +627,53 @@ async function handleStarredBoardEvent(event: Stripe.Event, stripe: Stripe): Pro
       },
     });
   }
+  return true;
+}
+
+// Admin-sent sponsor invoices (Admin > Sponsors > Invoices): keep the
+// SponsorInvoice record truthful when one of its invoices is paid. Only
+// the recorded invoice id matches (for monthly items that is the first,
+// activation-relevant invoice); renewal invoices no-op here.
+async function markSponsorInvoicePaid(invoiceId: unknown): Promise<void> {
+  if (typeof invoiceId !== "string" || !invoiceId) return;
+  await basePrisma.sponsorInvoice.updateMany({
+    where: { stripeInvoiceId: invoiceId, status: { not: "paid" } },
+    data: { status: "paid", paidAt: new Date() },
+  });
+}
+
+// Admin-sent campaign invoices: a one-off Stripe invoice carries no
+// subscription, so the lifecycle handlers above cannot match it. Its
+// metadata names the pending booking; on invoice.paid, fulfill it
+// exactly like a checkout payment (the shared fulfillPaidWeekBooking the
+// webhook and the admin mark-paid action both use) and mark the
+// SponsorInvoice record paid. Returns true when the event was one of
+// these invoices. Idempotent: fulfillment no-ops once the booking is
+// paid, and the record flip is a plain status update.
+async function handleSponsorWeekInvoiceEvent(event: Stripe.Event): Promise<boolean> {
+  if (event.type !== "invoice.paid") return false;
+  const invoice = event.data.object as Stripe.Invoice;
+  if (invoice.metadata?.kind !== "sponsor_week_invoice") return false;
+  const bookingId = invoice.metadata?.bookingId;
+  const workspaceId = invoice.metadata?.workspaceId;
+  if (!bookingId || !workspaceId) return false;
+
+  const booking = await basePrisma.sponsorWeekBooking.findFirst({
+    where: { id: bookingId, workspaceId },
+    include: { week: { select: { weekStart: true } }, sponsor: { select: { magicToken: true } } },
+  });
+  if (!booking) {
+    // Money captured for a booking that no longer exists (an admin
+    // cancelled the invoice, which deletes the pending booking, but the
+    // business paid anyway). Loud, like the checkout missing-row case.
+    console.error(
+      `Sponsor week invoice ${invoice.id} paid but booking ${bookingId} not found in ${workspaceId}; no ad was placed.`
+    );
+    return true;
+  }
+  const { fulfillPaidWeekBooking } = await import("@/lib/sponsor-week-fulfillment");
+  await fulfillPaidWeekBooking(workspaceId, booking);
+  await markSponsorInvoicePaid(invoice.id);
   return true;
 }
 
@@ -855,6 +918,8 @@ export async function POST(req: NextRequest) {
     if (premiumHandled) return NextResponse.json({ received: true, premiumDirectory: true });
     const bookHandled = await handleCouponBookSubscriptionEvent(event, stripe);
     if (bookHandled) return NextResponse.json({ received: true, couponBook: true });
+    const sponsorInvoiceHandled = await handleSponsorWeekInvoiceEvent(event);
+    if (sponsorInvoiceHandled) return NextResponse.json({ received: true, sponsorWeekInvoice: true });
     // Not a partnership or book event: fall through to normal handling.
   }
 
