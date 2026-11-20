@@ -111,6 +111,12 @@ export default function ContestPage() {
               href="/"
               className="inline-block bg-green-700 text-white font-semibold text-sm px-5 py-2.5 rounded-lg hover:bg-green-800 transition-colors"
             ><WorkspaceText>{" Subscribe to The Gist Decatur "}</WorkspaceText></Link>
+            <p className="text-sm text-gray-500 mt-6">
+              Your referrals still earn Reader Rewards points.{" "}
+              <Link href="/rewards" className="text-green-700 font-semibold underline">
+                Check your balance →
+              </Link>
+            </p>
           </div>
         ) : refLink ? (
           /* Success — show referral link */
@@ -186,6 +192,13 @@ export default function ContestPage() {
                 </div>
               </div>
             </div>
+
+            <p className="text-sm text-gray-500 mt-6">
+              Every referral also earns you Reader Rewards points.{" "}
+              <Link href="/rewards" className="text-green-700 font-semibold underline">
+                See your points →
+              </Link>
+            </p>
           </div>
         ) : (
           /* Main form */
