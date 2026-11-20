@@ -988,7 +988,7 @@ export async function POST(req: NextRequest) {
     });
 
     // Reader Rewards: product and Deals purchases earn the buyer points
-    // (1 pt per $1 by default). For a gift, the BUYER earns, never the
+    // (5 pts per $1 by default). For a gift, the BUYER earns, never the
     // recipient. Idempotent per session, so a re-delivered event pays
     // once; a buyer with no subscriber row earns nothing. Failures only
     // log: points must never break fulfillment.

@@ -79,7 +79,7 @@ export default function SettingsPage() {
     stripe_price_presenting_cents: "2500",
     stripe_price_wordy_cents: "2000",
     rewards_referral_signup_points: "50",
-    rewards_purchase_points_per_dollar: "1",
+    rewards_purchase_points_per_dollar: "5",
     rewards_deals_year_cost_points: "1500",
   });
   const [hasSmtp, setHasSmtp] = useState(false);
@@ -88,6 +88,9 @@ export default function SettingsPage() {
   const [saved, setSaved] = useState(false);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null);
+  const [backfilling, setBackfilling] = useState(false);
+  const [backfillResult, setBackfillResult] = useState<string | null>(null);
+  const [backfillError, setBackfillError] = useState<string | null>(null);
 
   async function loadSettings() {
     const res = await workspaceFetch("/api/admin/settings");
@@ -131,6 +134,39 @@ export default function SettingsPage() {
     const data = await res.json();
     setTestResult({ ok: res.ok, message: data.message });
     setTesting(false);
+  }
+
+  async function handleBackfill() {
+    setBackfilling(true);
+    setBackfillResult(null);
+    setBackfillError(null);
+    try {
+      const res = await workspaceFetch("/api/admin/rewards/backfill", {
+        method: "POST",
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "The backfill failed. Nothing was credited.");
+      }
+      const skipped =
+        (data.dealsPurchases?.skippedNoSession ?? 0) +
+        (data.dealsPurchases?.skippedUnresolved ?? 0);
+      setBackfillResult(
+        `Credited ${data.readersCredited} readers with ${data.pointsIssued} points: ` +
+          `${data.referrals.entriesCreated} referral awards (${data.referrals.pointsIssued} pts), ` +
+          `${data.productOrders.entriesCreated} product orders (${data.productOrders.pointsIssued} pts), ` +
+          `${data.dealsPurchases.entriesCreated} Deals purchases (${data.dealsPurchases.pointsIssued} pts).` +
+          (skipped > 0
+            ? ` ${skipped} Deals records were skipped (no Stripe session to verify, or not a paid book purchase).`
+            : "") +
+          ` Running this again adds nothing new.`
+      );
+    } catch (error) {
+      setBackfillError(
+        error instanceof Error ? error.message : "The backfill failed. Nothing was credited."
+      );
+    }
+    setBackfilling(false);
   }
 
   if (loading) {
@@ -661,7 +697,7 @@ export default function SettingsPage() {
                 onChange={(e) => setSettings((s) => ({ ...s, rewards_purchase_points_per_dollar: e.target.value }))}
                 className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
               />
-              <p className="text-xs text-gray-400 mt-1">Points per whole dollar spent on products and Deals (default: 1)</p>
+              <p className="text-xs text-gray-400 mt-1">Points per whole dollar spent on products and Deals (default: 5)</p>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">
@@ -677,6 +713,32 @@ export default function SettingsPage() {
               />
               <p className="text-xs text-gray-400 mt-1">Points a free year of Deals costs in a workspace that has not seeded its catalog yet (default: 1500)</p>
             </div>
+          </div>
+
+          <div className="mt-6 pt-5 border-t border-gray-100">
+            <h3 className="text-sm font-medium text-gray-700">Launch backfill</h3>
+            <p className="text-xs text-gray-400 mt-1">
+              One-time catch-up for this workspace: credit readers for the purchases and
+              referrals they made before Reader Rewards launched, at the rates above.
+              Save any rate changes first. Safe to run more than once: the same order or
+              signup is never credited twice.
+            </p>
+            <div className="flex items-center gap-3 mt-3">
+              <button
+                type="button"
+                onClick={handleBackfill}
+                disabled={backfilling}
+                className="bg-white border border-green-700 text-green-700 hover:bg-green-50 px-4 py-2 rounded-lg text-sm font-semibold transition-colors disabled:opacity-60"
+              >
+                {backfilling ? "Crediting…" : "Credit past purchases and referrals"}
+              </button>
+              {backfillError && (
+                <span className="text-red-600 text-sm font-medium">{backfillError}</span>
+              )}
+            </div>
+            {backfillResult && (
+              <p className="text-sm text-green-700 mt-3">{backfillResult}</p>
+            )}
           </div>
         </div>
 

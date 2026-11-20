@@ -30,7 +30,7 @@ export const REWARD_SETTING_KEYS: string[] = Object.values(SETTING_KEYS);
 
 const DEFAULTS = {
   referralSignupPoints: 50,
-  purchasePointsPerDollar: 1,
+  purchasePointsPerDollar: 5,
   dealsYearCostPoints: 1500,
 } as const;
 
@@ -92,6 +92,7 @@ export async function awardReferralPoints(
     referralSignupId: string;
     referrerSubscriberId: string;
     newSubscriberId: string;
+    note?: string;
   }
 ): Promise<boolean> {
   if (!args.referrerSubscriberId || !args.referralSignupId) return false;
@@ -111,6 +112,7 @@ export async function awardReferralPoints(
         kind: REWARD_KIND_REFERRAL_SIGNUP,
         points: config.referralSignupPoints,
         sourceRef: args.referralSignupId,
+        note: args.note ?? null,
       },
     });
     return true;
@@ -121,7 +123,7 @@ export async function awardReferralPoints(
 }
 
 // Earn hook: a paid product or Deals purchase. Points are whole dollars of
-// the order amount times the configured per-dollar rate (default 1 pt per
+// the order amount times the configured per-dollar rate (default 5 pts per
 // $1). The buyer is resolved by email, because purchase rows are
 // email-keyed; a buyer with no subscriber row in this workspace earns
 // nothing (safe no-op). Idempotent per Stripe checkout session.
@@ -132,6 +134,7 @@ export async function awardPurchasePoints(
     email: string;
     amountCents: number;
     sessionId: string;
+    note?: string;
   }
 ): Promise<boolean> {
   const email = (args.email || "").trim().toLowerCase();
@@ -154,6 +157,7 @@ export async function awardPurchasePoints(
         kind: REWARD_KIND_PURCHASE,
         points,
         sourceRef: args.sessionId,
+        note: args.note ?? null,
       },
     });
     return true;
@@ -161,6 +165,208 @@ export async function awardPurchasePoints(
     if (isUniqueViolation(error)) return false;
     throw error;
   }
+}
+
+// ── Launch backfill ─────────────────────────────────────────────────────
+//
+// Retroactive credit for activity from before Reader Rewards existed,
+// triggered by an admin from Admin > Settings (POST
+// /api/admin/rewards/backfill), once per workspace at launch. It never
+// runs automatically.
+//
+// The backfill awards through the same two hooks the live flow uses, so
+// every entry it creates carries the same (workspaceId, kind, sourceRef)
+// idempotency key the live flow writes: a ReferralSignup id for a
+// referral, a Stripe checkout session id for a purchase. Re-running it
+// therefore creates nothing new, and the live flow can never double-award
+// a backfilled order or signup. Entries it creates are stamped with
+// BACKFILL_NOTE so a reader's activity list shows why the points
+// appeared.
+//
+// Sources mirror the live flow exactly:
+// - Referrals: every ReferralSignup row in the workspace, at the current
+//   configured referral value.
+// - Products: every paid ProductOrder row, at the row's stored
+//   amountCents. Both live product flows (the product checkout and the
+//   legacy Payment Link flow) record the session total there and award
+//   on it, so the stored amount is the live amount basis.
+// - Deals: every CouponBookPurchase row carrying a Stripe checkout
+//   session id. Those rows store neither an amount nor (for a gift) the
+//   buyer, so the caller resolves each session back to the paid purchase
+//   the live flow would have awarded on (session kind, buyer email,
+//   session total). Rows with no session (reward redemptions, manual
+//   grants) and sessions that do not resolve to a paid book, upgrade, or
+//   gift purchase are skipped and counted. Mini guide purchases and
+//   Deals subscription renewals earn nothing in the live flow, so they
+//   earn nothing here either.
+
+export const BACKFILL_NOTE = "Launch credit for activity before Reader Rewards";
+
+export interface DealsSessionResolution {
+  buyerEmail: string;
+  amountCents: number;
+}
+
+export interface RewardsBackfillResult {
+  workspaceId: string;
+  readersCredited: number;
+  pointsIssued: number;
+  referrals: {
+    signupsFound: number;
+    entriesCreated: number;
+    pointsIssued: number;
+  };
+  productOrders: {
+    ordersFound: number;
+    entriesCreated: number;
+    pointsIssued: number;
+  };
+  dealsPurchases: {
+    purchasesFound: number;
+    entriesCreated: number;
+    pointsIssued: number;
+    skippedNoSession: number;
+    skippedUnresolved: number;
+  };
+}
+
+function purchasePointsFor(amountCents: number, config: RewardConfig): number {
+  return (
+    Math.floor(Math.max(0, amountCents) / 100) * config.purchasePointsPerDollar
+  );
+}
+
+async function markReaderCredited(
+  db: PrismaClient,
+  workspaceId: string,
+  email: string,
+  credited: Record<string, true>
+): Promise<void> {
+  const normalized = (email || "").trim().toLowerCase();
+  if (!normalized) return;
+  const subscriber = await db.subscriber.findFirst({
+    where: { workspaceId, email: normalized },
+    select: { id: true },
+  });
+  if (subscriber) credited[subscriber.id] = true;
+}
+
+export async function backfillRewards(
+  db: PrismaClient,
+  args: {
+    workspaceId: string;
+    resolveDealsSession: (
+      sessionId: string
+    ) => Promise<DealsSessionResolution | null>;
+  }
+): Promise<RewardsBackfillResult> {
+  const { workspaceId } = args;
+  const config = await getRewardConfig(db, workspaceId);
+  const credited: Record<string, true> = {};
+  const result: RewardsBackfillResult = {
+    workspaceId,
+    readersCredited: 0,
+    pointsIssued: 0,
+    referrals: { signupsFound: 0, entriesCreated: 0, pointsIssued: 0 },
+    productOrders: { ordersFound: 0, entriesCreated: 0, pointsIssued: 0 },
+    dealsPurchases: {
+      purchasesFound: 0,
+      entriesCreated: 0,
+      pointsIssued: 0,
+      skippedNoSession: 0,
+      skippedUnresolved: 0,
+    },
+  };
+
+  const signups = await db.referralSignup.findMany({
+    where: { workspaceId },
+    orderBy: { createdAt: "asc" },
+    select: {
+      id: true,
+      newSubscriberId: true,
+      referralCode: { select: { subscriberId: true } },
+    },
+  });
+  result.referrals.signupsFound = signups.length;
+  for (const signup of signups) {
+    const awarded = await awardReferralPoints(db, {
+      workspaceId,
+      referralSignupId: signup.id,
+      referrerSubscriberId: signup.referralCode.subscriberId,
+      newSubscriberId: signup.newSubscriberId ?? "",
+      note: BACKFILL_NOTE,
+    });
+    if (awarded) {
+      result.referrals.entriesCreated += 1;
+      result.referrals.pointsIssued += config.referralSignupPoints;
+      credited[signup.referralCode.subscriberId] = true;
+    }
+  }
+
+  const orders = await db.productOrder.findMany({
+    where: { workspaceId, status: "paid", stripeSessionId: { not: null } },
+    orderBy: { createdAt: "asc" },
+    select: { email: true, amountCents: true, stripeSessionId: true },
+  });
+  result.productOrders.ordersFound = orders.length;
+  for (const order of orders) {
+    if (!order.stripeSessionId) continue;
+    const awarded = await awardPurchasePoints(db, {
+      workspaceId,
+      email: order.email,
+      amountCents: order.amountCents,
+      sessionId: order.stripeSessionId,
+      note: BACKFILL_NOTE,
+    });
+    if (awarded) {
+      result.productOrders.entriesCreated += 1;
+      result.productOrders.pointsIssued += purchasePointsFor(
+        order.amountCents,
+        config
+      );
+      await markReaderCredited(db, workspaceId, order.email, credited);
+    }
+  }
+
+  const purchases = await db.couponBookPurchase.findMany({
+    where: { workspaceId },
+    orderBy: { createdAt: "asc" },
+    select: { stripeSessionId: true },
+  });
+  result.dealsPurchases.purchasesFound = purchases.length;
+  for (const purchase of purchases) {
+    if (!purchase.stripeSessionId) {
+      result.dealsPurchases.skippedNoSession += 1;
+      continue;
+    }
+    const resolved = await args.resolveDealsSession(purchase.stripeSessionId);
+    if (!resolved) {
+      result.dealsPurchases.skippedUnresolved += 1;
+      continue;
+    }
+    const awarded = await awardPurchasePoints(db, {
+      workspaceId,
+      email: resolved.buyerEmail,
+      amountCents: resolved.amountCents,
+      sessionId: purchase.stripeSessionId,
+      note: BACKFILL_NOTE,
+    });
+    if (awarded) {
+      result.dealsPurchases.entriesCreated += 1;
+      result.dealsPurchases.pointsIssued += purchasePointsFor(
+        resolved.amountCents,
+        config
+      );
+      await markReaderCredited(db, workspaceId, resolved.buyerEmail, credited);
+    }
+  }
+
+  result.pointsIssued =
+    result.referrals.pointsIssued +
+    result.productOrders.pointsIssued +
+    result.dealsPurchases.pointsIssued;
+  result.readersCredited = Object.keys(credited).length;
+  return result;
 }
 
 // The phase-1 catalog is exactly one Gist-owned item. Ensured lazily (the
