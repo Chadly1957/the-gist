@@ -78,7 +78,7 @@ export default function SettingsPage() {
     stripe_price_in_article_cents: "1500",
     stripe_price_presenting_cents: "2500",
     stripe_price_wordy_cents: "2000",
-    rewards_referral_signup_points: "250",
+    rewards_referral_signup_points: "50",
     rewards_purchase_points_per_dollar: "1",
     rewards_deals_year_cost_points: "1500",
   });
@@ -647,7 +647,7 @@ export default function SettingsPage() {
                 onChange={(e) => setSettings((s) => ({ ...s, rewards_referral_signup_points: e.target.value }))}
                 className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
               />
-              <p className="text-xs text-gray-400 mt-1">Points the referrer earns per new subscriber (default: 250)</p>
+              <p className="text-xs text-gray-400 mt-1">Points the referrer earns per new subscriber (default: 50)</p>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">

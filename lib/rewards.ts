@@ -29,7 +29,7 @@ const SETTING_KEYS = {
 export const REWARD_SETTING_KEYS: string[] = Object.values(SETTING_KEYS);
 
 const DEFAULTS = {
-  referralSignupPoints: 250,
+  referralSignupPoints: 50,
   purchasePointsPerDollar: 1,
   dealsYearCostPoints: 1500,
 } as const;
