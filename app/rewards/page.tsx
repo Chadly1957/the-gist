@@ -36,6 +36,8 @@ interface Summary {
     accessUntil: string | null;
   };
   referralCode?: string | null;
+  referralLink?: string | null;
+  referralSignupPoints?: number;
 }
 
 const KIND_LABELS: Record<string, string> = {
@@ -66,6 +68,7 @@ function RewardsPageInner() {
   const [summary, setSummary] = useState<Summary | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [error, setError] = useState("");
+  const [copied, setCopied] = useState(false);
   const [redeeming, setRedeeming] = useState(false);
   const [redeemed, setRedeemed] = useState<{ code: string; accessUntil: string } | null>(null);
   const [redeemError, setRedeemError] = useState("");
@@ -120,6 +123,14 @@ function RewardsPageInner() {
     } finally {
       setRedeeming(false);
     }
+  }
+
+  function copyReferralLink() {
+    if (!summary?.referralLink) return;
+    navigator.clipboard.writeText(summary.referralLink).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
   }
 
   const item = summary?.catalog?.[0];
@@ -198,15 +209,24 @@ function RewardsPageInner() {
                   </span>
                 </span>
               </div>
-              {summary.referralCode && (
-                <p className="text-xs text-gray-400 mt-4">
-                  Tip: every friend who subscribes through your referral link earns
-                  you points. Your link is on the{" "}
-                  <a href="/contest" className="text-green-700 underline">
-                    giveaway page
-                  </a>
-                  .
-                </p>
+              {summary.referralLink && (
+                <div className="mt-5 text-left">
+                  <p className="text-sm font-semibold text-gray-800 text-center mb-3">
+                    Refer friends to sign up for the newsletter -{" "}
+                    {summary.referralSignupPoints ?? 50} points per subscriber!
+                  </p>
+                  <div className="flex items-stretch gap-2">
+                    <p className="flex-1 min-w-0 text-sm font-mono text-gray-800 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 break-all leading-relaxed select-all">
+                      {summary.referralLink}
+                    </p>
+                    <button
+                      onClick={copyReferralLink}
+                      className="shrink-0 bg-green-700 hover:bg-green-800 text-white font-semibold px-4 rounded-xl transition-colors text-sm"
+                    >
+                      {copied ? "Copied ✓" : "Copy"}
+                    </button>
+                  </div>
+                </div>
               )}
             </div>
 
@@ -304,6 +324,7 @@ function RewardsPageInner() {
                 setRedeemed(null);
                 setRedeemError("");
                 setNotFound(false);
+                setCopied(false);
               }}
               className="mt-6 w-full text-xs text-gray-400 underline"
             >
