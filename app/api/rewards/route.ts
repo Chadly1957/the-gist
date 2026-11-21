@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { basePrisma } from "@/lib/db-base";
-import { getWorkspace } from "@/lib/workspace";
+import { getWorkspace, getWorkspaceUrl } from "@/lib/workspace";
 import {
   ensureDealsYearCatalogItem,
   getDealsAccess,
+  getRewardConfig,
   getRewardsSummary,
 } from "@/lib/rewards";
 
@@ -31,13 +32,15 @@ export async function POST(req: NextRequest) {
   }
 
   const item = await ensureDealsYearCatalogItem(basePrisma, workspace.id);
-  const [summary, dealsAccess, referralCode] = await Promise.all([
+  const [summary, dealsAccess, referralCode, config, appUrl] = await Promise.all([
     getRewardsSummary(basePrisma, workspace.id, subscriber.id),
     getDealsAccess(basePrisma, workspace.id, normalizedEmail),
     basePrisma.referralCode.findUnique({
       where: { subscriberId: subscriber.id },
       select: { code: true },
     }),
+    getRewardConfig(basePrisma, workspace.id),
+    getWorkspaceUrl(),
   ]);
 
   return NextResponse.json({
@@ -67,5 +70,11 @@ export async function POST(req: NextRequest) {
       accessUntil: dealsAccess.accessUntil,
     },
     referralCode: referralCode?.code ?? null,
+    // The reader's full referral link, built exactly the way the giveaway
+    // page builds it (app/api/contest/route.ts): workspace URL + /refer/<code>.
+    referralLink: referralCode ? `${appUrl}/refer/${referralCode.code}` : null,
+    // The live per-referral point value (Admin > Settings) so the page copy
+    // can never go stale when the value changes.
+    referralSignupPoints: config.referralSignupPoints,
   });
 }
