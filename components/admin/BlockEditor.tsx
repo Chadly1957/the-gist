@@ -8,7 +8,7 @@ import UrlInput from "@/components/UrlInput";
 
 export interface Block {
   id: string;
-  type: "header" | "text" | "image" | "articles" | "divider" | "button" | "footer" | "spotlight" | "presenting_sponsor" | "presenting_logo_bar" | "presenting_spotlight" | "events" | "referral" | "poll" | "wordy" | "match" | "games" | "tip_jar" | "deals_signup" | "weather" | "product_spotlight" | "board" | "guide_spotlight";
+  type: "header" | "text" | "image" | "articles" | "divider" | "button" | "footer" | "spotlight" | "presenting_sponsor" | "presenting_logo_bar" | "presenting_spotlight" | "events" | "referral" | "poll" | "wordy" | "match" | "games" | "tip_jar" | "deals_signup" | "weather" | "product_spotlight" | "board" | "guide_spotlight" | "rewards";
   content: Record<string, string>;
 }
 
@@ -53,6 +53,7 @@ const BLOCK_TYPES: { type: Block["type"]; label: string; icon: string }[] = [
   { type: "games", label: "Games (Wordy + Match)", icon: "🎮" },
   { type: "tip_jar", label: "Tip Jar", icon: "☕" },
   { type: "deals_signup", label: "Gist Deals Signup", icon: "🎟️" },
+  { type: "rewards", label: "Reader Rewards", icon: "⭐" },
   { type: "weather", label: "Weather Snapshot", icon: "🌤️" },
   { type: "product_spotlight", label: "Product Spotlight", icon: "🛍️" },
   { type: "guide_spotlight", label: "Guide Spotlight", icon: "📖" },
@@ -146,6 +147,11 @@ export default function BlockEditor({ blocks, onChange }: BlockEditorProps) {
         headline: "Introducing The Gist Deals",
         body: "Hundreds of deals from local businesses and your favorite stores. $15 once, yours for life.",
         buttonLabel: "Get the Book",
+      },
+      rewards: {
+        title: "Your Reader Rewards",
+        text: "You earn points for referring friends and shopping with The Gist — 100 points = $1, and 1,500 points scores a free year of The Gist Deals. Check your balance anytime.",
+        buttonLabel: "See My Points →",
       },
       weather: {
         label: "Today's Weather",
@@ -526,6 +532,17 @@ function BlockPreview({ block, products = [], minis = [] }: { block: Block; prod
           </span>
         </div>
       );
+    case "rewards":
+      return (
+        <div className="bg-green-50 border border-green-200 rounded-xl p-4 text-center">
+          <div className="text-xs font-semibold text-green-700 uppercase tracking-wide mb-1">Reader Rewards</div>
+          <p className="text-sm font-bold text-gray-900 mb-1">⭐ {block.content.title || "Your Reader Rewards"}</p>
+          <p className="text-xs text-gray-500 mb-2">{block.content.text || "You earn points for referring friends and shopping with The Gist."}</p>
+          <span className="inline-block bg-green-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg">
+            {block.content.buttonLabel || "See My Points →"}
+          </span>
+        </div>
+      );
     case "weather":
       return (
         <div className="flex items-center gap-3 py-2">
@@ -889,6 +906,15 @@ function BlockFields({
           {field("body", "Body", { placeholder: "Hundreds of deals from local businesses and your favorite stores. $15 once, yours for life." })}
           {field("buttonLabel", "Button Label", { placeholder: "Get the Book" })}
           <p className="text-xs text-gray-400">Links to this workspace&apos;s Deals Book signup page ({"/deals"}).</p>
+        </div>
+      );
+    case "rewards":
+      return (
+        <div className="space-y-3">
+          {field("title", "Heading", { placeholder: "Your Reader Rewards" })}
+          {field("text", "Body Text", { rows: 2, placeholder: "You earn points for referring friends and shopping with The Gist — 100 points = $1, and 1,500 points scores a free year of The Gist Deals. Check your balance anytime." })}
+          {field("buttonLabel", "Button Label", { placeholder: "See My Points →" })}
+          <p className="text-xs text-gray-400">The button links to each subscriber&apos;s own Rewards page: when the issue is sent, their email is filled in automatically so the link opens their points. The preview only ever shows a placeholder link, never a real reader&apos;s.</p>
         </div>
       );
     case "weather":

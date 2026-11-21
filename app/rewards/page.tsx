@@ -2,8 +2,10 @@
 import { useWorkspace } from "@/components/workspace/WorkspaceProvider";
 import { workspaceFetch } from "@/lib/workspace-client";
 
-import { useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import SiteHeader from "@/components/SiteHeader";
+import RewardsLinkForm from "@/components/RewardsLinkForm";
 
 interface RewardEntry {
   kind: string;
@@ -50,10 +52,17 @@ function formatDate(iso: string): string {
   });
 }
 
-export default function RewardsPage() {
+function RewardsPageInner() {
   const { workspace } = useWorkspace();
-  const [email, setEmail] = useState("");
-  const [loading, setLoading] = useState(false);
+  const searchParams = useSearchParams();
+  // Readers arrive from their emailed personal link (/rewards?email=...),
+  // the same passthrough the Deals page uses: the address they already
+  // gave us is never re-typed, and the points view opens on its own.
+  const emailParam = searchParams.get("email");
+  const initialEmail =
+    emailParam && emailParam.includes("@") ? emailParam.trim().toLowerCase() : "";
+  const [email, setEmail] = useState(initialEmail);
+  const [opening, setOpening] = useState(initialEmail !== "");
   const [summary, setSummary] = useState<Summary | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [error, setError] = useState("");
@@ -77,21 +86,18 @@ export default function RewardsPage() {
     setSummary(data);
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!email.trim()) return;
-    setError("");
-    setRedeemed(null);
-    setRedeemError("");
-    setLoading(true);
-    try {
-      await loadSummary(email.trim());
-    } catch {
-      setError("Something went wrong. Please try again.");
-    } finally {
-      setLoading(false);
-    }
-  }
+  // Open the points view automatically when the reader lands from their
+  // emailed link. Runs once per distinct link email.
+  const openedFor = useRef("");
+  useEffect(() => {
+    if (!initialEmail || openedFor.current === initialEmail) return;
+    openedFor.current = initialEmail;
+    setOpening(true);
+    loadSummary(initialEmail)
+      .catch(() => setError("Something went wrong. Please try again."))
+      .finally(() => setOpening(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialEmail]);
 
   async function handleRedeem(itemKey: string) {
     setRedeemError("");
@@ -131,7 +137,7 @@ export default function RewardsPage() {
             ⭐ Reader Rewards
           </div>
           <h1 className="text-3xl font-bold text-gray-900 mb-3 leading-tight">
-            Your {workspace.name} Points
+            Reader Rewards
           </h1>
           <p className="text-gray-500 text-sm">
             Earn points for referring friends and shopping with {workspace.name},
@@ -140,44 +146,33 @@ export default function RewardsPage() {
         </div>
 
         {!summary ? (
-          <form onSubmit={handleSubmit} className="space-y-3">
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
-                Email Address <span className="text-red-500">*</span>
-              </label>
-              <input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="jane@example.com"
-                required
-                autoFocus
-                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition"
-              />
-            </div>
-            {notFound && (
-              <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl px-4 py-3">
-                We couldn&apos;t find an active subscription for that email. Subscribe
-                first, then come back to see your points.
+          <div className="space-y-3">
+            {opening ? (
+              <p className="text-sm text-center text-gray-500 py-4">
+                Opening your Rewards page…
               </p>
+            ) : (
+              <>
+                {notFound && (
+                  <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl px-4 py-3">
+                    We couldn&apos;t find an active subscription for that email. Subscribe
+                    first, then come back to see your points.
+                  </p>
+                )}
+                {error && (
+                  <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl px-4 py-3">
+                    {error}
+                  </p>
+                )}
+                <p className="text-sm text-gray-600">
+                  Enter your email and we&apos;ll send you your personal Rewards
+                  link — your balance, your activity, and what your points can
+                  get you, one tap away. No password needed.
+                </p>
+                <RewardsLinkForm />
+              </>
             )}
-            {error && (
-              <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl px-4 py-3">
-                {error}
-              </p>
-            )}
-            <button
-              type="submit"
-              disabled={loading || !email.trim()}
-              className="w-full bg-green-700 hover:bg-green-800 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-3.5 rounded-xl transition-colors text-sm"
-            >
-              {loading ? "Looking up your points…" : "See My Points →"}
-            </button>
-            <p className="text-xs text-center text-gray-400">
-              Use the email you subscribe with. No password needed.
-            </p>
-          </form>
+          </div>
         ) : (
           <>
             {/* Balance */}
@@ -308,6 +303,7 @@ export default function RewardsPage() {
                 setSummary(null);
                 setRedeemed(null);
                 setRedeemError("");
+                setNotFound(false);
               }}
               className="mt-6 w-full text-xs text-gray-400 underline"
             >
@@ -317,5 +313,19 @@ export default function RewardsPage() {
         )}
       </main>
     </div>
+  );
+}
+
+export default function RewardsPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center">
+          <p className="text-gray-500">Loading…</p>
+        </div>
+      }
+    >
+      <RewardsPageInner />
+    </Suspense>
   );
 }

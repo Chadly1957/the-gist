@@ -9,6 +9,7 @@ import DealsOto from "@/components/DealsOto";
 import SponsorsMarquee from "@/components/SponsorsMarquee";
 import OriginalArticles from "@/components/OriginalArticles";
 import ProductsSection, { type ShopProduct } from "@/components/ProductsSection";
+import RewardsLinkForm from "@/components/RewardsLinkForm";
 import PhoneIssuePreview from "@/components/PhoneIssuePreview";
 import SiteHeader from "@/components/SiteHeader";
 
@@ -188,6 +189,9 @@ function CityLandingPage() {
             <Link href="/deals" className="inline-flex items-center rounded-full border border-green-200 bg-white px-4 py-2 text-sm font-semibold text-green-800 hover:bg-green-50 transition-colors">
               Deals
             </Link>
+            <Link href="/rewards" className="inline-flex items-center rounded-full border border-green-200 bg-white px-4 py-2 text-sm font-semibold text-green-800 hover:bg-green-50 transition-colors">
+              Rewards
+            </Link>
             <Link href="/partners" className="inline-flex items-center rounded-full border border-green-200 bg-white px-4 py-2 text-sm font-semibold text-green-800 hover:bg-green-50 transition-colors">
               Business Directory
             </Link>
@@ -326,6 +330,37 @@ function CityLandingPage() {
 
         <ProductsSection products={products} area={workspace.area} />
 
+        {/* ── REWARDS: readers email themselves their personal points link ── */}
+        <section className="pb-14 sm:pb-20">
+          <div className="max-w-6xl mx-auto px-6">
+            <div className="rounded-[2rem] border border-green-100 bg-white shadow-sm px-6 py-10 sm:px-10 sm:py-12">
+              <div className="grid lg:grid-cols-2 gap-8 items-center">
+                <div>
+                  <div className="inline-flex items-center gap-2 bg-green-100 text-green-800 text-xs font-bold tracking-widest uppercase px-3 py-1.5 rounded-full mb-4">
+                    ⭐ Reader Rewards
+                  </div>
+                  <h2 className="text-3xl font-extrabold text-gray-900 tracking-tight mb-3">
+                    Your reading earns rewards.
+                  </h2>
+                  <p className="text-gray-500 leading-relaxed mb-4">
+                    Subscribers earn points for referring friends and shopping with {workspace.name}, then spend them on rewards. 100 points = $1, and 1,500 points gets you a free year of The Gist Deals.
+                  </p>
+                  <Link href="/rewards" className="text-sm font-semibold text-green-700 hover:underline">
+                    How Rewards works →
+                  </Link>
+                </div>
+                <div className="bg-green-50/60 border border-green-100 rounded-2xl p-6">
+                  <p className="font-bold text-gray-900 mb-1">See your points</p>
+                  <p className="text-sm text-gray-500 mb-4">
+                    Enter your email and we&apos;ll send you your personal Rewards link. No password needed.
+                  </p>
+                  <RewardsLinkForm />
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
         {/* ── SPONSORSHIP CTA ── */}
         <section className="bg-green-900 py-14 sm:py-20">
           <div className="max-w-6xl mx-auto px-6">
@@ -435,6 +470,7 @@ function CityLandingPage() {
           <p className="text-sm text-gray-500">The daily newsletter for {workspace.area}.</p>
           <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs text-gray-400">
             <Link href="/games" className="hover:text-gray-600 transition-colors">Games</Link>
+            <Link href="/rewards" className="hover:text-gray-600 transition-colors">Rewards</Link>
             {products.length > 0 && (
               <Link href="/products" className="hover:text-gray-600 transition-colors">Shop</Link>
             )}
