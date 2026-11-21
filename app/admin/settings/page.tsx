@@ -28,6 +28,9 @@ interface Settings {
   stripe_price_in_article_cents: string;
   stripe_price_presenting_cents: string;
   stripe_price_wordy_cents: string;
+  rewards_referral_signup_points: string;
+  rewards_purchase_points_per_dollar: string;
+  rewards_deals_year_cost_points: string;
 }
 
 const PROVIDERS = [
@@ -75,6 +78,9 @@ export default function SettingsPage() {
     stripe_price_in_article_cents: "1500",
     stripe_price_presenting_cents: "2500",
     stripe_price_wordy_cents: "2000",
+    rewards_referral_signup_points: "50",
+    rewards_purchase_points_per_dollar: "5",
+    rewards_deals_year_cost_points: "1500",
   });
   const [hasSmtp, setHasSmtp] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -82,6 +88,9 @@ export default function SettingsPage() {
   const [saved, setSaved] = useState(false);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null);
+  const [backfilling, setBackfilling] = useState(false);
+  const [backfillResult, setBackfillResult] = useState<string | null>(null);
+  const [backfillError, setBackfillError] = useState<string | null>(null);
 
   async function loadSettings() {
     const res = await workspaceFetch("/api/admin/settings");
@@ -125,6 +134,39 @@ export default function SettingsPage() {
     const data = await res.json();
     setTestResult({ ok: res.ok, message: data.message });
     setTesting(false);
+  }
+
+  async function handleBackfill() {
+    setBackfilling(true);
+    setBackfillResult(null);
+    setBackfillError(null);
+    try {
+      const res = await workspaceFetch("/api/admin/rewards/backfill", {
+        method: "POST",
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "The backfill failed. Nothing was credited.");
+      }
+      const skipped =
+        (data.dealsPurchases?.skippedNoSession ?? 0) +
+        (data.dealsPurchases?.skippedUnresolved ?? 0);
+      setBackfillResult(
+        `Credited ${data.readersCredited} readers with ${data.pointsIssued} points: ` +
+          `${data.referrals.entriesCreated} referral awards (${data.referrals.pointsIssued} pts), ` +
+          `${data.productOrders.entriesCreated} product orders (${data.productOrders.pointsIssued} pts), ` +
+          `${data.dealsPurchases.entriesCreated} Deals purchases (${data.dealsPurchases.pointsIssued} pts).` +
+          (skipped > 0
+            ? ` ${skipped} Deals records were skipped (no Stripe session to verify, or not a paid book purchase).`
+            : "") +
+          ` Running this again adds nothing new.`
+      );
+    } catch (error) {
+      setBackfillError(
+        error instanceof Error ? error.message : "The backfill failed. Nothing was credited."
+      );
+    }
+    setBackfilling(false);
   }
 
   if (loading) {
@@ -611,6 +653,92 @@ export default function SettingsPage() {
                 </div>
               );
             })}
+          </div>
+        </div>
+
+        {/* Reader Rewards */}
+        <div className="bg-white rounded-xl border border-gray-200 p-6">
+          <div className="flex items-center gap-3 mb-5">
+            <div className="w-8 h-8 rounded-lg bg-green-50 flex items-center justify-center">
+              <svg className="w-4 h-4 text-green-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118L2.05 10.1c-.783-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+              </svg>
+            </div>
+            <div>
+              <h2 className="text-sm font-semibold text-gray-800">Reader Rewards</h2>
+              <p className="text-xs text-gray-400">Points readers earn and spend (100 points = $1). Changes apply immediately, no deploy needed.</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                Referral signup
+              </label>
+              <input
+                type="number"
+                min="0"
+                step="1"
+                value={settings.rewards_referral_signup_points}
+                onChange={(e) => setSettings((s) => ({ ...s, rewards_referral_signup_points: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+              />
+              <p className="text-xs text-gray-400 mt-1">Points the referrer earns per new subscriber (default: 50)</p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                Purchase points per $1
+              </label>
+              <input
+                type="number"
+                min="0"
+                step="1"
+                value={settings.rewards_purchase_points_per_dollar}
+                onChange={(e) => setSettings((s) => ({ ...s, rewards_purchase_points_per_dollar: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+              />
+              <p className="text-xs text-gray-400 mt-1">Points per whole dollar spent on products and Deals (default: 5)</p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                Free Deals year cost
+              </label>
+              <input
+                type="number"
+                min="0"
+                step="1"
+                value={settings.rewards_deals_year_cost_points}
+                onChange={(e) => setSettings((s) => ({ ...s, rewards_deals_year_cost_points: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+              />
+              <p className="text-xs text-gray-400 mt-1">Points a free year of Deals costs in a workspace that has not seeded its catalog yet (default: 1500)</p>
+            </div>
+          </div>
+
+          <div className="mt-6 pt-5 border-t border-gray-100">
+            <h3 className="text-sm font-medium text-gray-700">Launch backfill</h3>
+            <p className="text-xs text-gray-400 mt-1">
+              One-time catch-up for this workspace: credit readers for the purchases and
+              referrals they made before Reader Rewards launched, at the rates above.
+              Save any rate changes first. Safe to run more than once: the same order or
+              signup is never credited twice.
+            </p>
+            <div className="flex items-center gap-3 mt-3">
+              <button
+                type="button"
+                onClick={handleBackfill}
+                disabled={backfilling}
+                className="bg-white border border-green-700 text-green-700 hover:bg-green-50 px-4 py-2 rounded-lg text-sm font-semibold transition-colors disabled:opacity-60"
+              >
+                {backfilling ? "Crediting…" : "Credit past purchases and referrals"}
+              </button>
+              {backfillError && (
+                <span className="text-red-600 text-sm font-medium">{backfillError}</span>
+              )}
+            </div>
+            {backfillResult && (
+              <p className="text-sm text-green-700 mt-3">{backfillResult}</p>
+            )}
           </div>
         </div>
 

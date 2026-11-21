@@ -195,7 +195,8 @@ export async function POST(req: NextRequest) {
       .replace(/\{\{UNSUBSCRIBE_URL\}\}/g, `${appUrl}/unsubscribe`)
       .replace(/\{\{PROFILE_URL\}\}/g, `${appUrl}/profile?r=preview`)
       .replace(/\{\{APP_URL\}\}/g, appUrl)
-      .replace(/REFCODEPLACEHOLDER/g, "preview"),
+      .replace(/REFCODEPLACEHOLDER/g, "preview")
+      .replace(/EMAILPLACEHOLDER/g, "preview"),
     testBuyerToken ? DEALS_BUYER_COPY : dealsCopy,
     testBuyerToken ? `${appUrl}/deals?token=${testBuyerToken}` : `${appUrl}/deals?source=newsletter`
   );

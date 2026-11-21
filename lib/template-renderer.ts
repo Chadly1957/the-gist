@@ -2,7 +2,7 @@
 
 export interface Block {
   id: string;
-  type: "header" | "text" | "image" | "articles" | "divider" | "footer" | "button" | "spotlight" | "presenting_sponsor" | "presenting_logo_bar" | "presenting_spotlight" | "events" | "referral" | "poll" | "wordy" | "match" | "games" | "tip_jar" | "deals_signup" | "weather" | "product_spotlight" | "board" | "guide_spotlight";
+  type: "header" | "text" | "image" | "articles" | "divider" | "footer" | "button" | "spotlight" | "presenting_sponsor" | "presenting_logo_bar" | "presenting_spotlight" | "events" | "referral" | "poll" | "wordy" | "match" | "games" | "tip_jar" | "deals_signup" | "weather" | "product_spotlight" | "board" | "guide_spotlight" | "rewards";
   content: Record<string, unknown>;
 }
 
@@ -809,6 +809,32 @@ export function resolveDealsPlaceholders(html: string, copy: DealsCopy, url: str
     .replaceAll("{{DEALS_URL}}", () => url);
 }
 
+// Reader Rewards CTA. The button links to the reader's own Rewards page:
+// EMAILPLACEHOLDER is substituted per recipient with the recipient's email
+// in every send path (send, resend, resend-unopened, send-missed,
+// send-existing-issue — the same placeholder the unsubscribe URL uses),
+// and /rewards opens that reader's points view from the ?email= param.
+// In the editor preview and the public archive snapshot the placeholder
+// stays literal, so a preview never shows a real reader's link.
+function renderRewards(content: Record<string, unknown>): string {
+  const title = String(content.title || "Your Reader Rewards");
+  const text = String(
+    content.text ||
+      "You earn points for referring friends and shopping with The Gist — 100 points = $1, and 1,500 points scores a free year of The Gist Deals. Check your balance anytime."
+  );
+  const label = String(content.buttonLabel || "See My Points →");
+  const rewardsUrl = "{{APP_URL}}/rewards?email=EMAILPLACEHOLDER";
+  return `
+    <div style="padding:20px 40px;">
+      <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:24px;text-align:center;">
+        <div style="font-family:sans-serif;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#166534;margin-bottom:10px;">Reader Rewards</div>
+        <div style="font-size:18px;font-weight:700;color:#111827;font-family:Georgia,serif;line-height:1.3;margin-bottom:10px;">${title}</div>
+        <div style="font-size:14px;color:#4b5563;line-height:1.6;font-family:sans-serif;margin-bottom:20px;">${text}</div>
+        <a href="${rewardsUrl}" style="display:inline-block;background:#166534;color:#ffffff;padding:12px 28px;border-radius:6px;text-decoration:none;font-size:14px;font-family:sans-serif;font-weight:700;">${label}</a>
+      </div>
+    </div>`;
+}
+
 function renderDivider(): string {
   return `<div class="block" style="padding:8px 40px;"><hr class="divider" style="border:none;border-top:1px solid #e5e7eb;margin:0;" /></div>`;
 }
@@ -954,6 +980,8 @@ export function renderTemplate(
           return renderTipJar(block.content);
         case "deals_signup":
           return renderDealsSignup();
+        case "rewards":
+          return renderRewards(block.content);
         case "weather":
           return renderWeather(block.content, weatherData);
         case "product_spotlight": {

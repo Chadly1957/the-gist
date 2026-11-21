@@ -53,6 +53,9 @@ model Workspace {
   referralSprintRows          ReferralSprint[]
   referralCodeRows            ReferralCode[]
   referralSignupRows          ReferralSignup[]
+  rewardPointEntryRows        RewardPointEntry[]
+  rewardCatalogItemRows       RewardCatalogItem[]
+  rewardRedemptionRows        RewardRedemption[]
   wordyWordRows               WordyWord[]
   wordyBookingRows            WordyBooking[]
   wordyPlayRows               WordyPlay[]
@@ -748,6 +751,85 @@ model ReferralSignup {
   @@unique([id, workspaceId])
   @@index([referralCodeId])
   @@index([sprintId])
+  @@index([workspaceId])
+}
+
+// Reader Rewards (phase 1, 2026-11-20): one points program across every way
+// a reader engages with The Gist. Base ratio: 100 points = $1. The ledger is
+// append-only: a reader's balance is always the SUM of their entries, never
+// a stored counter, so every point can be traced to what earned or spent it.
+// subscriberId is a plain scalar (same pattern as ReferralCode.subscriberId):
+// readers are identified by their Subscriber row, and the ledger must
+// survive independently of it.
+model RewardPointEntry {
+  workspaceId  String    @default("decatur")
+  workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  id           String    @id @default(cuid())
+  subscriberId String
+  // Action kind. Phase 1 writes: referral_signup | purchase | redemption.
+  // Reserved for later phases: event_checkin | boosted_event | daily_game |
+  // daily_directory | daily_newsletter_click | daily_newsletter_engage |
+  // weekly_top_engaged | admin_adjustment.
+  kind         String
+  points       Int // signed: positive earns, negative spends
+  // What caused this entry: a ReferralSignup id (referral_signup), a Stripe
+  // checkout session id (purchase), a RewardRedemption id (redemption).
+  // The (workspaceId, kind, sourceRef) unique index is the idempotency
+  // guard: a re-delivered webhook or retried signup can never pay twice.
+  sourceRef    String?
+  note         String?
+  createdAt    DateTime  @default(now())
+
+  @@unique([id, workspaceId])
+  @@unique([workspaceId, kind, sourceRef])
+  @@index([workspaceId, subscriberId, createdAt])
+  @@index([workspaceId])
+}
+
+// What points can be spent on. Phase 1 seeds exactly one Gist-owned item
+// per workspace (key "deals_free_year", a free year of Deals); the row is
+// ensured lazily by lib/rewards.ts from the rewards_deals_year_cost_points
+// setting (default 1500). Business-donated perks are a later phase.
+model RewardCatalogItem {
+  workspaceId String             @default("decatur")
+  workspace   Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  id          String             @id @default(cuid())
+  key         String // stable key code looks the item up by, e.g. "deals_free_year"
+  title       String
+  description String?
+  costPoints  Int
+  kind        String             @default("deals_year") // deals_year in phase 1
+  active      Boolean            @default(true)
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  redemptions RewardRedemption[]
+
+  @@unique([workspaceId, key])
+  @@unique([id, workspaceId])
+  @@index([workspaceId, active])
+  @@index([workspaceId])
+}
+
+model RewardRedemption {
+  workspaceId   String          @default("decatur")
+  workspace     Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  id            String          @id @default(cuid())
+  subscriberId  String
+  catalogItemId String
+  catalogItem   RewardCatalogItem @relation(fields: [catalogItemId, workspaceId], references: [id, workspaceId], onDelete: Restrict)
+  pointsSpent   Int
+  // fulfilled | pending_fulfillment. The Deals year grant is a clean write
+  // (same shape as a gift purchase), so phase 1 fulfills immediately;
+  // pending_fulfillment is reserved for items a human must hand over.
+  status        String          @default("pending_fulfillment")
+  // Unique code the reader can quote; shown in their rewards page.
+  code          String          @unique @default(cuid())
+  createdAt     DateTime        @default(now())
+  fulfilledAt   DateTime?
+
+  @@unique([id, workspaceId])
+  @@index([workspaceId, subscriberId, createdAt])
+  @@index([workspaceId, status])
   @@index([workspaceId])
 }
 

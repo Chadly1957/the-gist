@@ -2,6 +2,8 @@ import { getWorkspaceUrl } from "@/lib/workspace";
 import { workspaceUnique } from "@/lib/workspace";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { basePrisma } from "@/lib/db-base";
+import { awardReferralPoints } from "@/lib/rewards";
 import { sendWelcomeEmail } from "@/lib/welcome-email";
 
 export const dynamic = "force-dynamic";
@@ -104,13 +106,27 @@ export async function POST(req: NextRequest, { params }: { params: { code: strin
 
   const sprint = await getActiveSprint();
 
-  await db.referralSignup.create({
+  const referralSignup = await db.referralSignup.create({
     data: {
       referralCodeId: ref.id,
       newSubscriberId: subscriber.id,
       sprintId: sprint?.id || null,
     },
   });
+
+  // Reader Rewards: the referrer earns points for this signup, whether or
+  // not a prize sprint is running. Idempotent per ReferralSignup row, and
+  // a failure here must never break the subscription itself.
+  try {
+    await awardReferralPoints(basePrisma, {
+      workspaceId: referralSignup.workspaceId,
+      referralSignupId: referralSignup.id,
+      referrerSubscriberId: ref.subscriberId,
+      newSubscriberId: subscriber.id,
+    });
+  } catch {
+    // Points are a bonus on top of the signup, never a reason to fail it.
+  }
 
   const appUrl = await getWorkspaceUrl();
   try {

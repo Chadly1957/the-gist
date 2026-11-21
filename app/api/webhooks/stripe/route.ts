@@ -4,6 +4,7 @@ import { withWorkspace } from "@/lib/workspace";
 import Stripe from "stripe";
 import { alertBookingFailureOnce } from "@/lib/sponsor-booking-alerts";
 import { recordPaidProductOrder, shippingFromSession } from "@/lib/products";
+import { awardPurchasePoints } from "@/lib/rewards";
 import { isProductSize } from "@/lib/product-sizes";
 import { boardRunDays, clampBoardRunWeeks } from "@/lib/board-constants";
 import {
@@ -764,6 +765,18 @@ async function fulfillPaymentLinkOrder(session: Stripe.Checkout.Session): Promis
     // checkout, so these sessions carry one; store it for fulfillment.
     shipping: shippingFromSession(session),
   });
+  // Reader Rewards: the buyer earns purchase points (idempotent per
+  // session). Points must never break fulfillment, so failures only log.
+  try {
+    await awardPurchasePoints(basePrisma, {
+      workspaceId: product.workspaceId,
+      email,
+      amountCents: session.amount_total ?? 0,
+      sessionId: session.id,
+    });
+  } catch (error) {
+    console.error(`Reader Rewards: purchase points failed for session ${session.id}`, error);
+  }
   return true;
 }
 
@@ -973,6 +986,34 @@ export async function POST(req: NextRequest) {
       where: { workspaceId, stripeSessionId: sessionId, status: "pending_payment" },
       data: { status: "paid", paidAt: approvedAt },
     });
+
+    // Reader Rewards: product and Deals purchases earn the buyer points
+    // (5 pts per $1 by default). For a gift, the BUYER earns, never the
+    // recipient. Idempotent per session, so a re-delivered event pays
+    // once; a buyer with no subscriber row earns nothing. Failures only
+    // log: points must never break fulfillment.
+    const rewardKind = session.metadata?.kind;
+    if (
+      rewardKind === "product" ||
+      rewardKind === "coupon_book" ||
+      rewardKind === "coupon_book_upgrade" ||
+      rewardKind === "coupon_book_gift"
+    ) {
+      const buyerEmail =
+        rewardKind === "coupon_book_gift"
+          ? session.customer_details?.email || session.metadata?.gifterEmail || ""
+          : session.customer_details?.email || session.metadata?.email || "";
+      try {
+        await awardPurchasePoints(basePrisma, {
+          workspaceId,
+          email: buyerEmail,
+          amountCents: session.amount_total ?? 0,
+          sessionId,
+        });
+      } catch (error) {
+        console.error(`Reader Rewards: purchase points failed for session ${sessionId}`, error);
+      }
+    }
   }
 
   if (event.type === "checkout.session.expired") {

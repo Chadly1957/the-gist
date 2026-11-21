@@ -27,6 +27,9 @@ const ALLOWED_KEYS = [
   "stripe_price_wordy_cents",
   "spotlight_count",
   "in_article_count",
+  "rewards_referral_signup_points",
+  "rewards_purchase_points_per_dollar",
+  "rewards_deals_year_cost_points",
 ];
 
 export async function GET() {
