@@ -3,7 +3,7 @@ import { getPresentingSponsor, recordGameSponsorEvent, type GameName } from "@/l
 
 export const dynamic = "force-dynamic";
 
-const GAMES: GameName[] = ["wordy", "match"];
+const GAMES: GameName[] = ["wordy", "match", "crossword"];
 const EVENT_TYPES = ["impression", "click"] as const;
 
 export async function POST(req: NextRequest) {

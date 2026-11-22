@@ -32,6 +32,7 @@ interface Settings {
   rewards_purchase_points_per_dollar: string;
   rewards_deals_year_cost_points: string;
   rewards_points_per_dollar: string;
+  rewards_crossword_points: string;
 }
 
 const PROVIDERS = [
@@ -83,6 +84,7 @@ export default function SettingsPage() {
     rewards_purchase_points_per_dollar: "5",
     rewards_deals_year_cost_points: "1500",
     rewards_points_per_dollar: "100",
+    rewards_crossword_points: "0",
   });
   const [hasSmtp, setHasSmtp] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -728,6 +730,20 @@ export default function SettingsPage() {
                 className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
               />
               <p className="text-xs text-gray-400 mt-1">How many points buy $1 off products and Deals in the rewards portal (default: 100)</p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                Daily crossword
+              </label>
+              <input
+                type="number"
+                min="0"
+                step="1"
+                value={settings.rewards_crossword_points}
+                onChange={(e) => setSettings((s) => ({ ...s, rewards_crossword_points: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+              />
+              <p className="text-xs text-gray-400 mt-1">Points for a reader&apos;s first finish of the day&apos;s crossword (default: 0 = off, no points)</p>
             </div>
           </div>
 
