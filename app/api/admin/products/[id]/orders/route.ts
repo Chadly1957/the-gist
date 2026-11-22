@@ -21,6 +21,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       id: true,
       email: true,
       amountCents: true,
+      pointsApplied: true,
       paidAt: true,
       fulfilledAt: true,
       size: true,

@@ -767,13 +767,16 @@ model RewardPointEntry {
   id           String    @id @default(cuid())
   subscriberId String
   // Action kind. Phase 1 writes: referral_signup | purchase | redemption.
+  // The points storefront (2026-11-22) adds: redeem | redeem_refund.
   // Reserved for later phases: event_checkin | boosted_event | daily_game |
   // daily_directory | daily_newsletter_click | daily_newsletter_engage |
   // weekly_top_engaged | admin_adjustment.
   kind         String
   points       Int // signed: positive earns, negative spends
   // What caused this entry: a ReferralSignup id (referral_signup), a Stripe
-  // checkout session id (purchase), a RewardRedemption id (redemption).
+  // checkout session id (purchase, redeem, redeem_refund), a
+  // RewardRedemption id (redemption), or a fulfilled order/purchase row id
+  // (redeem for a fully-points-paid purchase that never reached Stripe).
   // The (workspaceId, kind, sourceRef) unique index is the idempotency
   // guard: a re-delivered webhook or retried signup can never pay twice.
   sourceRef    String?
@@ -1010,6 +1013,11 @@ model ProductOrder {
   product         Product   @relation(fields: [productId, workspaceId], references: [id, workspaceId], onDelete: Restrict)
   email           String
   amountCents     Int
+  // Reader Rewards points the buyer spent on this order, when any (portal
+  // points-as-money checkout). amountCents is the CASH portion charged;
+  // the points portion is pointsApplied / the workspace's points-per-dollar
+  // rate in cents. Null = no points used (every pre-Rewards order).
+  pointsApplied   Int?
   stripeSessionId String?   @unique
   status          String    @default("pending_payment") // pending_payment | paid
   createdAt       DateTime  @default(now())
@@ -1106,6 +1114,9 @@ model CouponBookPurchase {
   workspace       Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
   id              String             @id @default(cuid())
   email           String
+  // Reader Rewards points the buyer spent on this purchase, when any
+  // (portal points-as-money checkout). Null = no points used.
+  pointsApplied   Int?
   stripeSessionId String?            @unique
   // Unguessable token encoded in the buyer's QR code; the cashier page needs
   // no login, so this token is the only credential. Keep it private.

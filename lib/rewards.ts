@@ -17,6 +17,14 @@ import {
 export const REWARD_KIND_REFERRAL_SIGNUP = "referral_signup";
 export const REWARD_KIND_PURCHASE = "purchase";
 export const REWARD_KIND_REDEMPTION = "redemption";
+// Points-as-money storefront (2026-11-22): a "redeem" entry is the debit
+// written when a portal checkout spends points (sourceRef = the Stripe
+// checkout session id, or the fulfilled order/purchase row id for a
+// fully-points-paid purchase, which never reaches Stripe). A
+// "redeem_refund" entry credits the same points back when that checkout
+// session expires unpaid (sourceRef = the same session id).
+export const REWARD_KIND_REDEEM = "redeem";
+export const REWARD_KIND_REDEEM_REFUND = "redeem_refund";
 
 export const DEALS_FREE_YEAR_KEY = "deals_free_year";
 
@@ -24,6 +32,7 @@ const SETTING_KEYS = {
   referralSignupPoints: "rewards_referral_signup_points",
   purchasePointsPerDollar: "rewards_purchase_points_per_dollar",
   dealsYearCostPoints: "rewards_deals_year_cost_points",
+  pointsPerDollar: "rewards_points_per_dollar",
 } as const;
 
 export const REWARD_SETTING_KEYS: string[] = Object.values(SETTING_KEYS);
@@ -32,12 +41,17 @@ const DEFAULTS = {
   referralSignupPoints: 50,
   purchasePointsPerDollar: 5,
   dealsYearCostPoints: 1500,
+  pointsPerDollar: 100,
 } as const;
 
 export interface RewardConfig {
   referralSignupPoints: number;
   purchasePointsPerDollar: number;
   dealsYearCostPoints: number;
+  // How many points buy $1 of store credit in the portal storefront
+  // (100 points = $1). The spend side of the base ratio; the earn side
+  // is purchasePointsPerDollar.
+  pointsPerDollar: number;
 }
 
 function parseNonNegativeInt(value: string | undefined, fallback: number): number {
@@ -67,6 +81,13 @@ export async function getRewardConfig(
     dealsYearCostPoints: parseNonNegativeInt(
       values[SETTING_KEYS.dealsYearCostPoints],
       DEFAULTS.dealsYearCostPoints
+    ),
+    pointsPerDollar: Math.max(
+      1,
+      parseNonNegativeInt(
+        values[SETTING_KEYS.pointsPerDollar],
+        DEFAULTS.pointsPerDollar
+      )
     ),
   };
 }
@@ -158,6 +179,154 @@ export async function awardPurchasePoints(
         points,
         sourceRef: args.sessionId,
         note: args.note ?? null,
+      },
+    });
+    return true;
+  } catch (error) {
+    if (isUniqueViolation(error)) return false;
+    throw error;
+  }
+}
+
+// ── Points-as-money storefront ──────────────────────────────────────────
+//
+// The portal storefront lets a reader spend points as dollars off any
+// Product or the Deals book, then pay the cash remainder through the
+// normal checkout. Points convert at the workspace's pointsPerDollar
+// rate (default 100 points = $1, i.e. one point is worth one cent).
+// Conversion is exact to the cent: the discount is the largest whole-cent
+// amount the requested points cover, and the points actually spent are
+// the smallest whole number of points covering that discount, so a reader
+// never spends points past the item's price.
+
+export interface PointsApplication {
+  // Points the reader asked to use, after clamping to their balance.
+  requestedPoints: number;
+  // Points actually debited (never more than requested, never more than
+  // the price needs).
+  pointsSpent: number;
+  // Cents taken off the price.
+  discountCents: number;
+  // Cents left to pay in cash.
+  cashCents: number;
+}
+
+export function computePointsApplication(args: {
+  balance: number;
+  priceCents: number;
+  pointsPerDollar: number;
+  requestedPoints: number;
+}): PointsApplication {
+  const rate = Math.max(1, Math.floor(args.pointsPerDollar) || 1);
+  const priceCents = Math.max(0, Math.floor(args.priceCents) || 0);
+  const balance = Math.max(0, Math.floor(args.balance) || 0);
+  const requestedPoints = Math.min(
+    balance,
+    Math.max(0, Math.floor(args.requestedPoints) || 0)
+  );
+  const discountCents = Math.min(
+    priceCents,
+    Math.floor((requestedPoints * 100) / rate)
+  );
+  const pointsSpent =
+    discountCents > 0
+      ? Math.min(requestedPoints, Math.ceil((discountCents * rate) / 100))
+      : 0;
+  return {
+    requestedPoints,
+    pointsSpent,
+    discountCents,
+    cashCents: priceCents - discountCents,
+  };
+}
+
+// A reader's current balance: the SUM of their ledger entries. Accepts
+// the base client or a transaction client, so the check can run inside
+// the same transaction that spends the points.
+export async function getPointsBalance(
+  db: PrismaClient | Prisma.TransactionClient,
+  workspaceId: string,
+  subscriberId: string
+): Promise<number> {
+  const agg = await db.rewardPointEntry.aggregate({
+    where: { workspaceId, subscriberId },
+    _sum: { points: true },
+  });
+  return agg._sum.points ?? 0;
+}
+
+// Debit points for a portal checkout, idempotent per (kind, sourceRef):
+// a retried checkout creation with the same session id can never debit
+// twice (the repeat returns false). Throws RewardsError when the balance
+// cannot cover the debit, so a race that drained the balance between the
+// balance check and here fails the checkout instead of overdrawing.
+// Callers that need the check-and-debit to be atomic (the fully-paid
+// path) run this inside their own serializable transaction client; this
+// helper works against any client with the rewardPointEntry model.
+export async function debitPointsForCheckout(
+  db: PrismaClient | Prisma.TransactionClient,
+  args: {
+    workspaceId: string;
+    subscriberId: string;
+    points: number;
+    sourceRef: string;
+    note?: string;
+  }
+): Promise<boolean> {
+  if (args.points <= 0 || !args.sourceRef) return false;
+  const balance = await getPointsBalance(db, args.workspaceId, args.subscriberId);
+  if (balance < args.points) {
+    throw new RewardsError(
+      "insufficient_points",
+      `You need ${args.points} points for this; your balance is ${balance}.`
+    );
+  }
+  try {
+    await db.rewardPointEntry.create({
+      data: {
+        workspaceId: args.workspaceId,
+        subscriberId: args.subscriberId,
+        kind: REWARD_KIND_REDEEM,
+        points: -args.points,
+        sourceRef: args.sourceRef,
+        note: args.note ?? null,
+      },
+    });
+    return true;
+  } catch (error) {
+    if (isUniqueViolation(error)) return false;
+    throw error;
+  }
+}
+
+// Credit points back when a portal checkout session expires unpaid.
+// Only refunds a debit that actually exists for the session, and only
+// once (the ledger's unique index on (workspaceId, kind, sourceRef) is
+// the guard against a re-delivered expired event). Returns true when
+// points were actually returned.
+export async function refundPointsForCheckout(
+  db: PrismaClient,
+  args: { workspaceId: string; sessionId: string }
+): Promise<boolean> {
+  if (!args.sessionId) return false;
+  const debit = await db.rewardPointEntry.findFirst({
+    where: {
+      workspaceId: args.workspaceId,
+      kind: REWARD_KIND_REDEEM,
+      sourceRef: args.sessionId,
+    },
+    select: { subscriberId: true, points: true, note: true },
+  });
+  if (!debit || debit.points >= 0) return false;
+  try {
+    await db.rewardPointEntry.create({
+      data: {
+        workspaceId: args.workspaceId,
+        subscriberId: debit.subscriberId,
+        kind: REWARD_KIND_REDEEM_REFUND,
+        points: -debit.points,
+        sourceRef: args.sessionId,
+        note: debit.note,
       },
     });
     return true;

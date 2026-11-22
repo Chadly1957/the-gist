@@ -31,6 +31,7 @@ interface Settings {
   rewards_referral_signup_points: string;
   rewards_purchase_points_per_dollar: string;
   rewards_deals_year_cost_points: string;
+  rewards_points_per_dollar: string;
 }
 
 const PROVIDERS = [
@@ -81,6 +82,7 @@ export default function SettingsPage() {
     rewards_referral_signup_points: "50",
     rewards_purchase_points_per_dollar: "5",
     rewards_deals_year_cost_points: "1500",
+    rewards_points_per_dollar: "100",
   });
   const [hasSmtp, setHasSmtp] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -670,7 +672,7 @@ export default function SettingsPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">
                 Referral signup
@@ -712,6 +714,20 @@ export default function SettingsPage() {
                 className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
               />
               <p className="text-xs text-gray-400 mt-1">Points a free year of Deals costs in a workspace that has not seeded its catalog yet (default: 1500)</p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                Points per $1 (spending)
+              </label>
+              <input
+                type="number"
+                min="1"
+                step="1"
+                value={settings.rewards_points_per_dollar}
+                onChange={(e) => setSettings((s) => ({ ...s, rewards_points_per_dollar: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+              />
+              <p className="text-xs text-gray-400 mt-1">How many points buy $1 off products and Deals in the rewards portal (default: 100)</p>
             </div>
           </div>
 

@@ -43,6 +43,7 @@ interface ProductOrder {
   id: string;
   email: string;
   amountCents: number;
+  pointsApplied: number | null;
   paidAt: string | null;
   fulfilledAt: string | null;
   size: string | null;
@@ -415,6 +416,7 @@ export default function ProductsPage() {
                           <div className="font-medium">{o.email}</div>
                           <div className="text-gray-500">
                             {money(o.amountCents)}
+                            {o.pointsApplied ? <> · {o.pointsApplied.toLocaleString()} points</> : null}
                             {o.paidAt && <> · {new Date(o.paidAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</>}
                             {o.size && <> · Size <span className="font-semibold text-gray-800">{o.size}</span></>}
                           </div>

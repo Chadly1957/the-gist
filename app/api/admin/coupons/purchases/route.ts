@@ -26,6 +26,7 @@ export async function GET(req: NextRequest) {
       createdAt: true,
       active: true,
       stripeSessionId: true,
+      pointsApplied: true,
       magicToken: true,
     },
   });
@@ -44,7 +45,9 @@ export async function GET(req: NextRequest) {
       email: p.email,
       createdAt: p.createdAt,
       active: p.active,
-      paid: !!p.stripeSessionId,
+      // A fully-points-paid purchase has no Stripe session but is paid.
+      paid: !!p.stripeSessionId || (p.pointsApplied ?? 0) > 0,
+      pointsApplied: p.pointsApplied,
       magicLink: `${workspaceUrl}/deals?token=${p.magicToken}`,
     })),
   });

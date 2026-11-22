@@ -30,6 +30,7 @@ const ALLOWED_KEYS = [
   "rewards_referral_signup_points",
   "rewards_purchase_points_per_dollar",
   "rewards_deals_year_cost_points",
+  "rewards_points_per_dollar",
 ];
 
 export async function GET() {
