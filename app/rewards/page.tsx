@@ -6,6 +6,7 @@ import { Suspense, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import SiteHeader from "@/components/SiteHeader";
 import RewardsLinkForm from "@/components/RewardsLinkForm";
+import { PRODUCT_SIZES } from "@/lib/product-sizes";
 
 interface RewardEntry {
   kind: string;
@@ -20,6 +21,19 @@ interface CatalogItem {
   description: string | null;
   costPoints: number;
   kind: string;
+}
+
+interface StorefrontItem {
+  type: "deals" | "product";
+  productId: string | null;
+  name: string;
+  tagline: string | null;
+  priceCents: number;
+  imageUrl: string | null;
+  soldOut: boolean;
+  remaining: number | null;
+  offersSizes: boolean;
+  requiresShipping: boolean;
 }
 
 interface Summary {
@@ -38,13 +52,23 @@ interface Summary {
   referralCode?: string | null;
   referralLink?: string | null;
   referralSignupPoints?: number;
+  storefront?: {
+    pointsPerDollar: number;
+    items: StorefrontItem[];
+  };
 }
 
 const KIND_LABELS: Record<string, string> = {
   referral_signup: "A friend subscribed with your link",
   purchase: "Purchase",
   redemption: "Reward redeemed",
+  redeem: "Points spent",
+  redeem_refund: "Points returned (checkout not finished)",
 };
+
+function formatMoney(cents: number): string {
+  return `$${(cents / 100).toFixed(2)}`;
+}
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString("en-US", {
@@ -52,6 +76,192 @@ function formatDate(iso: string): string {
     day: "numeric",
     year: "numeric",
   });
+}
+
+// One storefront item with a points-as-money control: the reader picks
+// how many points to spend (defaulted to the most that help), sees the
+// cash left to pay, and checks out. Points that cover the whole price
+// finish right here; anything with a cash remainder hands off to the
+// item's normal Stripe checkout (the server returns its URL).
+function StorefrontCard({
+  item,
+  email,
+  balance,
+  pointsPerDollar,
+  dealsLifetime,
+  onPointsPaid,
+}: {
+  item: StorefrontItem;
+  email: string;
+  balance: number;
+  pointsPerDollar: number;
+  dealsLifetime: boolean;
+  onPointsPaid: () => Promise<void>;
+}) {
+  const rate = Math.max(1, pointsPerDollar);
+  // The most points that can usefully go toward this item: the balance,
+  // or what the full price costs in points, whichever is smaller.
+  const maxUsefulPoints = Math.min(
+    balance,
+    Math.ceil((item.priceCents * rate) / 100)
+  );
+  const [pointsInput, setPointsInput] = useState(String(maxUsefulPoints));
+  const [size, setSize] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [done, setDone] = useState(false);
+
+  const requested = Math.max(0, Math.floor(Number(pointsInput) || 0));
+  const clamped = Math.min(requested, balance);
+  const discountCents = Math.min(
+    item.priceCents,
+    Math.floor((clamped * 100) / rate)
+  );
+  const pointsSpent =
+    discountCents > 0
+      ? Math.min(clamped, Math.ceil((discountCents * rate) / 100))
+      : 0;
+  const cashCents = item.priceCents - discountCents;
+  const fullyPoints = pointsSpent > 0 && cashCents === 0;
+
+  async function handleBuy() {
+    setError("");
+    if (item.offersSizes && !size) {
+      setError("Please choose a size.");
+      return;
+    }
+    setBusy(true);
+    try {
+      const res = await workspaceFetch("/api/rewards/store/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: email.trim(),
+          itemType: item.type,
+          productId: item.productId ?? undefined,
+          size: item.offersSizes ? size : undefined,
+          pointsToApply: clamped,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Something went wrong. Please try again.");
+      } else if (data.url) {
+        window.location.href = data.url;
+        return;
+      } else if (data.pointsPaid) {
+        setDone(true);
+        await onPointsPaid();
+      } else {
+        setError("Something went wrong. Please try again.");
+      }
+    } catch {
+      setError("Something went wrong. Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="bg-white border border-gray-100 rounded-2xl p-6 mb-4">
+      <div className="flex items-start justify-between gap-3 mb-1">
+        <h3 className="font-bold text-gray-900">{item.name}</h3>
+        <p className="font-semibold text-gray-800 whitespace-nowrap">
+          {formatMoney(item.priceCents)}
+        </p>
+      </div>
+      {item.tagline && <p className="text-sm text-gray-500 mb-4">{item.tagline}</p>}
+
+      {item.type === "deals" && dealsLifetime ? (
+        <p className="text-sm text-gray-500">
+          You already have lifetime Deals access. This one is yours forever.
+        </p>
+      ) : item.soldOut ? (
+        <p className="text-sm font-semibold text-gray-500">Sold out</p>
+      ) : done ? (
+        <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3 text-sm text-green-800">
+          <p className="font-semibold mb-1">🎉 It&apos;s yours!</p>
+          <p>
+            You paid for this one entirely with points
+            {item.type === "deals"
+              ? ", and we emailed you the link to open your book."
+              : ". We will follow up at your email about delivery."}
+          </p>
+        </div>
+      ) : (
+        <>
+          {item.remaining !== null && (
+            <p className="text-xs text-gray-400 mb-3">
+              {item.remaining} left
+            </p>
+          )}
+          {item.offersSizes && (
+            <div className="mb-3">
+              <label className="block text-xs font-semibold text-gray-500 mb-1">
+                Size
+              </label>
+              <select
+                value={size}
+                onChange={(e) => setSize(e.target.value)}
+                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white"
+              >
+                <option value="">Choose a size…</option>
+                {PRODUCT_SIZES.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+          <label className="block text-xs font-semibold text-gray-500 mb-1">
+            Points to use (you have {balance.toLocaleString()})
+          </label>
+          <input
+            type="number"
+            min={0}
+            max={balance}
+            step={1}
+            value={pointsInput}
+            onChange={(e) => setPointsInput(e.target.value)}
+            className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm mb-3"
+          />
+          <p className="text-sm text-gray-600 mb-4">
+            {pointsSpent > 0 ? (
+              <>
+                {pointsSpent.toLocaleString()} points takes{" "}
+                {formatMoney(discountCents)} off.{" "}
+              </>
+            ) : null}
+            {cashCents > 0 ? (
+              <>
+                You pay <span className="font-semibold text-gray-800">{formatMoney(cashCents)}</span>{" "}
+                at checkout.
+              </>
+            ) : pointsSpent > 0 ? (
+              <>Your points cover the whole price.</>
+            ) : (
+              <>Pay the full price at checkout, or use points to bring it down.</>
+            )}
+          </p>
+          <button
+            onClick={handleBuy}
+            disabled={busy}
+            className="w-full bg-green-700 hover:bg-green-800 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-3 rounded-xl transition-colors text-sm"
+          >
+            {busy
+              ? "One moment…"
+              : fullyPoints
+                ? `Buy with ${pointsSpent.toLocaleString()} points`
+                : pointsSpent > 0
+                  ? `Use ${pointsSpent.toLocaleString()} points and pay ${formatMoney(cashCents)}`
+                  : `Buy for ${formatMoney(item.priceCents)}`}
+          </button>
+          {error && <p className="text-sm text-red-600 mt-3">{error}</p>}
+        </>
+      )}
+    </div>
+  );
 }
 
 function RewardsPageInner() {
@@ -284,6 +494,33 @@ function RewardsPageInner() {
                   </>
                 )}
               </div>
+            )}
+
+            {/* Storefront: points as money on everything for sale */}
+            {summary.storefront && summary.storefront.items.length > 0 && (
+              <>
+                <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mt-6 mb-3 px-1">
+                  Shop with your points
+                </p>
+                <p className="text-sm text-gray-500 mb-4 px-1">
+                  Your points are money here:{" "}
+                  {summary.storefront.pointsPerDollar.toLocaleString()} points = $1
+                  off anything below. Spend points, points and cash, or just cash.
+                </p>
+                {summary.storefront.items.map((storeItem) => (
+                  <StorefrontCard
+                    key={storeItem.type === "deals" ? "deals" : storeItem.productId ?? storeItem.name}
+                    item={storeItem}
+                    email={email}
+                    balance={balance}
+                    pointsPerDollar={summary.storefront?.pointsPerDollar ?? 100}
+                    dealsLifetime={isLifetime}
+                    onPointsPaid={async () => {
+                      await loadSummary(email.trim());
+                    }}
+                  />
+                ))}
+              </>
             )}
 
             {/* Recent activity */}

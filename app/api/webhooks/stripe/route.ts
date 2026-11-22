@@ -4,7 +4,7 @@ import { withWorkspace } from "@/lib/workspace";
 import Stripe from "stripe";
 import { alertBookingFailureOnce } from "@/lib/sponsor-booking-alerts";
 import { recordPaidProductOrder, shippingFromSession } from "@/lib/products";
-import { awardPurchasePoints } from "@/lib/rewards";
+import { awardPurchasePoints, refundPointsForCheckout } from "@/lib/rewards";
 import { isProductSize } from "@/lib/product-sizes";
 import { boardRunDays, clampBoardRunWeeks } from "@/lib/board-constants";
 import {
@@ -122,6 +122,9 @@ async function fulfillCouponBookPurchase(stripe: Stripe, workspaceId: string, se
         subscriptionStatus: annual.subscriptionStatus,
         ...(annual.accessUntil ? { accessUntil: annual.accessUntil } : {}),
         cancelAtPeriodEnd: annual.cancelAtPeriodEnd,
+        ...(pointsAppliedFromSession(session) !== null
+          ? { pointsApplied: pointsAppliedFromSession(session) }
+          : {}),
       },
       create: {
         workspaceId,
@@ -133,6 +136,7 @@ async function fulfillCouponBookPurchase(stripe: Stripe, workspaceId: string, se
         subscriptionStatus: annual.subscriptionStatus,
         accessUntil: annual.accessUntil,
         cancelAtPeriodEnd: annual.cancelAtPeriodEnd,
+        pointsApplied: pointsAppliedFromSession(session),
       },
     });
     const { sendCouponBookMagicLinkEmail } = await import("@/lib/coupon-book-email");
@@ -144,8 +148,20 @@ async function fulfillCouponBookPurchase(stripe: Stripe, workspaceId: string, se
   // Idempotent: the same session completing twice reuses the purchase row.
   const purchase = await basePrisma.couponBookPurchase.upsert({
     where: { stripeSessionId: session.id },
-    update: { active: true, email },
-    create: { workspaceId, email, stripeSessionId: session.id, active: true },
+    update: {
+      active: true,
+      email,
+      ...(pointsAppliedFromSession(session) !== null
+        ? { pointsApplied: pointsAppliedFromSession(session) }
+        : {}),
+    },
+    create: {
+      workspaceId,
+      email,
+      stripeSessionId: session.id,
+      active: true,
+      pointsApplied: pointsAppliedFromSession(session),
+    },
   });
   const { sendCouponBookMagicLinkEmail } = await import("@/lib/coupon-book-email");
   await sendCouponBookMagicLinkEmail({ workspaceId, to: email, magicToken: purchase.magicToken });
@@ -692,22 +708,32 @@ async function fulfillProductOrder(workspaceId: string, session: Stripe.Checkout
   // checkout route stored it); this is the backfill for a missing row.
   const rawSize = session.metadata?.size;
   const sizeFromMeta = isProductSize(rawSize) ? rawSize : null;
+  // Reader Rewards points the buyer spent on this order, when the portal
+  // storefront checkout applied them (session metadata). The pending row
+  // the checkout route created already carries it; this is the record for
+  // a missing-row fallback and a backfill if the row predates it.
+  const pointsFromMeta = pointsAppliedFromSession(session);
   const existing = await basePrisma.productOrder.findUnique({
     where: { stripeSessionId: session.id },
-    select: { id: true, status: true, size: true },
+    select: { id: true, status: true, size: true, pointsApplied: true },
   });
   if (existing) {
     const sizeFill: { size?: string } = !existing.size && sizeFromMeta ? { size: sizeFromMeta } : {};
+    const pointsFill: { pointsApplied?: number } =
+      existing.pointsApplied === null && pointsFromMeta !== null
+        ? { pointsApplied: pointsFromMeta }
+        : {};
     if (existing.status !== "paid") {
       await basePrisma.productOrder.update({
         where: { id: existing.id },
-        data: { status: "paid", paidAt, ...(shipping ?? {}), ...sizeFill },
+        data: { status: "paid", paidAt, ...(shipping ?? {}), ...sizeFill, ...pointsFill },
       });
-    } else if (shipping || sizeFill.size) {
-      // Redelivery after the flip: backfill the address or size if missing.
+    } else if (shipping || sizeFill.size || pointsFill.pointsApplied !== undefined) {
+      // Redelivery after the flip: backfill the address, size, or points
+      // if missing.
       await basePrisma.productOrder.update({
         where: { id: existing.id },
-        data: { ...(shipping ?? {}), ...sizeFill },
+        data: { ...(shipping ?? {}), ...sizeFill, ...pointsFill },
       });
     }
     return;
@@ -724,6 +750,7 @@ async function fulfillProductOrder(workspaceId: string, session: Stripe.Checkout
       productId,
       email,
       amountCents: session.amount_total ?? 0,
+      pointsApplied: pointsFromMeta,
       stripeSessionId: session.id,
       status: "paid",
       paidAt,
@@ -731,6 +758,16 @@ async function fulfillProductOrder(workspaceId: string, session: Stripe.Checkout
       ...(sizeFromMeta ? { size: sizeFromMeta } : {}),
     },
   });
+}
+
+// Reader Rewards points spent on a checkout, from the session metadata
+// the portal storefront checkout writes. Null when the session used no
+// points (every other checkout flow).
+function pointsAppliedFromSession(session: Stripe.Checkout.Session): number | null {
+  const raw = session.metadata?.pointsApplied;
+  if (!raw) return null;
+  const n = parseInt(raw, 10);
+  return Number.isFinite(n) && n > 0 ? n : null;
 }
 
 // Legacy Payment Link sales: sessions bought through a standalone Stripe
@@ -1038,6 +1075,18 @@ export async function POST(req: NextRequest) {
     await basePrisma.tip.deleteMany({
       where: { workspaceId, stripeSessionId: sessionId, status: "pending_payment" },
     });
+    // Reader Rewards: a portal storefront checkout debits its points when
+    // the session is created, so an expired session gives them back. The
+    // refund is keyed to the session's own debit (no debit, no refund)
+    // and idempotent, so a re-delivered event returns nothing twice.
+    // Points must never break webhook handling, so failures only log.
+    if (pointsAppliedFromSession(session) !== null) {
+      try {
+        await refundPointsForCheckout(basePrisma, { workspaceId, sessionId });
+      } catch (error) {
+        console.error(`Reader Rewards: points refund failed for expired session ${sessionId}`, error);
+      }
+    }
   }
 
   return NextResponse.json({ received: true });
