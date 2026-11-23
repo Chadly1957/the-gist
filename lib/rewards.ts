@@ -25,6 +25,12 @@ export const REWARD_KIND_REDEMPTION = "redemption";
 // session expires unpaid (sourceRef = the same session id).
 export const REWARD_KIND_REDEEM = "redeem";
 export const REWARD_KIND_REDEEM_REFUND = "redeem_refund";
+// Daily Crossword completion (2026-11-22): sourceRef is
+// "<subscriberId>:<date>", so a reader can earn for a day's puzzle at
+// most once per workspace. The points value is a per-workspace setting
+// that defaults to 0 (off): the hook ships dark and Chad turns it on
+// from Admin > Settings if and when he sets a value.
+export const REWARD_KIND_CROSSWORD = "crossword";
 
 export const DEALS_FREE_YEAR_KEY = "deals_free_year";
 
@@ -33,6 +39,7 @@ const SETTING_KEYS = {
   purchasePointsPerDollar: "rewards_purchase_points_per_dollar",
   dealsYearCostPoints: "rewards_deals_year_cost_points",
   pointsPerDollar: "rewards_points_per_dollar",
+  crosswordPoints: "rewards_crossword_points",
 } as const;
 
 export const REWARD_SETTING_KEYS: string[] = Object.values(SETTING_KEYS);
@@ -42,6 +49,8 @@ const DEFAULTS = {
   purchasePointsPerDollar: 5,
   dealsYearCostPoints: 1500,
   pointsPerDollar: 100,
+  // Off until Chad sets a value: no points for crossword completions.
+  crosswordPoints: 0,
 } as const;
 
 export interface RewardConfig {
@@ -52,6 +61,9 @@ export interface RewardConfig {
   // (100 points = $1). The spend side of the base ratio; the earn side
   // is purchasePointsPerDollar.
   pointsPerDollar: number;
+  // Points for a reader's first completion of a day's Daily Crossword.
+  // 0 (the default) disables the hook entirely.
+  crosswordPoints: number;
 }
 
 function parseNonNegativeInt(value: string | undefined, fallback: number): number {
@@ -88,6 +100,10 @@ export async function getRewardConfig(
         values[SETTING_KEYS.pointsPerDollar],
         DEFAULTS.pointsPerDollar
       )
+    ),
+    crosswordPoints: parseNonNegativeInt(
+      values[SETTING_KEYS.crosswordPoints],
+      DEFAULTS.crosswordPoints
     ),
   };
 }
@@ -184,6 +200,48 @@ export async function awardPurchasePoints(
     return true;
   } catch (error) {
     if (isUniqueViolation(error)) return false;
+    throw error;
+  }
+}
+
+// Earn hook: a reader's first completion of a day's Daily Crossword.
+// Built but OFF: it pays only when the workspace's rewards_crossword_
+// points setting is above 0 (default 0). Idempotent per reader per day
+// via the ledger's unique index on (workspaceId, kind, sourceRef) with
+// sourceRef "<subscriberId>:<date>", and the CrosswordPlay row's own
+// unique index means the completion itself is recorded once. Returns
+// the points actually appended (0 when the hook is off, the reader is
+// unknown to this workspace, or the day was already paid).
+export async function awardCrosswordPoints(
+  db: PrismaClient,
+  args: {
+    workspaceId: string;
+    subscriberId: string;
+    date: string;
+  }
+): Promise<number> {
+  if (!args.subscriberId || !args.date) return 0;
+  const subscriber = await db.subscriber.findFirst({
+    where: { id: args.subscriberId, workspaceId: args.workspaceId },
+    select: { id: true },
+  });
+  if (!subscriber) return 0;
+  const config = await getRewardConfig(db, args.workspaceId);
+  if (config.crosswordPoints <= 0) return 0;
+  try {
+    await db.rewardPointEntry.create({
+      data: {
+        workspaceId: args.workspaceId,
+        subscriberId: subscriber.id,
+        kind: REWARD_KIND_CROSSWORD,
+        points: config.crosswordPoints,
+        sourceRef: `${subscriber.id}:${args.date}`,
+        note: "Daily crossword completed",
+      },
+    });
+    return config.crosswordPoints;
+  } catch (error) {
+    if (isUniqueViolation(error)) return 0;
     throw error;
   }
 }

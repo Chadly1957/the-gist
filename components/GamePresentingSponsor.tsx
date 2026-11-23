@@ -20,7 +20,7 @@ interface SponsorData {
  * Community Partner listing than a loud ad banner. Renders nothing if
  * there's no presenting sponsor booked for today.
  */
-export default function GamePresentingSponsor({ game }: { game: "wordy" | "match" }) {
+export default function GamePresentingSponsor({ game }: { game: "wordy" | "match" | "crossword" }) {
   const [sponsor, setSponsor] = useState<SponsorData | null>(null);
 
   useEffect(() => {

@@ -2,7 +2,7 @@
 
 export interface Block {
   id: string;
-  type: "header" | "text" | "image" | "articles" | "divider" | "footer" | "button" | "spotlight" | "presenting_sponsor" | "presenting_logo_bar" | "presenting_spotlight" | "events" | "referral" | "poll" | "wordy" | "match" | "games" | "tip_jar" | "deals_signup" | "weather" | "product_spotlight" | "board" | "guide_spotlight" | "rewards";
+  type: "header" | "text" | "image" | "articles" | "divider" | "footer" | "button" | "spotlight" | "presenting_sponsor" | "presenting_logo_bar" | "presenting_spotlight" | "events" | "referral" | "poll" | "wordy" | "match" | "games" | "tip_jar" | "deals_signup" | "weather" | "product_spotlight" | "board" | "guide_spotlight" | "rewards" | "crossword";
   content: Record<string, unknown>;
 }
 
@@ -835,6 +835,34 @@ function renderRewards(content: Record<string, unknown>): string {
     </div>`;
 }
 
+// Daily Crossword CTA. Email cannot run a grid, so the block links to
+// the crossword page on the site. EMAILPLACEHOLDER is substituted per
+// recipient in every send path (the same placeholder the Reader
+// Rewards block and the unsubscribe URL use), and /crossword reads the
+// ?email= param so a reader arriving from their issue is recognized
+// for points when crossword points are turned on. In the editor
+// preview and the public archive snapshot the placeholder stays
+// literal, so a preview never shows a real reader's link.
+function renderCrossword(content: Record<string, unknown>): string {
+  const title = String(content.title || "Today's Daily Crossword");
+  const text = String(
+    content.text ||
+      "A fresh 5 × 5 mini, every day. Same puzzle for everyone, bragging rights for whoever finishes first."
+  );
+  const label = String(content.buttonLabel || "Play Today's Crossword →");
+  const playUrl = "{{APP_URL}}/crossword?email=EMAILPLACEHOLDER";
+  return `
+    <div style="padding:20px 40px;">
+      <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:24px;text-align:center;">
+        <div style="font-family:sans-serif;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#166534;margin-bottom:10px;">Daily Crossword</div>
+        <div style="font-size:22px;letter-spacing:4px;margin-bottom:12px;">⬛⬜⬛⬜⬛</div>
+        <div style="font-size:18px;font-weight:700;color:#111827;font-family:Georgia,serif;line-height:1.3;margin-bottom:10px;">${title}</div>
+        <div style="font-size:14px;color:#4b5563;line-height:1.6;font-family:sans-serif;margin-bottom:20px;">${text}</div>
+        <a href="${playUrl}" style="display:inline-block;background:#166534;color:#ffffff;padding:12px 28px;border-radius:6px;text-decoration:none;font-size:14px;font-family:sans-serif;font-weight:700;">${label}</a>
+      </div>
+    </div>`;
+}
+
 function renderDivider(): string {
   return `<div class="block" style="padding:8px 40px;"><hr class="divider" style="border:none;border-top:1px solid #e5e7eb;margin:0;" /></div>`;
 }
@@ -982,6 +1010,8 @@ export function renderTemplate(
           return renderDealsSignup();
         case "rewards":
           return renderRewards(block.content);
+        case "crossword":
+          return renderCrossword(block.content);
         case "weather":
           return renderWeather(block.content, weatherData);
         case "product_spotlight": {

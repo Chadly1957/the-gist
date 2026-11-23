@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/db";
 
-export type GameName = "wordy" | "match";
+export type GameName = "wordy" | "match" | "crossword";
 
 export interface GameSponsorData {
   bookingId: string;

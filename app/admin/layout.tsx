@@ -166,6 +166,15 @@ const NAV_ITEMS = [
     ),
   },
   {
+    href: "/admin/crossword",
+    label: "Crossword",
+    icon: (
+      <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M4 4h16v16H4zM4 9.33h16M4 14.67h16M9.33 4v16M14.67 4v16" />
+      </svg>
+    ),
+  },
+  {
     href: "/admin/polls",
     label: "Polls",
     icon: (

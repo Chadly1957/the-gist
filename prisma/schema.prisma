@@ -59,6 +59,7 @@ model Workspace {
   wordyWordRows               WordyWord[]
   wordyBookingRows            WordyBooking[]
   wordyPlayRows               WordyPlay[]
+  crosswordPlayRows           CrosswordPlay[]
   matchScoreRows              MatchScore[]
   joinTestEventRows           JoinTestEvent[]
   pollRows                    Poll[]
@@ -889,6 +890,48 @@ model WordyPlay {
   wordLength  Int
   createdAt   DateTime  @default(now())
 
+  @@unique([id, workspaceId])
+  @@index([date])
+  @@index([workspaceId])
+}
+
+// Daily Crossword (2026-11-22): a 5x5 mini, generated from the word/clue
+// bank in lib/crossword-bank.ts by lib/crossword-generate.ts. Deliberately
+// GLOBAL — no workspaceId and no workspace relation: both cities play the
+// identical puzzle on a given date, so the row is keyed by date alone.
+// The queue tops itself up to 30 days ahead from the today endpoint and
+// the admin page (lib/crossword.ts), so it can never silently run dry the
+// way the hand-filled Wordy calendar did. Because this model has no
+// workspaceId, the workspace-scoped prisma client refuses it; crossword
+// code uses basePrisma, like lib/rewards.ts.
+model CrosswordPuzzle {
+  id        String   @id @default(cuid())
+  date      String   @unique // YYYY-MM-DD
+  // JSON: { size: 5, blacks: number[], answers: string (25 chars, "#" on
+  // black squares), slots: [{ number, direction, row, col, length, cells,
+  // answer, clue }] }. Answers live only here and in the check / reveal /
+  // complete endpoints; the today payload strips them.
+  grid      Json
+  createdAt DateTime @default(now())
+
+  @@index([date])
+}
+
+// One row per reader completion of a day's crossword. subscriberId is null
+// for anonymous players (they play without points). The unique index on
+// (workspaceId, date, subscriberId) makes an identified reader's
+// completion count once per day per city, which is also the guard that
+// keeps the points hook (lib/rewards.ts awardCrosswordPoints) from ever
+// paying a day twice.
+model CrosswordPlay {
+  workspaceId  String    @default("decatur")
+  workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  id           String    @id @default(cuid())
+  date         String
+  subscriberId String?
+  createdAt    DateTime  @default(now())
+
+  @@unique([workspaceId, date, subscriberId])
   @@unique([id, workspaceId])
   @@index([date])
   @@index([workspaceId])

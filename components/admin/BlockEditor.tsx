@@ -8,7 +8,7 @@ import UrlInput from "@/components/UrlInput";
 
 export interface Block {
   id: string;
-  type: "header" | "text" | "image" | "articles" | "divider" | "button" | "footer" | "spotlight" | "presenting_sponsor" | "presenting_logo_bar" | "presenting_spotlight" | "events" | "referral" | "poll" | "wordy" | "match" | "games" | "tip_jar" | "deals_signup" | "weather" | "product_spotlight" | "board" | "guide_spotlight" | "rewards";
+  type: "header" | "text" | "image" | "articles" | "divider" | "button" | "footer" | "spotlight" | "presenting_sponsor" | "presenting_logo_bar" | "presenting_spotlight" | "events" | "referral" | "poll" | "wordy" | "match" | "games" | "tip_jar" | "deals_signup" | "weather" | "product_spotlight" | "board" | "guide_spotlight" | "rewards" | "crossword";
   content: Record<string, string>;
 }
 
@@ -54,6 +54,7 @@ const BLOCK_TYPES: { type: Block["type"]; label: string; icon: string }[] = [
   { type: "tip_jar", label: "Tip Jar", icon: "☕" },
   { type: "deals_signup", label: "Gist Deals Signup", icon: "🎟️" },
   { type: "rewards", label: "Reader Rewards", icon: "⭐" },
+  { type: "crossword", label: "Daily Crossword", icon: "▦" },
   { type: "weather", label: "Weather Snapshot", icon: "🌤️" },
   { type: "product_spotlight", label: "Product Spotlight", icon: "🛍️" },
   { type: "guide_spotlight", label: "Guide Spotlight", icon: "📖" },
@@ -152,6 +153,11 @@ export default function BlockEditor({ blocks, onChange }: BlockEditorProps) {
         title: "Your Reader Rewards",
         text: "You earn points for referring friends and shopping with The Gist — 100 points = $1, and 1,500 points scores a free year of The Gist Deals. Check your balance anytime.",
         buttonLabel: "See My Points →",
+      },
+      crossword: {
+        title: "Today's Daily Crossword",
+        text: "A fresh 5 × 5 mini, every day. Same puzzle for everyone, bragging rights for whoever finishes first.",
+        buttonLabel: "Play Today's Crossword →",
       },
       weather: {
         label: "Today's Weather",
@@ -543,6 +549,17 @@ function BlockPreview({ block, products = [], minis = [] }: { block: Block; prod
           </span>
         </div>
       );
+    case "crossword":
+      return (
+        <div className="bg-green-50 border border-green-200 rounded-xl p-4 text-center">
+          <div className="text-xs font-semibold text-green-700 uppercase tracking-wide mb-1">Daily Crossword</div>
+          <p className="text-sm font-bold text-gray-900 mb-1">▦ {block.content.title || "Today's Daily Crossword"}</p>
+          <p className="text-xs text-gray-500 mb-2">{block.content.text || "A fresh 5 × 5 mini, every day."}</p>
+          <span className="inline-block bg-green-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg">
+            {block.content.buttonLabel || "Play Today's Crossword →"}
+          </span>
+        </div>
+      );
     case "weather":
       return (
         <div className="flex items-center gap-3 py-2">
@@ -915,6 +932,15 @@ function BlockFields({
           {field("text", "Body Text", { rows: 2, placeholder: "You earn points for referring friends and shopping with The Gist — 100 points = $1, and 1,500 points scores a free year of The Gist Deals. Check your balance anytime." })}
           {field("buttonLabel", "Button Label", { placeholder: "See My Points →" })}
           <p className="text-xs text-gray-400">The button links to each subscriber&apos;s own Rewards page: when the issue is sent, their email is filled in automatically so the link opens their points. The preview only ever shows a placeholder link, never a real reader&apos;s.</p>
+        </div>
+      );
+    case "crossword":
+      return (
+        <div className="space-y-3">
+          {field("title", "Heading", { placeholder: "Today's Daily Crossword" })}
+          {field("text", "Body Text", { rows: 2, placeholder: "A fresh 5 × 5 mini, every day. Same puzzle for everyone, bragging rights for whoever finishes first." })}
+          {field("buttonLabel", "Button Label", { placeholder: "Play Today's Crossword →" })}
+          <p className="text-xs text-gray-400">The button links to this workspace&apos;s crossword page with the reader&apos;s email filled in, the same way the Reader Rewards block works, so a reader arriving from their issue is recognized for points if crossword points are turned on in Settings. The preview only ever shows a placeholder link, never a real reader&apos;s.</p>
         </div>
       );
     case "weather":
