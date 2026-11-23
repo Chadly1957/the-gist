@@ -3,6 +3,7 @@ import { basePrisma } from "@/lib/db-base";
 import { getWorkspace, getWorkspaceUrl } from "@/lib/workspace";
 import {
   ensureDealsYearCatalogItem,
+  getDailyTasksStatus,
   getDealsAccess,
   getRewardConfig,
   getRewardsSummary,
@@ -33,7 +34,7 @@ export async function POST(req: NextRequest) {
   }
 
   const item = await ensureDealsYearCatalogItem(basePrisma, workspace.id);
-  const [summary, dealsAccess, referralCode, config, appUrl, storefrontItems] = await Promise.all([
+  const [summary, dealsAccess, referralCode, config, appUrl, storefrontItems, dailyTasks] = await Promise.all([
     getRewardsSummary(basePrisma, workspace.id, subscriber.id),
     getDealsAccess(basePrisma, workspace.id, normalizedEmail),
     basePrisma.referralCode.findUnique({
@@ -43,6 +44,7 @@ export async function POST(req: NextRequest) {
     getRewardConfig(basePrisma, workspace.id),
     getWorkspaceUrl(),
     listStorefrontItems(basePrisma, workspace.id, workspace.name),
+    getDailyTasksStatus(basePrisma, workspace.id, subscriber.id),
   ]);
 
   return NextResponse.json({
@@ -78,6 +80,18 @@ export async function POST(req: NextRequest) {
     // The live per-referral point value (Admin > Settings) so the page copy
     // can never go stale when the value changes.
     referralSignupPoints: config.referralSignupPoints,
+    // Today's to-do list: the four daily earning tasks with their live
+    // values and whether this reader has already earned each one today
+    // (from today's ledger entries, so it always matches what was
+    // actually paid). Each link carries the reader's email the same way
+    // the referral link above is built, so arriving at the game or the
+    // Directory identifies them for the award.
+    dailyTasks: dailyTasks.map((task) => ({
+      key: task.key,
+      points: task.points,
+      done: task.done,
+      href: `${appUrl}/${task.key === "directory" ? "partners" : task.key}?email=${encodeURIComponent(normalizedEmail)}`,
+    })),
     // Points-as-money storefront: everything for sale in this workspace
     // (Deals book + active products, availability already resolved) and
     // the live spend rate, so the portal can offer points off any of it

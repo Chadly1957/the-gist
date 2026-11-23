@@ -36,6 +36,13 @@ interface StorefrontItem {
   requiresShipping: boolean;
 }
 
+interface DailyTask {
+  key: string;
+  points: number;
+  done: boolean;
+  href: string;
+}
+
 interface Summary {
   found: boolean;
   firstName?: string | null;
@@ -43,6 +50,7 @@ interface Summary {
   totalEarned?: number;
   totalRedeemed?: number;
   entries?: RewardEntry[];
+  dailyTasks?: DailyTask[];
   catalog?: CatalogItem[];
   dealsAccess?: {
     hasAccess: boolean;
@@ -64,6 +72,17 @@ const KIND_LABELS: Record<string, string> = {
   redemption: "Reward redeemed",
   redeem: "Points spent",
   redeem_refund: "Points returned (checkout not finished)",
+  crossword: "Daily crossword completed",
+  wordy: "Wordy win",
+  match: "Gist Match finished",
+  directory: "Directory check",
+};
+
+const DAILY_TASK_LABELS: Record<string, string> = {
+  crossword: "Finish today's Crossword",
+  wordy: "Win today's Wordy",
+  match: "Finish today's Gist Match",
+  directory: "Check the local Directory",
 };
 
 function formatMoney(cents: number): string {
@@ -439,6 +458,47 @@ function RewardsPageInner() {
                 </div>
               )}
             </div>
+
+            {/* Today's to-do list: the daily earning tasks, each with its
+                live points value and whether this reader already earned
+                it today (from today's ledger entries, via the summary). */}
+            {summary.dailyTasks && summary.dailyTasks.length > 0 && (
+              <div className="bg-white border border-gray-100 rounded-2xl p-6 mb-4">
+                <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-1">
+                  Today&apos;s to-do list
+                </p>
+                <p className="text-sm text-gray-500 mb-4">
+                  A few small daily habits that earn points. Each one pays
+                  once a day.
+                </p>
+                <div className="space-y-3">
+                  {summary.dailyTasks.map((task) => (
+                    <div
+                      key={task.key}
+                      className="flex items-center justify-between gap-3 text-sm"
+                    >
+                      <span className="text-gray-700">
+                        {DAILY_TASK_LABELS[task.key] || task.key}
+                      </span>
+                      {task.done ? (
+                        <span className="font-semibold text-green-700 whitespace-nowrap">
+                          Done ✓
+                        </span>
+                      ) : task.points > 0 ? (
+                        <a
+                          href={task.href}
+                          className="font-semibold text-green-700 hover:underline whitespace-nowrap"
+                        >
+                          +{task.points.toLocaleString()} points →
+                        </a>
+                      ) : (
+                        <span className="text-gray-400 whitespace-nowrap">Off</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Catalog */}
             {item && (

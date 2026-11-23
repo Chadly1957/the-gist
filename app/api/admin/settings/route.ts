@@ -32,6 +32,9 @@ const ALLOWED_KEYS = [
   "rewards_deals_year_cost_points",
   "rewards_points_per_dollar",
   "rewards_crossword_points",
+  "rewards_wordy_points",
+  "rewards_match_points",
+  "rewards_directory_points",
 ];
 
 export async function GET() {
