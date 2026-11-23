@@ -33,6 +33,9 @@ interface Settings {
   rewards_deals_year_cost_points: string;
   rewards_points_per_dollar: string;
   rewards_crossword_points: string;
+  rewards_wordy_points: string;
+  rewards_match_points: string;
+  rewards_directory_points: string;
 }
 
 const PROVIDERS = [
@@ -85,6 +88,9 @@ export default function SettingsPage() {
     rewards_deals_year_cost_points: "1500",
     rewards_points_per_dollar: "100",
     rewards_crossword_points: "0",
+    rewards_wordy_points: "0",
+    rewards_match_points: "0",
+    rewards_directory_points: "0",
   });
   const [hasSmtp, setHasSmtp] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -744,6 +750,48 @@ export default function SettingsPage() {
                 className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
               />
               <p className="text-xs text-gray-400 mt-1">Points for a reader&apos;s first finish of the day&apos;s crossword (default: 0 = off, no points)</p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                Daily Wordy
+              </label>
+              <input
+                type="number"
+                min="0"
+                step="1"
+                value={settings.rewards_wordy_points}
+                onChange={(e) => setSettings((s) => ({ ...s, rewards_wordy_points: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+              />
+              <p className="text-xs text-gray-400 mt-1">Points for a reader&apos;s first Wordy win of the day (default: 0 = off, no points)</p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                Daily Gist Match
+              </label>
+              <input
+                type="number"
+                min="0"
+                step="1"
+                value={settings.rewards_match_points}
+                onChange={(e) => setSettings((s) => ({ ...s, rewards_match_points: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+              />
+              <p className="text-xs text-gray-400 mt-1">Points for a reader&apos;s first Gist Match finish of the day (default: 0 = off, no points)</p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                Daily Directory check
+              </label>
+              <input
+                type="number"
+                min="0"
+                step="1"
+                value={settings.rewards_directory_points}
+                onChange={(e) => setSettings((s) => ({ ...s, rewards_directory_points: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+              />
+              <p className="text-xs text-gray-400 mt-1">Points for a reader&apos;s first check of the local Directory each day (default: 0 = off, no points)</p>
             </div>
           </div>
 

@@ -3,6 +3,9 @@ import SiteHeader from "@/components/SiteHeader";
 import Link from "@/components/workspace/WorkspaceLink";
 import { getWorkspace } from "@/lib/workspace";
 import { prisma } from "@/lib/db";
+import { basePrisma } from "@/lib/db-base";
+import { awardDirectoryPoints, resolveReaderSubscriberId } from "@/lib/rewards";
+import { todayDateKey } from "@/lib/matchGame";
 import {
   PARTNER_CATEGORIES,
   isPartnerCategory,
@@ -69,8 +72,43 @@ function PartnerCard({ p, premium = false }: { p: {
   );
 }
 
-export default async function PartnersPage() {
+export default async function PartnersPage({
+  searchParams,
+}: {
+  searchParams?: { email?: string | string[] };
+}) {
   const ws = await getWorkspace();
+
+  // Reader Rewards daily task: an identified reader (the ?email= link
+  // from their rewards portal to-do list) earns the day's Directory
+  // points on their first visit, and only when the workspace's
+  // rewards_directory_points setting is above 0 (default 0 = off). The
+  // ledger's unique index makes the day count once per reader. No email
+  // in the URL means public traffic skips this entirely and gets the
+  // exact page it always has; a rewards hiccup must never break the
+  // directory, so failures are swallowed.
+  const emailParam =
+    typeof searchParams?.email === "string"
+      ? searchParams.email.trim().toLowerCase()
+      : "";
+  if (emailParam && emailParam.includes("@")) {
+    try {
+      const subscriberId = await resolveReaderSubscriberId(
+        basePrisma,
+        ws.id,
+        { email: emailParam }
+      );
+      if (subscriberId) {
+        await awardDirectoryPoints(basePrisma, {
+          workspaceId: ws.id,
+          subscriberId,
+          date: todayDateKey(),
+        });
+      }
+    } catch {
+      // Directory first: never let a points failure break the page.
+    }
+  }
 
   const rows = await prisma.spotlightListing.findMany({
     where: { status: { in: ["approved", "active"] } },

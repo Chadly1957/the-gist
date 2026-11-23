@@ -3,6 +3,7 @@ import {
   couponBookPrepaidYearEnd,
   couponBookPurchaseHasAccess,
 } from "@/lib/coupon-book";
+import { todayDateKey } from "@/lib/matchGame";
 
 // Reader Rewards (phase 1): points live in an append-only ledger
 // (RewardPointEntry); a reader's balance is the SUM of their entries and is
@@ -31,6 +32,14 @@ export const REWARD_KIND_REDEEM_REFUND = "redeem_refund";
 // that defaults to 0 (off): the hook ships dark and Chad turns it on
 // from Admin > Settings if and when he sets a value.
 export const REWARD_KIND_CROSSWORD = "crossword";
+// Daily tasks (2026-11-23): the other two daily games and the Directory
+// check join the crossword under the same pattern. Each kind's sourceRef
+// is "<subscriberId>:<date>", so a reader earns for a given day at most
+// once per workspace per task. Every value is a per-workspace setting
+// that defaults to 0 (off); nothing is hardcoded.
+export const REWARD_KIND_WORDY = "wordy";
+export const REWARD_KIND_MATCH = "match";
+export const REWARD_KIND_DIRECTORY = "directory";
 
 export const DEALS_FREE_YEAR_KEY = "deals_free_year";
 
@@ -40,6 +49,9 @@ const SETTING_KEYS = {
   dealsYearCostPoints: "rewards_deals_year_cost_points",
   pointsPerDollar: "rewards_points_per_dollar",
   crosswordPoints: "rewards_crossword_points",
+  wordyPoints: "rewards_wordy_points",
+  matchPoints: "rewards_match_points",
+  directoryPoints: "rewards_directory_points",
 } as const;
 
 export const REWARD_SETTING_KEYS: string[] = Object.values(SETTING_KEYS);
@@ -51,6 +63,10 @@ const DEFAULTS = {
   pointsPerDollar: 100,
   // Off until Chad sets a value: no points for crossword completions.
   crosswordPoints: 0,
+  // Same for the rest of the daily tasks: the hooks ship dark.
+  wordyPoints: 0,
+  matchPoints: 0,
+  directoryPoints: 0,
 } as const;
 
 export interface RewardConfig {
@@ -64,6 +80,12 @@ export interface RewardConfig {
   // Points for a reader's first completion of a day's Daily Crossword.
   // 0 (the default) disables the hook entirely.
   crosswordPoints: number;
+  // Points for a reader's first Wordy win of the day. 0 = off.
+  wordyPoints: number;
+  // Points for a reader's first Gist Match finish of the day. 0 = off.
+  matchPoints: number;
+  // Points for a reader's first Directory check of the day. 0 = off.
+  directoryPoints: number;
 }
 
 function parseNonNegativeInt(value: string | undefined, fallback: number): number {
@@ -104,6 +126,18 @@ export async function getRewardConfig(
     crosswordPoints: parseNonNegativeInt(
       values[SETTING_KEYS.crosswordPoints],
       DEFAULTS.crosswordPoints
+    ),
+    wordyPoints: parseNonNegativeInt(
+      values[SETTING_KEYS.wordyPoints],
+      DEFAULTS.wordyPoints
+    ),
+    matchPoints: parseNonNegativeInt(
+      values[SETTING_KEYS.matchPoints],
+      DEFAULTS.matchPoints
+    ),
+    directoryPoints: parseNonNegativeInt(
+      values[SETTING_KEYS.directoryPoints],
+      DEFAULTS.directoryPoints
     ),
   };
 }
@@ -244,6 +278,205 @@ export async function awardCrosswordPoints(
     if (isUniqueViolation(error)) return 0;
     throw error;
   }
+}
+
+// Resolve the reader behind a game or Directory visit to the active
+// Subscriber in this workspace, or null when the visit is anonymous or
+// the reader is unknown here. Two identity carriers, both already in
+// use on the reader surface: the rewards email pattern (?email=, from
+// the portal and the crossword/rewards newsletter blocks) and the
+// newsletter recipient id (?r=, the RIDPLACEHOLDER swap the Wordy and
+// Match blocks have always used). A recipient id resolves through its
+// NewsletterRecipient row, which carries the subscriber id directly
+// and the email as a fallback. Anonymous visits resolve to null and
+// simply play or browse without points.
+export async function resolveReaderSubscriberId(
+  db: PrismaClient,
+  workspaceId: string,
+  identity: { email?: string | null; recipientId?: string | null }
+): Promise<string | null> {
+  const email = (identity.email || "").trim().toLowerCase();
+  if (email && email.includes("@")) {
+    const subscriber = await db.subscriber.findFirst({
+      where: { workspaceId, email, active: true },
+      select: { id: true },
+    });
+    if (subscriber) return subscriber.id;
+  }
+  const recipientId = (identity.recipientId || "").trim();
+  if (recipientId) {
+    const recipient = await db.newsletterRecipient.findFirst({
+      where: { id: recipientId, workspaceId },
+      select: { subscriberId: true, email: true },
+    });
+    if (recipient) {
+      if (recipient.subscriberId) {
+        const subscriber = await db.subscriber.findFirst({
+          where: { id: recipient.subscriberId, workspaceId, active: true },
+          select: { id: true },
+        });
+        if (subscriber) return subscriber.id;
+      }
+      const recipientEmail = (recipient.email || "").trim().toLowerCase();
+      if (recipientEmail && recipientEmail.includes("@")) {
+        const subscriber = await db.subscriber.findFirst({
+          where: { workspaceId, email: recipientEmail, active: true },
+          select: { id: true },
+        });
+        if (subscriber) return subscriber.id;
+      }
+    }
+  }
+  return null;
+}
+
+// Shared body of the daily-task earn hooks (Wordy, Match, Directory):
+// the crossword hook above is the original and stays as written; these
+// three run the identical rule. Pays the configured value only when it
+// is above 0, only to a subscriber who belongs to this workspace, and
+// at most once per reader per day: the ledger's unique index on
+// (workspaceId, kind, sourceRef) with sourceRef "<subscriberId>:<date>"
+// is the guard, so a retried completion or a second device can never
+// pay twice. Returns the points actually appended (0 when the hook is
+// off or the day was already paid).
+async function awardDailyTaskPoints(
+  db: PrismaClient,
+  args: {
+    workspaceId: string;
+    subscriberId: string;
+    date: string;
+    kind: string;
+    points: number;
+    note: string;
+  }
+): Promise<number> {
+  if (!args.subscriberId || !args.date) return 0;
+  if (args.points <= 0) return 0;
+  const subscriber = await db.subscriber.findFirst({
+    where: { id: args.subscriberId, workspaceId: args.workspaceId },
+    select: { id: true },
+  });
+  if (!subscriber) return 0;
+  try {
+    await db.rewardPointEntry.create({
+      data: {
+        workspaceId: args.workspaceId,
+        subscriberId: subscriber.id,
+        kind: args.kind,
+        points: args.points,
+        sourceRef: `${subscriber.id}:${args.date}`,
+        note: args.note,
+      },
+    });
+    return args.points;
+  } catch (error) {
+    if (isUniqueViolation(error)) return 0;
+    throw error;
+  }
+}
+
+// Earn hook: a reader's first Wordy WIN of the day. The caller (the
+// wordy complete route) re-verifies the win against the day's stored
+// word before calling; a loss never reaches this hook. Pays only when
+// rewards_wordy_points is above 0 (default 0 = off).
+export async function awardWordyPoints(
+  db: PrismaClient,
+  args: { workspaceId: string; subscriberId: string; date: string }
+): Promise<number> {
+  const config = await getRewardConfig(db, args.workspaceId);
+  return awardDailyTaskPoints(db, {
+    ...args,
+    kind: REWARD_KIND_WORDY,
+    points: config.wordyPoints,
+    note: "Wordy win",
+  });
+}
+
+// Earn hook: a reader's first Gist Match finish of the day, recorded
+// when the day's score is submitted (the game's completion event; the
+// MatchScore row is the server-side record). Pays only when
+// rewards_match_points is above 0 (default 0 = off).
+export async function awardMatchPoints(
+  db: PrismaClient,
+  args: { workspaceId: string; subscriberId: string; date: string }
+): Promise<number> {
+  const config = await getRewardConfig(db, args.workspaceId);
+  return awardDailyTaskPoints(db, {
+    ...args,
+    kind: REWARD_KIND_MATCH,
+    points: config.matchPoints,
+    note: "Gist Match finished",
+  });
+}
+
+// Earn hook: a reader's first Directory check of the day, recorded when
+// an identified reader loads /partners. Pays only when
+// rewards_directory_points is above 0 (default 0 = off).
+export async function awardDirectoryPoints(
+  db: PrismaClient,
+  args: { workspaceId: string; subscriberId: string; date: string }
+): Promise<number> {
+  const config = await getRewardConfig(db, args.workspaceId);
+  return awardDailyTaskPoints(db, {
+    ...args,
+    kind: REWARD_KIND_DIRECTORY,
+    points: config.directoryPoints,
+    note: "Directory check",
+  });
+}
+
+export interface DailyTaskStatus {
+  key: "crossword" | "wordy" | "match" | "directory";
+  // The live configured value for this workspace (0 = the task is off).
+  points: number;
+  // True when today's ledger entry for this task exists for the reader,
+  // i.e. the task was completed AND paid today. Derived from the same
+  // ledger rows the award hooks write, so the portal's to-do list can
+  // never disagree with what was actually earned.
+  done: boolean;
+}
+
+// Today's daily-task state for one reader, for the portal to-do list.
+// Each game keeps its own "today" convention, and the lookup follows
+// it: Wordy and the crossword key their puzzles by the server-local
+// date (the same expression as lib/crossword's crosswordTodayKey and
+// the wordy today route), while Gist Match resets at midnight
+// America/Chicago (lib/matchGame's todayDateKey) and the Directory
+// check uses that same Chicago day.
+export async function getDailyTasksStatus(
+  db: PrismaClient,
+  workspaceId: string,
+  subscriberId: string
+): Promise<DailyTaskStatus[]> {
+  const config = await getRewardConfig(db, workspaceId);
+  const serverDay = new Date().toLocaleDateString("en-CA");
+  const chicagoDay = todayDateKey();
+  const defs: { key: DailyTaskStatus["key"]; kind: string; points: number; date: string }[] = [
+    { key: "crossword", kind: REWARD_KIND_CROSSWORD, points: config.crosswordPoints, date: serverDay },
+    { key: "wordy", kind: REWARD_KIND_WORDY, points: config.wordyPoints, date: serverDay },
+    { key: "match", kind: REWARD_KIND_MATCH, points: config.matchPoints, date: chicagoDay },
+    { key: "directory", kind: REWARD_KIND_DIRECTORY, points: config.directoryPoints, date: chicagoDay },
+  ];
+  const refs: string[] = [];
+  for (const def of defs) refs.push(`${subscriberId}:${def.date}`);
+  const entries = await db.rewardPointEntry.findMany({
+    where: {
+      workspaceId,
+      subscriberId,
+      kind: { in: defs.map((d) => d.kind) },
+      sourceRef: { in: refs },
+    },
+    select: { kind: true, sourceRef: true },
+  });
+  const paid: Record<string, true> = {};
+  for (const entry of entries) {
+    if (entry.sourceRef) paid[`${entry.kind}|${entry.sourceRef}`] = true;
+  }
+  return defs.map((def) => ({
+    key: def.key,
+    points: def.points,
+    done: Boolean(paid[`${def.kind}|${subscriberId}:${def.date}`]),
+  }));
 }
 
 // ── Points-as-money storefront ──────────────────────────────────────────

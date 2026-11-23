@@ -41,6 +41,10 @@ function WordyGame() {
   const { workspace, prefix } = useWorkspace();
   const searchParams = useSearchParams();
   const recipientId = searchParams.get("r");
+  // Reader Rewards identity for readers who arrive from their portal
+  // to-do list (/wordy?email=...): passed to the complete call so a win
+  // can be credited. Newsletter arrivals use the recipient id above.
+  const emailParam = searchParams.get("email");
 
   const [phase, setPhase]               = useState<GamePhase>("loading");
   const [meta, setMeta]                 = useState<GameMeta | null>(null);
@@ -77,7 +81,7 @@ function WordyGame() {
     workspaceFetch("/api/wordy/complete", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ date: m.date, won: newPhase === "won", guesses: finalGuesses.length, maxGuesses: m.maxGuesses, wordLength: m.wordLength, recipientId }),
+      body: JSON.stringify({ date: m.date, won: newPhase === "won", guesses: finalGuesses.length, maxGuesses: m.maxGuesses, wordLength: m.wordLength, recipientId, email: emailParam || undefined, guessWords: finalGuesses }),
     }).catch(() => {});
     const lsKey = `decatur_wordy_${m.date}`;
     workspaceStorage.setItem(lsKey, JSON.stringify({ guesses: finalGuesses, results: finalResults, phase: newPhase, answer: revealedAnswer }));
@@ -144,14 +148,14 @@ function WordyGame() {
       workspaceFetch("/api/wordy/complete", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ date: meta.date, won: false, guesses: newGuesses.length, maxGuesses: meta.maxGuesses, wordLength: meta.wordLength, recipientId }),
+        body: JSON.stringify({ date: meta.date, won: false, guesses: newGuesses.length, maxGuesses: meta.maxGuesses, wordLength: meta.wordLength, recipientId, email: emailParam || undefined, guessWords: newGuesses }),
       }).catch(() => {});
       workspaceStorage.setItem(`decatur_wordy_${meta.date}`, JSON.stringify({ guesses: newGuesses, results: newResults, phase: "lost", answer: finalAnswer }));
     } else {
       workspaceStorage.setItem(`decatur_wordy_${meta.date}`, JSON.stringify({ guesses: newGuesses, results: newResults, phase: "playing", answer: null }));
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [current, guesses, meta, phase, recipientId, results, submitting]);
+  }, [current, guesses, meta, phase, recipientId, emailParam, results, submitting]);
 
   const handleKey = useCallback((key: string) => {
     if (phase !== "playing") return;

@@ -48,6 +48,19 @@ export default function MatchPage() {
   const toastRef = useRef<HTMLDivElement>(null);
   const engineRef = useRef<MatchEngine | null>(null);
   const dateKeyRef = useRef<string>("");
+  // Reader Rewards identity, read once from the arrival URL: ?email=
+  // from the reader's portal to-do list, ?r= (recipient id) from the
+  // newsletter Match block. Forwarded with the score submit so a finish
+  // can be credited; anonymous players are unaffected.
+  const identityRef = useRef<{ email?: string; recipientId?: string }>({});
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    identityRef.current = {
+      email: params.get("email") || undefined,
+      recipientId: params.get("r") || undefined,
+    };
+  }, []);
 
   const loadLeaderboard = useCallback(async () => {
     try {
@@ -108,7 +121,12 @@ export default function MatchPage() {
       const res = await workspaceFetch("/api/match/submit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: name.trim() || "Player", score: finalScore }),
+        body: JSON.stringify({
+          name: name.trim() || "Player",
+          score: finalScore,
+          email: identityRef.current.email,
+          recipientId: identityRef.current.recipientId,
+        }),
       });
       const data = await res.json();
       if (!res.ok) {
