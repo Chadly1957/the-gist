@@ -32,6 +32,7 @@ model Workspace {
   newsletterSendSpotlightRows NewsletterSendSpotlight[]
   newsletterRecipientRows     NewsletterRecipient[]
   linkClickRows               LinkClick[]
+  qrScanRows                  QrScan[]
   sponsorProfileRows          SponsorProfile[]
   spotlightListingRows        SpotlightListing[]
   starredBoardSubscriptionRows StarredBoardSubscription[]
@@ -255,6 +256,25 @@ model LinkClick {
 
   @@unique([id, workspaceId])
   @@index([newsletterRecipientId])
+  @@index([workspaceId])
+}
+
+// QR scan log (2026-11-24, Chad's call): one row per visit that arrives via
+// a printed QR code, matched on pathname + exact UTM triple in middleware.
+// No IPs, no personal data; a scan that never opens the page is not counted.
+model QrScan {
+  workspaceId String    @default("decatur")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  id          String    @id @default(cuid())
+  code        String // "flyer-dinner-club" | "banner-signup"
+  utmSource   String
+  utmMedium   String
+  utmCampaign String
+  device      String // "mobile" | "tablet" | "desktop" | "unknown"
+  createdAt   DateTime  @default(now())
+
+  @@unique([id, workspaceId])
+  @@index([workspaceId, code, createdAt])
   @@index([workspaceId])
 }
 

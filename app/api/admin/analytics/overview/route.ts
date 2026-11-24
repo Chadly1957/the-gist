@@ -3,6 +3,7 @@ import { getAdminSession } from "@/lib/auth";
 import { getWorkspace } from "@/lib/workspace";
 import { prisma } from "@/lib/db";
 import { deriveReaderState, ReaderState } from "@/lib/reader-segments";
+import { QR_CODES } from "@/lib/qr-scan";
 
 export const dynamic = "force-dynamic";
 
@@ -21,8 +22,9 @@ export async function GET(req: NextRequest) {
   const q = (req.nextUrl.searchParams.get("q") || "").trim().toLowerCase();
   const segment = (req.nextUrl.searchParams.get("segment") || "").trim();
   const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+  const qrCutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 
-  const [subscribers, recipients, linkClicks, deals, orders, referralSignups, referrerCodes] =
+  const [subscribers, recipients, linkClicks, deals, orders, referralSignups, referrerCodes, qrAll, qr30] =
     await Promise.all([
       prisma.subscriber.findMany({
         where: { workspaceId: wid },
@@ -72,6 +74,16 @@ export async function GET(req: NextRequest) {
       prisma.referralCode.findMany({
         where: { workspaceId: wid },
         select: { id: true, subscriberId: true },
+      }),
+      prisma.qrScan.groupBy({
+        by: ["code"],
+        where: { workspaceId: wid },
+        _count: { _all: true },
+      }),
+      prisma.qrScan.groupBy({
+        by: ["code"],
+        where: { workspaceId: wid, createdAt: { gte: qrCutoff } },
+        _count: { _all: true },
       }),
     ]);
 
@@ -182,6 +194,20 @@ export async function GET(req: NextRequest) {
   }
   const topLinks = Array.from(linkAgg.values()).sort((a, b) => b.clicks - a.clicks).slice(0, 10);
 
+  // QR scans: one row per page open from the two printed QR codes (matched
+  // on pathname + exact UTM triple in middleware). Both codes are always
+  // listed, even at zero, so the section never silently disappears.
+  const qrScans = QR_CODES.map((def) => {
+    const all = qrAll.find((r) => r.code === def.code);
+    const last30 = qr30.find((r) => r.code === def.code);
+    return {
+      code: def.code,
+      label: def.label,
+      last30d: last30 ? last30._count._all : 0,
+      allTime: all ? all._count._all : 0,
+    };
+  });
+
   // Per-send trend for the period, newest first.
   const sendAgg = new Map<string, { subject: string; sentAt: string; opens: number; clicks: number; recipients: number }>();
   for (const r of recipients) {
@@ -217,6 +243,7 @@ export async function GET(req: NextRequest) {
     acquisition: Array.from(acquisition.entries())
       .map(([label, count]) => ({ label, count }))
       .sort((a, b) => b.count - a.count),
+    qrScans,
     topLinks,
     trend,
     topReaders,
