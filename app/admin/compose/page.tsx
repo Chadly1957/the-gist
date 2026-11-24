@@ -879,7 +879,7 @@ export default function ComposePage() {
                   value={blurb}
                   onChange={(e) => setBlurb(e.target.value)}
                   rows={5}
-                  placeholder={"Add a personal note for today's issue…\n\nUse blank lines to create new paragraphs."}
+                  placeholder={"Add a personal note for today's issue…\n\nUse blank lines to create new paragraphs. Paste a link and it becomes clickable, or write [link text](https://example.com)."}
                   className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-y"
                 />
               </div>

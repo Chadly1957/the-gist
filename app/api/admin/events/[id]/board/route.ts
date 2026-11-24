@@ -1,25 +1,28 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getAdminSession } from "@/lib/auth";
-import { boardRunDays, validateBoardPostInput } from "@/lib/board";
+import { boardRunDays, clampBoardRunWeeks, validateBoardPostInput } from "@/lib/board";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = prisma as any;
 
 export const dynamic = "force-dynamic";
 
-// Admin event -> Community Board upgrade (free, 7 days): create a Board
-// post from an event, auto-approved like a paid post once payment
+// Admin event -> Community Board upgrade (free, 1 to 4 weeks): create a
+// Board post from an event, auto-approved like a paid post once payment
 // clears, but with no Stripe checkout and $0. The post is live
-// immediately for one week (BOARD_RUN_DAYS * 1). Idempotent per event:
-// an event already on the Board returns its existing post instead of
-// stacking a duplicate.
+// immediately for the chosen run length (BOARD_RUN_DAYS * runWeeks).
+// Idempotent per event: an event already on the Board returns its
+// existing post instead of stacking a duplicate.
 export async function POST(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
   const session = await getAdminSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const body = await req.json().catch(() => ({}));
+  const runWeeks = clampBoardRunWeeks((body as Record<string, unknown>)?.runWeeks);
 
   const event = await db.event.findUnique({
     where: { id: params.id },
@@ -70,7 +73,7 @@ export async function POST(
     contactInfo: event.location ?? "",
     displayName: String(event.sponsor?.businessName ?? "").slice(0, 40),
     email,
-    runWeeks: 1,
+    runWeeks,
   });
   if ("error" in validated) {
     return NextResponse.json({ error: validated.error }, { status: 400 });
@@ -90,10 +93,10 @@ export async function POST(
       email: input.email,
       status: "active",
       amountCents: 0,
-      runWeeks: 1,
+      runWeeks,
       paidAt: now,
       approvedAt: now,
-      expiresAt: new Date(now.getTime() + boardRunDays(1) * 24 * 60 * 60 * 1000),
+      expiresAt: new Date(now.getTime() + boardRunDays(runWeeks) * 24 * 60 * 60 * 1000),
       eventId: event.id,
     },
   });

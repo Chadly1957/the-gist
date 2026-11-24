@@ -28,6 +28,7 @@ const STATUS_COLORS: Record<string, string> = {
   pending_approval: "bg-amber-100 text-amber-800",
   active: "bg-green-100 text-green-800",
   rejected: "bg-red-100 text-red-800",
+  expired: "bg-gray-100 text-gray-600",
 };
 
 function fmt(d: string | null): string {
@@ -51,9 +52,10 @@ export default function BoardAdminPage() {
     load();
   }, []);
 
-  async function act(id: string, action: "approve" | "reject") {
+  async function act(id: string, action: "approve" | "reject" | "reup") {
     setNotice("");
     const target = posts.find((p) => p.id === id);
+    if (action === "reup" && target && !confirm(`Re-up "${target.title}" for another 7 days, free?`)) return;
     const paidLabel = target ? `$${(target.amountCents / 100).toFixed(0)}` : "the payment";
     const res = await workspaceFetch("/api/admin/board", {
       method: "PATCH",
@@ -73,6 +75,8 @@ export default function BoardAdminPage() {
       );
     } else if (action === "reject") {
       setNotice(`Post rejected and ${paidLabel} was refunded.`);
+    } else if (action === "reup") {
+      setNotice("Post re-upped: it runs for another 7 days in the newsletter and on the Board page.");
     } else {
       setNotice(
         `Post approved: it runs for ${target ? boardRunWeeksLabel(target.runWeeks || 1) : "1 week"} in the newsletter and on the Board page.`
@@ -107,15 +111,18 @@ export default function BoardAdminPage() {
         <p className="text-gray-400 text-sm py-8 text-center">No board posts yet.</p>
       ) : (
         <div className="space-y-4">
-          {posts.map((p) => (
+          {posts.map((p) => {
+            const isExpired =
+              p.status === "active" && !!p.expiresAt && new Date(p.expiresAt).getTime() < Date.now();
+            return (
             <div key={p.id} className="bg-white border border-gray-200 rounded-2xl p-5">
               <div className="flex items-start justify-between gap-3 mb-2">
                 <div>
                   <p className="font-bold text-gray-900">{p.title}</p>
                   <p className="text-sm text-gray-600 mt-1">{p.description}</p>
                 </div>
-                <span className={`shrink-0 text-xs font-semibold px-2.5 py-1 rounded-full ${STATUS_COLORS[p.status] || "bg-gray-100 text-gray-600"}`}>
-                  {p.status}
+                <span className={`shrink-0 text-xs font-semibold px-2.5 py-1 rounded-full ${STATUS_COLORS[isExpired ? "expired" : p.status] || "bg-gray-100 text-gray-600"}`}>
+                  {isExpired ? "Expired" : p.status}
                 </span>
               </div>
               <p className="text-xs text-gray-500">
@@ -142,6 +149,14 @@ export default function BoardAdminPage() {
                       Approve (start {boardRunWeeksLabel(p.runWeeks || 1)} run)
                     </button>
                   )}
+                  {isExpired && (
+                    <button
+                      onClick={() => act(p.id, "reup")}
+                      className="bg-green-700 hover:bg-green-800 text-white text-sm font-semibold px-4 py-2 rounded-lg"
+                    >
+                      Re-up (run again · 7 days)
+                    </button>
+                  )}
                   <button
                     onClick={() => act(p.id, "reject")}
                     className="border border-gray-200 hover:bg-gray-50 text-gray-700 text-sm font-semibold px-4 py-2 rounded-lg"
@@ -151,7 +166,8 @@ export default function BoardAdminPage() {
                 </div>
               )}
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

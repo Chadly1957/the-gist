@@ -2,6 +2,7 @@
 import { WorkspaceAnchor } from "@/components/workspace/WorkspaceLink";
 
 import { workspaceFetch } from "@/lib/workspace-client";
+import { BOARD_RUN_WEEK_OPTIONS, boardRunWeeksLabel } from "@/lib/board-constants";
 
 import { useEffect, useState } from "react";
 import UrlInput from "@/components/UrlInput";
@@ -65,7 +66,8 @@ export default function AdminEventsPage() {
   const [scrapeWarnings, setScrapeWarnings] = useState<string[]>([]);
   const [scrapeFound, setScrapeFound] = useState<Record<string, boolean>>({});
   const [boardSaving, setBoardSaving] = useState(false);
-  const [boardResult, setBoardResult] = useState<{ eventId: string; postId: string; expiresAt: string; already: boolean } | null>(null);
+  const [boardWeeks, setBoardWeeks] = useState(1);
+  const [boardResult, setBoardResult] = useState<{ eventId: string; postId: string; expiresAt: string; already: boolean; weeks: number } | null>(null);
   const [boardError, setBoardError] = useState<{ eventId: string; message: string } | null>(null);
 
   async function load() {
@@ -93,22 +95,26 @@ export default function AdminEventsPage() {
     await load();
   }
 
-  // Free Community Board upgrade: create a $0, 7-day Board post from
-  // this event (auto-approved, no Stripe). Shows the created post with
-  // a link to view it on /board.
+  // Free Community Board upgrade: create a $0 Board post from
+  // this event (auto-approved, no Stripe) for the chosen run length.
+  // Shows the created post with a link to view it on /board.
   async function addToBoard(ev: Event) {
-    if (!confirm(`Add "${ev.title}" to the Community Board for free? It will run for 7 days.`)) return;
+    if (!confirm(`Add "${ev.title}" to the Community Board for free? It will run for ${boardRunWeeksLabel(boardWeeks)}.`)) return;
     setBoardSaving(true);
     setBoardError(null);
     setBoardResult(null);
-    const res = await workspaceFetch(`/api/admin/events/${ev.id}/board`, { method: "POST" });
+    const res = await workspaceFetch(`/api/admin/events/${ev.id}/board`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ runWeeks: boardWeeks }),
+    });
     const data = await res.json().catch(() => ({}));
     setBoardSaving(false);
     if (!res.ok) {
       setBoardError({ eventId: ev.id, message: data.error || "Could not add this event to the Board." });
       return;
     }
-    setBoardResult({ eventId: ev.id, postId: data.post.id, expiresAt: data.post.expiresAt, already: data.already });
+    setBoardResult({ eventId: ev.id, postId: data.post.id, expiresAt: data.post.expiresAt, already: data.already, weeks: boardWeeks });
     await load();
   }
 
@@ -463,16 +469,28 @@ export default function AdminEventsPage() {
                               On the Board ✓
                             </WorkspaceAnchor>
                           ) : (
-                            <button onClick={() => addToBoard(ev)} disabled={boardSaving}
-                              className="px-3 py-1.5 bg-rose-600 text-white rounded-lg text-xs font-semibold hover:bg-rose-700 disabled:opacity-50">
-                              {boardSaving ? "Adding…" : "Add to Board — Free · 7 days"}
-                            </button>
+                            <span className="inline-flex items-center gap-1.5">
+                              <select
+                                value={boardWeeks}
+                                onChange={(e) => setBoardWeeks(Number(e.target.value))}
+                                aria-label="Board run length"
+                                className="px-2 py-1.5 border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 bg-white"
+                              >
+                                {BOARD_RUN_WEEK_OPTIONS.map((w) => (
+                                  <option key={w} value={w}>{boardRunWeeksLabel(w)}</option>
+                                ))}
+                              </select>
+                              <button onClick={() => addToBoard(ev)} disabled={boardSaving}
+                                className="px-3 py-1.5 bg-rose-600 text-white rounded-lg text-xs font-semibold hover:bg-rose-700 disabled:opacity-50">
+                                {boardSaving ? "Adding…" : `Add to Board — Free · ${boardRunWeeksLabel(boardWeeks)}`}
+                              </button>
+                            </span>
                           )
                         )}
                       </div>
                       {boardResult && boardResult.eventId === ev.id && (
                         <p className="text-xs text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
-                          {boardResult.already ? "Already on the Board." : "Added to the Community Board — free, runs 7 days."}{" "}
+                          {boardResult.already ? "Already on the Board." : `Added to the Community Board — free, runs ${boardRunWeeksLabel(boardResult.weeks)}.`}{" "}
                           <WorkspaceAnchor href="/board" className="underline font-semibold">View it on the Board →</WorkspaceAnchor>
                           {boardResult.expiresAt && ` (runs until ${new Date(boardResult.expiresAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })})`}
                         </p>

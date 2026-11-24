@@ -37,17 +37,19 @@ export async function GET() {
   return NextResponse.json({ posts });
 }
 
-// PATCH /api/admin/board { id, action: "approve" | "reject" }
+// PATCH /api/admin/board { id, action: "approve" | "reject" | "reup" }
 // Approve starts the post's run (its purchased weeks) now. Reject refunds
 // what the buyer paid (when a payment
 // intent is on file) and marks the post rejected; a failed refund still
 // rejects but reports it so it can be refunded manually in Stripe.
+// Re-up restarts an expired post for a fresh free 7-day run from today:
+// only on Chad's click, never automatic.
 export async function PATCH(req: NextRequest) {
   const session = await getAdminSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const workspace = await getWorkspace();
   const { id, action } = await req.json().catch(() => ({}));
-  if (!id || (action !== "approve" && action !== "reject")) {
+  if (!id || (action !== "approve" && action !== "reject" && action !== "reup")) {
     return NextResponse.json({ error: "Post id and a valid action are required." }, { status: 400 });
   }
   const post = await prisma.boardPost.findFirst({
@@ -65,6 +67,22 @@ export async function PATCH(req: NextRequest) {
     const updated = await prisma.boardPost.update({
       where: { id: post.id },
       data: { status: "active", approvedAt, expiresAt },
+    });
+    return NextResponse.json({ post: updated });
+  }
+
+  if (action === "reup") {
+    if (post.status !== "active") {
+      return NextResponse.json({ error: "Only posts on the Board can be re-upped." }, { status: 400 });
+    }
+    if (post.expiresAt && new Date(post.expiresAt) > new Date()) {
+      return NextResponse.json({ error: "This post is still running. Only expired posts can be re-upped." }, { status: 400 });
+    }
+    const approvedAt = new Date();
+    const expiresAt = new Date(approvedAt.getTime() + boardRunDays(1) * 24 * 60 * 60 * 1000);
+    const updated = await prisma.boardPost.update({
+      where: { id: post.id },
+      data: { status: "active", approvedAt, expiresAt, runWeeks: 1 },
     });
     return NextResponse.json({ post: updated });
   }
