@@ -58,8 +58,10 @@ export async function GET() {
       take: 5,
       select: { id: true, businessName: true, createdAt: true },
     }),
-    // Public-form event submissions land as "pending" with no other
-    // signal; soonest event first so overdue ones surface at the top.
+    // Pending events are legacy only: new submissions auto-approve since
+    // Nov 24, 2026, so rows still pending here are ones Chad has not
+    // reviewed or deleted yet. Soonest event first so overdue ones
+    // surface at the top.
     prisma.event.findMany({
       where: { workspaceId: wid, status: "pending" },
       orderBy: { eventDate: "asc" },
@@ -104,8 +106,9 @@ export async function GET() {
     eventItems: pendingEvents.map((e) => ({ id: e.id, label: e.title, createdAt: e.createdAt })),
     recentProfiles,
     // Board posts are informational only (they auto-approve), so they
-    // never count toward the attention badge. Pending events do count:
-    // a human has to approve them before they can run.
+    // never count toward the attention badge. Pending events still count
+    // while any legacy pending rows remain: Chad has to approve or
+    // delete them before they can run (new submissions auto-approve).
     total: sponsorPending + ordersUnfulfilled + eventsPending,
   });
 }
