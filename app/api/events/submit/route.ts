@@ -8,9 +8,9 @@ const db = prisma as any;
 export const dynamic = "force-dynamic";
 
 // POST /api/events/submit — public event creation, same fields as the
-// sponsor portal form. Unlike sponsor events (auto-approved for known
-// businesses), public submissions land as "pending" for admin review in
-// /admin/events before they can run in the newsletter calendar.
+// sponsor portal form. Since Nov 24, 2026 (Chad's call) every submission
+// is auto-approved: it goes straight on the calendar and into the
+// newsletter pool like sponsor and admin events. No admin review step.
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
   const str = (v: unknown, max: number) =>
@@ -43,7 +43,8 @@ export async function POST(req: NextRequest) {
       location,
       url,
       cost,
-      status: "pending",
+      status: "approved",
+      approvedAt: new Date(),
       sponsorId: null,
     },
   });

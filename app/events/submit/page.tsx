@@ -6,8 +6,9 @@ import SiteHeader from "@/components/SiteHeader";
 import BoardBoostPrompt from "@/components/BoardBoostPrompt";
 
 // Public event submission: the same flow as the sponsor portal's event
-// form, minus the sponsor login. Submissions are pending until an admin
-// approves them, and the poster gets the same optional $5 Board boost.
+// form, minus the sponsor login. Submissions go live on the calendar
+// immediately (auto-approved since Nov 24, 2026), and the poster gets
+// the same optional $5 Board boost.
 export default function PublicEventSubmitPage() {
   const [form, setForm] = useState({ title: "", description: "", eventDate: "", startTime: "", endTime: "", location: "", url: "", cost: "" });
   const [submitting, setSubmitting] = useState(false);
@@ -55,8 +56,8 @@ export default function PublicEventSubmitPage() {
           <div className="text-center mb-8">
             <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight mb-2">Submit an Event</h1>
             <p className="text-sm text-gray-500 leading-relaxed">
-              Free. Events are reviewed before they run in the newsletter calendar, so
-              allow a day or two for approval.
+              Free. Your event goes live on the calendar right away and runs in
+              the newsletter calendar.
             </p>
           </div>
 
@@ -69,8 +70,8 @@ export default function PublicEventSubmitPage() {
             />
           ) : success ? (
             <div className="bg-green-50 border border-green-100 rounded-xl p-6 text-center">
-              <p className="text-green-800 font-semibold mb-1">Event submitted for review!</p>
-              <p className="text-sm text-green-600">We&apos;ll review it and include it in an upcoming newsletter calendar.</p>
+              <p className="text-green-800 font-semibold mb-1">Event submitted!</p>
+              <p className="text-sm text-green-600">It&apos;s live on the calendar now and will run in an upcoming newsletter calendar.</p>
               <div className="flex gap-3 justify-center mt-4">
                 <button onClick={() => setSuccess(false)} className="text-sm text-green-700 underline">Submit another event</button>
                 <Link href="/board" className="text-sm text-gray-500 underline">Back to the Board</Link>
@@ -176,10 +177,10 @@ export default function PublicEventSubmitPage() {
                 disabled={submitting}
                 className="w-full bg-green-700 hover:bg-green-800 disabled:opacity-60 text-white font-bold py-3 rounded-xl text-sm transition-colors"
               >
-                {submitting ? "Submitting…" : "Submit Event for Review"}
+                {submitting ? "Submitting…" : "Submit Event"}
               </button>
               <p className="text-xs text-gray-400 text-center">
-                Free to submit. After approval it runs in the newsletter calendar, and you can
+                Free to submit. It runs in the newsletter calendar right away, and you can
                 optionally add it to the Gist Board for $5.
               </p>
             </form>
