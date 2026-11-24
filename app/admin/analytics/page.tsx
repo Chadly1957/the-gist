@@ -81,6 +81,7 @@ interface OverviewData {
   };
   segments: Record<string, number>;
   acquisition: { label: string; count: number }[];
+  qrScans: { code: string; label: string; last30d: number; allTime: number }[];
   topLinks: { url: string; label: string; type: string; clicks: number }[];
   trend: { subject: string; sentAt: string; opens: number; clicks: number; recipients: number }[];
   topReaders: OverviewReader[];
@@ -455,6 +456,28 @@ export default function AnalyticsPage() {
                         <span className="font-semibold text-gray-900 shrink-0">{l.clicks} clicks</span>
                       </div>
                     ))}
+                  </div>
+                )}
+              </div>
+              <div className="bg-white rounded-xl border border-gray-200 p-5 lg:col-span-2">
+                <p className="text-sm font-semibold text-gray-800 mb-3">QR scans</p>
+                {ovLoading || !overview ? (
+                  <p className="text-sm text-gray-400">Loading…</p>
+                ) : (overview.qrScans ?? []).length === 0 ? (
+                  <p className="text-sm text-gray-400">No QR scans logged yet.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {(overview.qrScans ?? []).map((q) => (
+                      <div key={q.code} className="flex items-center justify-between text-sm gap-3">
+                        <span className="text-gray-700 truncate">{q.label}</span>
+                        <span className="font-semibold text-gray-900 shrink-0">
+                          {q.last30d.toLocaleString()} last 30d · {q.allTime.toLocaleString()} all time
+                        </span>
+                      </div>
+                    ))}
+                    <p className="text-xs text-gray-400 pt-1">
+                      One count per page open from the two printed QR codes (Dinner Club flyer, homepage banner). A scan that never opens the page is not counted.
+                    </p>
                   </div>
                 )}
               </div>

@@ -1,11 +1,39 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, NextFetchEvent } from "next/server";
 import { jwtVerify } from "jose";
 import { pathWorkspace } from "./lib/workspace-constants";
+import { matchQrCode } from "./lib/qr-scan";
 const SECRET = new TextEncoder().encode(process.env.JWT_SECRET || "dev-secret-change-in-production-32chars");
 
-export async function middleware(req: NextRequest) {
+export async function middleware(req: NextRequest, event: NextFetchEvent) {
   const scoped = pathWorkspace(req.nextUrl.pathname);
   const pathname = scoped?.pathname || req.nextUrl.pathname;
+  // QR scan logging (2026-11-24): a printed QR code that matches one of the
+  // two tracked codes logs one hit per page open, in the background. The
+  // log call never blocks or breaks the page: failures are swallowed.
+  const qr = matchQrCode(pathname, req.nextUrl.searchParams);
+  if (qr) {
+    event.waitUntil(
+      fetch(`${req.nextUrl.origin}/api/qr-scan`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          accept: "application/json",
+          "accept-language": "en-US,en;q=0.9",
+          // Cloudflare fronts the public domains and blocks non-browser
+          // user agents, so the internal log call identifies as a browser.
+          "user-agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+        },
+        body: JSON.stringify({
+          code: qr.code,
+          utmSource: qr.utmSource,
+          utmMedium: qr.utmMedium,
+          utmCampaign: qr.utmCampaign,
+          userAgent: req.headers.get("user-agent") || "",
+        }),
+      }).catch(() => undefined)
+    );
+  }
   const requestHeaders = new Headers(req.headers);
   // Never trust a caller-supplied scope. It comes only from the URL.
   requestHeaders.delete("x-gist-workspace");
