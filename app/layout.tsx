@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Script from "next/script";
+import { Analytics } from "@vercel/analytics/react";
 import { headers } from "next/headers";
 import { getWorkspace } from "@/lib/workspace";
 import { WorkspaceProvider } from "@/components/workspace/WorkspaceProvider";
@@ -23,5 +24,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         (it ships in page source), so it is inlined rather than env-gated. */}
     <Script id="meta-pixel" strategy="afterInteractive">{`!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window, document,'script','https://connect.facebook.net/en_US/fbevents.js');fbq('init', '1151230177367290');fbq('track', 'PageView');`}</Script>
     <noscript><img height="1" width="1" style={{ display: "none" }} src="https://www.facebook.com/tr?id=1151230177367290&ev=PageView&noscript=1" alt="" /></noscript>
+    {/* Vercel Web Analytics (Vercel's own product, cookieless, no Google):
+        pageviews / top pages / referrers for both workspaces. Free tier:
+        50,000 events/mo, 1-month reporting window, collection pauses at the
+        limit. No custom events, no Speed Insights, no paid add-ons. */}
+    <Analytics />
     <WorkspaceProvider workspace={workspace} prefix={prefix}>{children}</WorkspaceProvider></body></html>;
 }
