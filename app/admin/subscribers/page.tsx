@@ -50,7 +50,7 @@ export default function ListsPage() {
 
   const [search, setSearch] = useState("");
   const [importing, setImporting] = useState(false);
-  const [importResult, setImportResult] = useState<{ imported: number; skipped: number; issueSent?: number } | null>(null);
+  const [importResult, setImportResult] = useState<{ imported: number; skipped: number; welcomeSent?: number } | null>(null);
   const [importError, setImportError] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
   const [sendingLatest, setSendingLatest] = useState(false);
@@ -360,7 +360,7 @@ export default function ListsPage() {
         <div className="mb-4 p-3 bg-green-50 border border-green-100 rounded-lg text-sm text-green-700">
           Import complete: <strong>{importResult.imported}</strong> added
           {importResult.skipped > 0 && `, ${importResult.skipped} skipped (duplicates or invalid)`}
-          {importResult.issueSent ? ` · latest issue sending to ${importResult.issueSent} new subscriber${importResult.issueSent === 1 ? "" : "s"}` : ""}
+          {importResult.welcomeSent ? ` · welcome email sending to ${importResult.welcomeSent} new subscriber${importResult.welcomeSent === 1 ? "" : "s"}` : ""}
         </div>
       )}
       {latestResult && (
